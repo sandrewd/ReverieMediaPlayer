@@ -1,51 +1,31 @@
 import QtQuick
-import QtQuick.Shapes
 
-// The Reverie mark: a 3:2 Lissajous figure, the shape audio makes on an XY oscilloscope.
+// The Reverie mark, rendered from the shipped gradient master.
 //
-// Drawn parametrically rather than loaded from brand/reverie-mark.svg on purpose. That file
-// uses stroke="currentColor", and Qt's SVG renderer implements a subset of SVG 1.2 Tiny which
-// does not resolve it — an Image would come out unthemed. Generating the path here also binds
-// strokeColor straight to the palette, so the in-app mark follows the user's accent live,
-// stays resolution-independent, and could animate a draw-on later via strokeDashOffset.
+// Deliberately NOT themed. BRANDING.md §4 proposed that the in-app mark follow the user's
+// accent; that was overruled — the mark is identity, and identity should not change with the
+// user's colour choices. Keeping it static also means the in-app mark and the launcher icon
+// are provably the same artwork rather than two things kept in agreement by hand.
 //
-// The launcher icon is a separate, fixed-colour asset and must never be themed this way.
+// Because it no longer needs a live colour binding there is no reason to redraw the curve
+// parametrically: the scalable icon carries a real linearGradient — not currentColor, which
+// Qt's SVG renderer would refuse to resolve — so it renders correctly as an ordinary Image.
 Item {
     id: root
 
-    // Master grid is 64 units: centre (32,32), radius 23, stroke 5.0.
-    property color color: Theme.accent
-    property real strokeScale: 1.0
-    readonly property real unit: Math.min(width, height) / 64
-
+    // An Item wrapper, because Image takes its implicit size from its source and will not
+    // accept one being set.
     implicitWidth: 64
     implicitHeight: 64
 
-    Shape {
+    Image {
         anchors.fill: parent
-        antialiasing: true
-        // Curve quality matters more than fill here; the mark is a single open stroke.
-        ShapePath {
-            strokeColor: root.color
-            strokeWidth: Math.max(1, 5.0 * root.unit * root.strokeScale)
-            fillColor: "transparent"
-            capStyle: ShapePath.RoundCap
-            joinStyle: ShapePath.RoundJoin
-
-            PathPolyline {
-                path: {
-                    const points = []
-                    const u = root.unit
-                    const cx = 32 * u, cy = 32 * u, r = 23 * u
-                    const segments = 240
-                    for (let i = 0; i <= segments; ++i) {
-                        const t = (i / segments) * 2 * Math.PI
-                        points.push(Qt.point(cx + r * Math.sin(3 * t),
-                                             cy + r * Math.sin(2 * t + Math.PI / 2)))
-                    }
-                    return points
-                }
-            }
-        }
+        source: "qrc:/branding/scalable/apps/reverie.svg"
+        // Rasterised at the displayed size rather than scaled from a default, so the stroke
+        // stays crisp wherever the mark is used.
+        sourceSize.width: Math.max(16, Math.round(root.width))
+        sourceSize.height: Math.max(16, Math.round(root.height))
+        fillMode: Image.PreserveAspectFit
+        smooth: true
     }
 }

@@ -301,10 +301,6 @@ ApplicationWindow {
                         Layout.alignment: Qt.AlignHCenter
                         Layout.preferredWidth: 96
                         Layout.preferredHeight: 96
-                        // Over the visualiser area, so it uses the overlay tokens rather than
-                        // the accent, which could be any colour against black.
-                        color: Theme.overlayTextDim
-                        opacity: 0.7
                     }
                     Label {
                         Layout.alignment: Qt.AlignHCenter

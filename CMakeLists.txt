@@ -23,7 +23,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Quick OpenGL DBus)
+find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Quick OpenGL DBus Svg)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GST REQUIRED IMPORTED_TARGET
     gstreamer-1.0 gstreamer-app-1.0 gstreamer-audio-1.0 gstreamer-tag-1.0)
@@ -104,6 +104,7 @@ qt_add_resources(player "branding"
         assets/share/icons/hicolor/64x64/apps/reverie.png
         assets/share/icons/hicolor/128x128/apps/reverie.png
         assets/share/icons/hicolor/256x256/apps/reverie.png
+        assets/share/icons/hicolor/scalable/apps/reverie.svg
 )
 
 qt_add_qml_module(player
@@ -138,6 +139,7 @@ target_link_libraries(player PRIVATE
     Qt6::Quick
     Qt6::OpenGL
     Qt6::DBus
+    Qt6::Svg
     PkgConfig::GST
     PkgConfig::TAGLIB
     libprojectM::projectM
