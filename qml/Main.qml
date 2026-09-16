@@ -86,6 +86,19 @@ ApplicationWindow {
         menu.width = Math.max(minimum, Math.min(maximum, widest + 44))
     }
 
+    // Editing a colour while some other theme is active looked like nothing happening, so
+    // choosing one switches to the custom theme rather than quietly storing it for later.
+    function applyCustomColour(role, picked) {
+        switch (role) {
+        case "background": SystemTheme.customBackground = picked; break
+        case "surface":    SystemTheme.customSurface = picked; break
+        case "accent":     SystemTheme.customAccent = picked; break
+        case "text":       SystemTheme.customText = picked; break
+        }
+        if (SystemTheme.preference !== SystemTheme.Custom)
+            SystemTheme.preference = SystemTheme.Custom
+    }
+
     function playIndex(index) {
         if (index < 0 || index >= PlaylistModel.count)
             return
@@ -463,27 +476,48 @@ ApplicationWindow {
         }
         Menu {
             title: qsTr("Appearance")
+
+            // A ButtonGroup makes these genuinely exclusive: clicking the active one cannot
+            // leave the group with nothing selected, which is what happened when they were
+            // four independent checkboxes. It also stops QML breaking the `checked` binding
+            // on click - assigning to checked detaches it, and setting the preference to the
+            // value it already held emitted no change to restore it.
+            ButtonGroup { id: appearanceGroup }
+
             MenuItem {
                 text: qsTr("Follow system theme")
                 checkable: true
+                ButtonGroup.group: appearanceGroup
                 checked: SystemTheme.preference === SystemTheme.FollowSystem
                 onTriggered: SystemTheme.preference = SystemTheme.FollowSystem
             }
             MenuItem {
                 text: qsTr("Always dark")
                 checkable: true
+                ButtonGroup.group: appearanceGroup
                 checked: SystemTheme.preference === SystemTheme.AlwaysDark
                 onTriggered: SystemTheme.preference = SystemTheme.AlwaysDark
             }
             MenuItem {
                 text: qsTr("Always light")
                 checkable: true
+                ButtonGroup.group: appearanceGroup
                 checked: SystemTheme.preference === SystemTheme.AlwaysLight
                 onTriggered: SystemTheme.preference = SystemTheme.AlwaysLight
             }
+            MenuItem {
+                text: qsTr("My own colours")
+                checkable: true
+                ButtonGroup.group: appearanceGroup
+                checked: SystemTheme.preference === SystemTheme.Custom
+                onTriggered: {
+                    SystemTheme.preference = SystemTheme.Custom
+                    themeDialog.open()
+                }
+            }
             MenuSeparator {}
             MenuItem {
-                text: qsTr("Choose my own colours…")
+                text: qsTr("Edit my colours…")
                 onTriggered: themeDialog.open()
             }
         }
@@ -552,58 +586,32 @@ ApplicationWindow {
                 font.pixelSize: 11
             }
 
-            Repeater {
-                model: [
-                    { key: "customBackground", label: qsTr("Background") },
-                    { key: "customSurface",    label: qsTr("Panels") },
-                    { key: "customAccent",     label: qsTr("Highlight") },
-                    { key: "customText",       label: qsTr("Text") }
-                ]
-                delegate: RowLayout {
-                    required property var modelData
-                    Layout.fillWidth: true
-                    spacing: 8
-
-                    Label {
-                        text: modelData.label
-                        color: Theme.text
-                        font.pixelSize: 12
-                        Layout.preferredWidth: 92
-                    }
-
-                    // The swatch opens the platform colour chooser, which carries its own
-                    // palette; the field beside it takes a hex value directly, so neither
-                    // route depends on the other.
-                    Rectangle {
-                        implicitWidth: 40
-                        implicitHeight: 26
-                        radius: 4
-                        color: SystemTheme[modelData.key]
-                        border.color: Theme.border
-                        border.width: 1
-                        TapHandler {
-                            onTapped: {
-                                colourPicker.targetKey = modelData.key
-                                colourPicker.selectedColor = SystemTheme[modelData.key]
-                                colourPicker.open()
-                            }
-                        }
-                    }
-
-                    TextField {
-                        Layout.fillWidth: true
-                        text: String(SystemTheme[modelData.key]).toUpperCase()
-                        font.family: "monospace"
-                        font.pixelSize: 12
-                        selectByMouse: true
-                        inputMask: ">\\#HHHHHH;_"
-                        onEditingFinished: {
-                            const value = text.trim()
-                            if (/^#[0-9A-Fa-f]{6}$/.test(value))
-                                SystemTheme[modelData.key] = value
-                        }
-                    }
-                }
+            // Written out one per role rather than generated from a list of property names:
+            // a dynamic lookup like SystemTheme[key] does not register as a binding
+            // dependency, so those rows never updated when the value changed.
+            ColourRow {
+                Layout.fillWidth: true
+                label: qsTr("Background")
+                colour: SystemTheme.customBackground
+                onColourPicked: function(picked) { root.applyCustomColour("background", picked) }
+            }
+            ColourRow {
+                Layout.fillWidth: true
+                label: qsTr("Panels")
+                colour: SystemTheme.customSurface
+                onColourPicked: function(picked) { root.applyCustomColour("surface", picked) }
+            }
+            ColourRow {
+                Layout.fillWidth: true
+                label: qsTr("Highlight")
+                colour: SystemTheme.customAccent
+                onColourPicked: function(picked) { root.applyCustomColour("accent", picked) }
+            }
+            ColourRow {
+                Layout.fillWidth: true
+                label: qsTr("Text")
+                colour: SystemTheme.customText
+                onColourPicked: function(picked) { root.applyCustomColour("text", picked) }
             }
 
             RowLayout {
@@ -624,11 +632,6 @@ ApplicationWindow {
             }
         }
 
-        ColorDialog {
-            id: colourPicker
-            property string targetKey: ""
-            onAccepted: if (targetKey !== "") SystemTheme[targetKey] = selectedColor
-        }
     }
 
     Dialog {
@@ -752,6 +755,14 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 placeholderText: qsTr("http://example.com:8000/stream")
                 selectByMouse: true
+                color: Theme.text
+                placeholderTextColor: Theme.textDim
+                background: Rectangle {
+                    color: Theme.surfaceHigh
+                    border.color: urlField.activeFocus ? Theme.accent : Theme.border
+                    border.width: 1
+                    radius: 3
+                }
                 onAccepted: if (streamDialog.acceptable) streamDialog.accept()
             }
             Label {
@@ -764,6 +775,14 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 placeholderText: qsTr("Leave blank to use the address")
                 selectByMouse: true
+                color: Theme.text
+                placeholderTextColor: Theme.textDim
+                background: Rectangle {
+                    color: Theme.surfaceHigh
+                    border.color: nameField.activeFocus ? Theme.accent : Theme.border
+                    border.width: 1
+                    radius: 3
+                }
                 onAccepted: if (streamDialog.acceptable) streamDialog.accept()
             }
             Label {

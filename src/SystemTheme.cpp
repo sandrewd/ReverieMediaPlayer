@@ -13,14 +13,19 @@ SystemTheme::SystemTheme(QObject *parent)
     QSettings settings;
     m_preference = static_cast<Preference>(
         settings.value(QStringLiteral("appearance/preference"), int(FollowSystem)).toInt());
-    m_customBackground = settings.value(QStringLiteral("appearance/background"),
-                                        QColor("#0f1115")).value<QColor>();
-    m_customSurface = settings.value(QStringLiteral("appearance/surface"),
-                                     QColor("#171a21")).value<QColor>();
-    m_customAccent = settings.value(QStringLiteral("appearance/accent"),
-                                    QColor("#4da3ff")).value<QColor>();
-    m_customText = settings.value(QStringLiteral("appearance/text"),
-                                  QColor("#e8eaed")).value<QColor>();
+    const auto readColour = [&settings](const char *key, const char *fallback) {
+        // Accepts both the "#rrggbb" we write now and a QVariant-serialised QColor from an
+        // older settings file.
+        const QVariant stored = settings.value(QLatin1String(key));
+        if (stored.typeId() == QMetaType::QColor)
+            return stored.value<QColor>();
+        const QColor parsed(stored.toString());
+        return parsed.isValid() ? parsed : QColor(QLatin1String(fallback));
+    };
+    m_customBackground = readColour("appearance/background", "#0f1115");
+    m_customSurface = readColour("appearance/surface", "#171a21");
+    m_customAccent = readColour("appearance/accent", "#4da3ff");
+    m_customText = readColour("appearance/text", "#e8eaed");
 
     if (qApp) {
         m_platformPalette = qApp->palette();
@@ -139,7 +144,7 @@ void SystemTheme::setCustomBackground(const QColor &colour)
     if (!colour.isValid() || colour == m_customBackground)
         return;
     m_customBackground = colour;
-    QSettings().setValue(QStringLiteral("appearance/background"), colour);
+    QSettings().setValue(QStringLiteral("appearance/background"), colour.name());
     applyPalette();
     emit customChanged();
     emit darkChanged();
@@ -150,7 +155,7 @@ void SystemTheme::setCustomSurface(const QColor &colour)
     if (!colour.isValid() || colour == m_customSurface)
         return;
     m_customSurface = colour;
-    QSettings().setValue(QStringLiteral("appearance/surface"), colour);
+    QSettings().setValue(QStringLiteral("appearance/surface"), colour.name());
     applyPalette();
     emit customChanged();
 }
@@ -160,7 +165,7 @@ void SystemTheme::setCustomAccent(const QColor &colour)
     if (!colour.isValid() || colour == m_customAccent)
         return;
     m_customAccent = colour;
-    QSettings().setValue(QStringLiteral("appearance/accent"), colour);
+    QSettings().setValue(QStringLiteral("appearance/accent"), colour.name());
     applyPalette();
     emit customChanged();
 }
@@ -170,7 +175,7 @@ void SystemTheme::setCustomText(const QColor &colour)
     if (!colour.isValid() || colour == m_customText)
         return;
     m_customText = colour;
-    QSettings().setValue(QStringLiteral("appearance/text"), colour);
+    QSettings().setValue(QStringLiteral("appearance/text"), colour.name());
     applyPalette();
     emit customChanged();
 }

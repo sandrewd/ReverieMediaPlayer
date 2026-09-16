@@ -70,6 +70,7 @@ qt_add_qml_module(player
         qml/IconButton.qml
         qml/TransportBar.qml
         qml/PlaylistPanel.qml
+        qml/ColourRow.qml
 )
 
 target_include_directories(player PRIVATE src)
