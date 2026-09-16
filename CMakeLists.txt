@@ -5,7 +5,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Quick OpenGL)
+find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Quick OpenGL DBus)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GST REQUIRED IMPORTED_TARGET
+    gstreamer-1.0 gstreamer-app-1.0 gstreamer-audio-1.0 gstreamer-tag-1.0)
+pkg_check_modules(TAGLIB REQUIRED IMPORTED_TARGET taglib)
 qt_standard_project_setup(REQUIRES 6.4)
 
 # projectM is vendored and built into build/projectm-install (see README).
@@ -36,12 +40,26 @@ qt_add_executable(player
     src/main.cpp
     src/ProjectMItem.cpp
     src/ProjectMItem.h
+    src/AudioEngine.cpp
+    src/AudioEngine.h
+    src/AudioRingBuffer.h
+    src/PlaylistModel.cpp
+    src/PlaylistModel.h
+    src/MprisAdaptor.cpp
+    src/MprisAdaptor.h
 )
+
+set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 qt_add_qml_module(player
     URI Player
     VERSION 1.0
-    QML_FILES qml/main.qml
+    QML_FILES
+        qml/Main.qml
+        qml/Theme.qml
+        qml/IconButton.qml
+        qml/TransportBar.qml
+        qml/PlaylistPanel.qml
 )
 
 target_include_directories(player PRIVATE src)
@@ -53,5 +71,8 @@ endif()
 target_link_libraries(player PRIVATE
     Qt6::Quick
     Qt6::OpenGL
+    Qt6::DBus
+    PkgConfig::GST
+    PkgConfig::TAGLIB
     libprojectM::projectM
 )

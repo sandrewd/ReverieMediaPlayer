@@ -3,6 +3,13 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
+#include <QFileInfo>
+#include <QUrl>
+
+#include "PlaylistModel.h"
+#include "AudioEngine.h"
+#include "MprisAdaptor.h"
+
 #include <QSurfaceFormat>
 #include <QTimer>
 
@@ -21,7 +28,10 @@ int main(int argc, char *argv[])
     QSurfaceFormat::setDefaultFormat(format);
 
     QGuiApplication app(argc, argv);
-    app.setApplicationName("player-spike");
+    // QSettings and QStandardPaths both key off these, so the persistence toggle and the
+    // saved session live under ~/.config/player and ~/.local/share/player.
+    app.setOrganizationName("player");
+    app.setApplicationName("player");
 
     QCommandLineParser parser;
     parser.setApplicationDescription("Phase 0 spike: projectM inside QML's scene graph.");
@@ -34,6 +44,12 @@ int main(int argc, char *argv[])
     parser.addOption(scaleOption);
     parser.addOption(secondsOption);
     parser.addOption(captureOption);
+    QCommandLineOption autoplayOption("autoplay", "Start playing the first track immediately.");
+    parser.addOption(autoplayOption);
+    QCommandLineOption miniOption("mini", "Start in mini-player mode.");
+    parser.addOption(miniOption);
+    parser.addPositionalArgument("files", "Audio files or folders to add to the playlist.",
+                                 "[files...]");
     parser.process(app);
 
     QQmlApplicationEngine engine;
@@ -42,7 +58,7 @@ int main(int argc, char *argv[])
 
     // Qt 6.4 puts QML module resources under qrc:/<URI>/; the qrc:/qt/qml/<URI>/ layout
     // only arrives in 6.5. Noble ships 6.4.2, so this path is version-sensitive.
-    engine.load(QUrl(QStringLiteral("qrc:/Player/qml/main.qml")));
+    engine.load(QUrl(QStringLiteral("qrc:/Player/qml/Main.qml")));
     if (engine.rootObjects().isEmpty())
         return 1;
 
@@ -50,6 +66,53 @@ int main(int argc, char *argv[])
     // desktop stream, so the spike can run unattended and report on exit.
     // Grab what is actually composited. The frame timings say projectM is doing work;
     // they say nothing about whether a single pixel reaches the window.
+    // Files named on the command line go straight into the one playlist. This is also how
+    // a file manager's "Open with" reaches us.
+    auto *playlist = engine.singletonInstance<PlaylistModel *>(
+        qmlTypeId("Player", 1, 0, "PlaylistModel"));
+    auto *audio = engine.singletonInstance<AudioEngine *>(
+        qmlTypeId("Player", 1, 0, "AudioEngine"));
+    QObject *window = engine.rootObjects().first();
+
+    // Media keys arrive as MPRIS method calls, so next/previous have to go through the same
+    // QML entry points the buttons use rather than poking the engine directly - otherwise the
+    // playlist's idea of the current track drifts from what is actually playing.
+    auto *mpris = new MprisPlayer(audio, playlist, &app);
+    QObject::connect(mpris, &MprisPlayer::nextRequested, window,
+                     [window]() { QMetaObject::invokeMethod(window, "playNext"); });
+    QObject::connect(mpris, &MprisPlayer::previousRequested, window,
+                     [window]() { QMetaObject::invokeMethod(window, "playPrevious"); });
+    QObject::connect(mpris, &MprisPlayer::raiseRequested, window, [window]() {
+        QMetaObject::invokeMethod(window, "show");
+        QMetaObject::invokeMethod(window, "raise");
+    });
+    QObject::connect(mpris, &MprisPlayer::quitRequested, &app, &QGuiApplication::quit);
+    mpris->registerService();
+
+    const QStringList positional = parser.positionalArguments();
+    if (!positional.isEmpty()) {
+        {
+            QList<QUrl> files;
+            for (const QString &argument : positional) {
+                const QFileInfo info(argument);
+                if (info.isDir())
+                    playlist->addFolder(QUrl::fromLocalFile(info.absoluteFilePath()));
+                else
+                    files.append(QUrl::fromLocalFile(info.absoluteFilePath()));
+            }
+            if (!files.isEmpty())
+                playlist->addFiles(files);
+
+            if (parser.isSet(autoplayOption) && playlist->rowCount() > 0) {
+                QMetaObject::invokeMethod(engine.rootObjects().first(), "playIndex",
+                                          Q_ARG(QVariant, 0));
+            }
+        }
+    }
+
+    if (parser.isSet(miniOption))
+        window->setProperty("mini", true);
+
     const QString capturePath = parser.value(captureOption);
     if (!capturePath.isEmpty()) {
         auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());

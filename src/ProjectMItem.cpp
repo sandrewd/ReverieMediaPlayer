@@ -10,6 +10,9 @@
 
 #include <projectM-4/projectM.h>
 
+#include "AudioEngine.h"
+
+
 namespace {
 
 // Phase 0 has no audio pipeline yet, so the visualizer is driven by a synthetic tone:
@@ -72,6 +75,8 @@ public:
             invalidateFramebufferObject();
         }
 
+        m_ring = pmItem->audioEngine() ? pmItem->audioEngine()->ringBuffer() : nullptr;
+
         const QString wanted = pmItem->presetPath();
         if (wanted != m_presetPath) {
             m_presetPath = wanted;
@@ -95,7 +100,7 @@ public:
             }
         }
 
-        feedSyntheticAudio();
+        feedAudio();
 
         QElapsedTimer timer;
         timer.start();
@@ -159,6 +164,16 @@ public:
             }
         }
 
+        // Dump the offscreen buffer itself, before the scene graph upscales it. Comparing
+        // this against --capture separates projectM's output from our compositing.
+        static const QString dumpPath = qEnvironmentVariable("PLAYER_DUMP_FBO");
+        if (!dumpPath.isEmpty() && m_frameCount == 90) {
+            if (QOpenGLFramebufferObject *fbo = framebufferObject()) {
+                if (fbo->toImage().save(dumpPath))
+                    qInfo("dumped fbo to %s", qPrintable(dumpPath));
+            }
+        }
+
         static const bool probe = qEnvironmentVariableIsSet("PLAYER_PROBE");
         if (probe && m_frameCount % 30 == 0) {
             if (QOpenGLFramebufferObject *fbo = framebufferObject()) {
@@ -203,9 +218,17 @@ private:
                      qMax(16, qRound(itemSize.height() * m_renderScale)));
     }
 
-    void feedSyntheticAudio()
+    void feedAudio()
     {
         float samples[kSamplesPerFrame * 2];
+
+        // Real audio when the pipeline is delivering it; the synthetic sweep otherwise, so
+        // the visualiser is never a still image while the user is browsing a playlist.
+        if (m_ring && m_ring->readLatest(samples, kSamplesPerFrame)) {
+            projectm_pcm_add_float(m_pm, samples, kSamplesPerFrame, PROJECTM_STEREO);
+            return;
+        }
+
         const double sweep = 220.0 + 160.0 * std::sin(m_sweepPhase);
         m_sweepPhase += 0.01;
 
@@ -224,6 +247,7 @@ private:
 
     projectm_handle m_pm = nullptr;
     ProjectMItem *m_item = nullptr;
+    AudioRingBuffer *m_ring = nullptr;
     qreal m_renderScale = 0.5;
     QSize m_fboSize;
     QString m_presetPath;
@@ -270,6 +294,15 @@ void ProjectMItem::setPresetPath(const QString &path)
         return;
     m_presetPath = path;
     emit presetPathChanged();
+    update();
+}
+
+void ProjectMItem::setAudioEngine(AudioEngine *engine)
+{
+    if (engine == m_audioEngine)
+        return;
+    m_audioEngine = engine;
+    emit audioEngineChanged();
     update();
 }
 
