@@ -108,19 +108,66 @@ Rectangle {
 
                 HoverHandler { id: hover }
 
+                // The background tint alone reads as "selected" and depends on whatever the
+                // user's highlight colour happens to be. A hard edge marks the playing track
+                // unambiguously in every palette.
+                Rectangle {
+                    anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
+                    width: 3
+                    color: Theme.accent
+                    visible: model.isCurrent
+                }
+
                 RowLayout {
                     anchors.fill: parent
                     anchors.leftMargin: 10
                     anchors.rightMargin: 10
                     spacing: 8
 
-                    Label {
-                        text: index + 1
-                        color: Theme.textDim
-                        font.pixelSize: 11
-                        font.family: "monospace"
+                    Item {
                         Layout.preferredWidth: 26
-                        horizontalAlignment: Text.AlignRight
+                        Layout.fillHeight: true
+
+                        Label {
+                            anchors.centerIn: parent
+                            visible: !model.isCurrent
+                            text: index + 1
+                            color: Theme.textDim
+                            font.pixelSize: 11
+                            font.family: "monospace"
+                        }
+
+                        // Drawn rather than a glyph character: no dependency on which symbols
+                        // the system font happens to carry.
+                        Canvas {
+                            id: nowPlayingMark
+                            anchors.centerIn: parent
+                            width: 11; height: 11
+                            visible: model.isCurrent
+                            property bool paused: AudioEngine.state !== AudioEngine.Playing
+                            // Contrast is against the row's own highlighted background, so it
+                            // follows the text colour rather than the accent - an accent mark
+                            // on an accent-derived row can disappear in some palettes.
+                            property color mark: Theme.text
+                            onPausedChanged: requestPaint()
+                            onMarkChanged: requestPaint()
+                            onPaint: {
+                                const ctx = getContext("2d")
+                                ctx.reset()
+                                ctx.fillStyle = mark
+                                if (paused) {
+                                    ctx.fillRect(0, 0, width * 0.34, height)
+                                    ctx.fillRect(width * 0.62, 0, width * 0.34, height)
+                                } else {
+                                    ctx.beginPath()
+                                    ctx.moveTo(0, 0)
+                                    ctx.lineTo(width, height / 2)
+                                    ctx.lineTo(0, height)
+                                    ctx.closePath()
+                                    ctx.fill()
+                                }
+                            }
+                        }
                     }
                     ColumnLayout {
                         Layout.fillWidth: true
@@ -130,6 +177,7 @@ Rectangle {
                             text: model.title
                             color: Theme.text
                             font.pixelSize: 12
+                            font.weight: model.isCurrent ? Font.DemiBold : Font.Normal
                             elide: Text.ElideRight
                         }
                         Label {
@@ -160,8 +208,18 @@ Rectangle {
                     }
                     Label {
                         visible: !model.isStream
-                        text: model.durationText
-                        color: Theme.textDim
+                        // The playing track counts down, which says "this one is running" in a
+                        // way a static duration never can.
+                        text: {
+                            if (!model.isCurrent || AudioEngine.duration <= 0)
+                                return model.durationText
+                            const left = Math.max(0, Math.round(
+                                (AudioEngine.duration - AudioEngine.position) / 1000))
+                            const m = Math.floor(left / 60)
+                            const sec = left % 60
+                            return "-" + m + ":" + (sec < 10 ? "0" : "") + sec
+                        }
+                        color: model.isCurrent ? Theme.text : Theme.textDim
                         font.pixelSize: 11
                         font.family: "monospace"
                     }

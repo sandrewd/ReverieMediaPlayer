@@ -81,6 +81,14 @@ void AudioEngine::buildPipeline()
     const QByteArray sinkOverride = qgetenv("PLAYER_AUDIO_SINK");
     GstElement *sink = gst_element_factory_make(
         sinkOverride.isEmpty() ? "autoaudiosink" : sinkOverride.constData(), nullptr);
+
+    // A substituted sink must still honour the clock. fakesink defaults to sync=false, which
+    // makes the pipeline race through a track in a second or two - so anything timed looks
+    // wrong under test for reasons that have nothing to do with the code being tested.
+    if (sink && !sinkOverride.isEmpty()
+        && g_object_class_find_property(G_OBJECT_GET_CLASS(sink), "sync")) {
+        g_object_set(sink, "sync", TRUE, nullptr);
+    }
     GstElement *pcmQueue = gst_element_factory_make("queue", nullptr);
     GstElement *pcmConvert = gst_element_factory_make("audioconvert", nullptr);
     GstElement *pcmResample = gst_element_factory_make("audioresample", nullptr);
