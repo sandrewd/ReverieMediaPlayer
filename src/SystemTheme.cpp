@@ -36,6 +36,8 @@ SystemTheme::SystemTheme(QObject *parent)
     while (m_recentColours.size() > kRecentLimit)
         m_recentColours.removeLast();
 
+    m_savedPalettes = settings.value(QStringLiteral("appearance/savedPalettes")).toStringList();
+
     m_schemeHint = querySchemeHint();
     m_themeNameHint = queryThemeNameHint();
     m_systemIsDark = detectSystemDark();
@@ -209,6 +211,72 @@ void SystemTheme::rememberColour(const QColor &colour)
 
     QSettings().setValue(QStringLiteral("appearance/recentColours"), m_recentColours);
     emit recentColoursChanged();
+}
+
+QVariantList SystemTheme::savedPalettes() const
+{
+    QVariantList result;
+    for (const QString &entry : m_savedPalettes) {
+        const QStringList parts = entry.split(QLatin1Char('\x1f'));
+        if (parts.size() != 5)
+            continue;
+        result.append(QVariantMap{{QStringLiteral("name"), parts.at(0)},
+                                  {QStringLiteral("background"), parts.at(1)},
+                                  {QStringLiteral("surface"), parts.at(2)},
+                                  {QStringLiteral("accent"), parts.at(3)},
+                                  {QStringLiteral("text"), parts.at(4)}});
+    }
+    return result;
+}
+
+void SystemTheme::savePalette(const QString &name)
+{
+    const QString trimmed = name.trimmed().left(kPaletteNameLimit);
+    if (trimmed.isEmpty())
+        return;
+
+    const QString entry = QStringList{trimmed, m_customBackground.name(), m_customSurface.name(),
+                                      m_customAccent.name(), m_customText.name()}
+                              .join(QLatin1Char('\x1f'));
+
+    // Saving under a name that already exists replaces it rather than making a duplicate.
+    for (int i = 0; i < m_savedPalettes.size(); ++i) {
+        if (m_savedPalettes.at(i).section(QLatin1Char('\x1f'), 0, 0).compare(
+                trimmed, Qt::CaseInsensitive) == 0) {
+            m_savedPalettes[i] = entry;
+            QSettings().setValue(QStringLiteral("appearance/savedPalettes"), m_savedPalettes);
+            emit savedPalettesChanged();
+            return;
+        }
+    }
+
+    m_savedPalettes.append(entry);
+    QSettings().setValue(QStringLiteral("appearance/savedPalettes"), m_savedPalettes);
+    emit savedPalettesChanged();
+}
+
+void SystemTheme::deletePalette(const QString &name)
+{
+    const int before = m_savedPalettes.size();
+    m_savedPalettes.removeIf([&name](const QString &entry) {
+        return entry.section(QLatin1Char('\x1f'), 0, 0).compare(name, Qt::CaseInsensitive) == 0;
+    });
+    if (m_savedPalettes.size() == before)
+        return;
+    QSettings().setValue(QStringLiteral("appearance/savedPalettes"), m_savedPalettes);
+    emit savedPalettesChanged();
+}
+
+void SystemTheme::applySavedPalette(const QString &name)
+{
+    for (const QString &entry : std::as_const(m_savedPalettes)) {
+        const QStringList parts = entry.split(QLatin1Char('\x1f'));
+        if (parts.size() != 5 || parts.at(0).compare(name, Qt::CaseInsensitive) != 0)
+            continue;
+        applyPalettePreset(QColor(parts.at(1)), QColor(parts.at(2)),
+                           QColor(parts.at(3)), QColor(parts.at(4)));
+        return;
+    }
 }
 
 void SystemTheme::seedCustomFromCurrent()

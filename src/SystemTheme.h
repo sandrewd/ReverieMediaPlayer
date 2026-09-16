@@ -4,6 +4,7 @@
 #include <QPalette>
 #include <QObject>
 #include <QStringList>
+#include <QVariantList>
 #include <QProcess>
 #include <QTimer>
 #include <QtQml/qqmlregistration.h>
@@ -29,6 +30,8 @@ class SystemTheme : public QObject
     Q_PROPERTY(QColor customText READ customText WRITE setCustomText NOTIFY customChanged)
     Q_PROPERTY(QStringList recentColours READ recentColours NOTIFY recentColoursChanged)
     Q_PROPERTY(int recentColoursLimit READ recentColoursLimit CONSTANT)
+    Q_PROPERTY(QVariantList savedPalettes READ savedPalettes NOTIFY savedPalettesChanged)
+    Q_PROPERTY(int paletteNameMaximum READ paletteNameLimit CONSTANT)
 
 public:
     enum Preference { FollowSystem, AlwaysDark, AlwaysLight, Custom };
@@ -48,6 +51,7 @@ public:
     QColor customText() const { return m_customText; }
     QStringList recentColours() const { return m_recentColours; }
     int recentColoursLimit() const { return kRecentLimit; }
+    QVariantList savedPalettes() const;
     void setCustomBackground(const QColor &colour);
     void setCustomSurface(const QColor &colour);
     void setCustomAccent(const QColor &colour);
@@ -66,12 +70,20 @@ public:
     // front rather than duplicating it.
     Q_INVOKABLE void rememberColour(const QColor &colour);
 
+    // Palettes the user has named and kept. Saving under an existing name replaces it, so the
+    // list grows only when a genuinely new name is used.
+    Q_INVOKABLE void savePalette(const QString &name);
+    Q_INVOKABLE void deletePalette(const QString &name);
+    Q_INVOKABLE void applySavedPalette(const QString &name);
+    static int paletteNameLimit() { return kPaletteNameLimit; }
+
 signals:
     void darkChanged();
     void systemIsDarkChanged();
     void preferenceChanged();
     void customChanged();
     void recentColoursChanged();
+    void savedPalettesChanged();
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -104,7 +116,10 @@ private:
     QColor m_customAccent;
     QColor m_customText;
     static constexpr int kRecentLimit = 5;
+    static constexpr int kPaletteNameLimit = 24;
     QStringList m_recentColours;
+    // Each entry is name + four colours, unit-separated so a name may contain anything.
+    QStringList m_savedPalettes;
     // The desktop's own palette, captured before we ever impose one. Qt has no API to read
     // the platform palette back once an application palette has been set, so this is the only
     // chance to have it.

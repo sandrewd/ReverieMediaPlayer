@@ -51,6 +51,20 @@ ApplicationWindow {
     property bool fullscreen: false
     property bool playlistVisible: true
     property bool alwaysOnTop: false
+
+    // Our renditions in these four roles, not reproductions of anyone's published scheme.
+    readonly property var curatedPalettes: [
+        { name: qsTr("Midnight"),      bg: "#0f1115", sf: "#171a21", ac: "#4da3ff", tx: "#e8eaed" },
+        { name: qsTr("Daylight"),      bg: "#f2f3f5", sf: "#ffffff", ac: "#1f6feb", tx: "#1b1e23" },
+        { name: qsTr("Pastel"),        bg: "#fbf1f6", sf: "#ffffff", ac: "#e39ec1", tx: "#4a3b46" },
+        { name: qsTr("Funky"),         bg: "#1b1035", sf: "#2a1a52", ac: "#ff5fa2", tx: "#ffe7f4" },
+        { name: qsTr("Techno"),        bg: "#05010a", sf: "#12032a", ac: "#00ffd5", tx: "#d7f9ff" },
+        { name: qsTr("High contrast"), bg: "#000000", sf: "#0b0b0b", ac: "#ffff00", tx: "#ffffff" },
+        { name: qsTr("Forest"),        bg: "#10201a", sf: "#17322a", ac: "#6ee7a8", tx: "#e2f5ea" },
+        { name: qsTr("Ember"),         bg: "#1d1210", sf: "#2e1d19", ac: "#ff7a45", tx: "#ffe9df" },
+        { name: qsTr("Slate"),         bg: "#2e3440", sf: "#3b4252", ac: "#88c0d0", tx: "#eceff4" },
+        { name: qsTr("Sepia"),         bg: "#f4ecd8", sf: "#fffaf0", ac: "#a2673f", tx: "#3b2f2a" }
+    ]
     property bool controlsVisible: true
 
     // In fullscreen the chrome gets out of the way; windowed, it always stays.
@@ -559,9 +573,49 @@ ApplicationWindow {
                 }
             }
             MenuSeparator {}
-            MenuItem {
-                text: qsTr("Edit my colours…")
-                onTriggered: themeDialog.open()
+
+            // Palettes live here rather than inside the colour editor: choosing "my own
+            // colours" and then picking somebody else's curated set read as a contradiction.
+            Menu {
+                id: palettesMenu
+                title: qsTr("Palettes")
+
+                Instantiator {
+                    model: root.curatedPalettes
+                    delegate: MenuItem {
+                        required property var modelData
+                        text: modelData.name
+                        onTriggered: SystemTheme.applyPalettePreset(modelData.bg, modelData.sf,
+                                                                    modelData.ac, modelData.tx)
+                    }
+                    onObjectAdded: function(index, object) { palettesMenu.insertItem(index, object) }
+                    onObjectRemoved: function(index, object) { palettesMenu.removeItem(object) }
+                }
+
+                MenuSeparator {
+                    // Only worth a divider once there is something below it.
+                    visible: SystemTheme.savedPalettes.length > 0
+                    height: visible ? implicitHeight : 0
+                }
+
+                Instantiator {
+                    model: SystemTheme.savedPalettes
+                    delegate: MenuItem {
+                        required property var modelData
+                        text: modelData.name
+                        onTriggered: SystemTheme.applySavedPalette(modelData.name)
+                    }
+                    onObjectAdded: function(index, object) {
+                        palettesMenu.insertItem(root.curatedPalettes.length + 1 + index, object)
+                    }
+                    onObjectRemoved: function(index, object) { palettesMenu.removeItem(object) }
+                }
+
+                MenuSeparator {}
+                MenuItem {
+                    text: qsTr("Edit and save colours…")
+                    onTriggered: themeDialog.open()
+                }
             }
         }
         MenuItem {
@@ -629,83 +683,6 @@ ApplicationWindow {
                 font.pixelSize: 11
             }
 
-            // Ready-made starting points. These are our renditions of well-known palettes
-            // rather than exact reproductions - the four roles here do not map one-to-one
-            // onto anybody else's scheme.
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 8
-                Label {
-                    text: qsTr("Palette")
-                    color: Theme.text
-                    font.pixelSize: 12
-                    Layout.preferredWidth: 92
-                }
-                ComboBox {
-                    id: palettePicker
-                    Layout.fillWidth: true
-                    currentIndex: -1
-                    // An explicit delegate rather than textRole: against a JavaScript array of
-                    // objects the roles did not resolve and every entry rendered blank. It
-                    // also lets each row show what it will actually look like.
-                    displayText: currentIndex < 0 ? qsTr("Choose a palette…")
-                                                  : model[currentIndex].name
-                    delegate: ItemDelegate {
-                        id: paletteEntry
-                        required property var modelData
-                        required property int index
-                        width: palettePicker.width
-                        highlighted: palettePicker.highlightedIndex === index
-                        background: Rectangle {
-                            color: paletteEntry.highlighted ? Theme.accent : Theme.surface
-                        }
-                        contentItem: RowLayout {
-                            spacing: 8
-                            Row {
-                                spacing: 2
-                                Repeater {
-                                    model: [paletteEntry.modelData.bg, paletteEntry.modelData.sf,
-                                            paletteEntry.modelData.ac, paletteEntry.modelData.tx]
-                                    delegate: Rectangle {
-                                        required property string modelData
-                                        width: 14; height: 14; radius: 2
-                                        color: modelData
-                                        border.color: Theme.border
-                                        border.width: 1
-                                    }
-                                }
-                            }
-                            Label {
-                                Layout.fillWidth: true
-                                text: paletteEntry.modelData.name
-                                color: paletteEntry.highlighted
-                                       ? (Theme.dark ? "#0f1115" : "#ffffff") : Theme.text
-                                font.pixelSize: 12
-                                elide: Text.ElideRight
-                            }
-                        }
-                        onClicked: {
-                            palettePicker.currentIndex = index
-                            SystemTheme.applyPalettePreset(modelData.bg, modelData.sf,
-                                                           modelData.ac, modelData.tx)
-                            palettePicker.popup.close()
-                        }
-                    }
-                    model: [
-                        { name: qsTr("Midnight"),        bg: "#0f1115", sf: "#171a21", ac: "#4da3ff", tx: "#e8eaed" },
-                        { name: qsTr("Daylight"),        bg: "#f2f3f5", sf: "#ffffff", ac: "#1f6feb", tx: "#1b1e23" },
-                        { name: qsTr("Pastel"),          bg: "#fbf1f6", sf: "#ffffff", ac: "#e39ec1", tx: "#4a3b46" },
-                        { name: qsTr("Funky"),           bg: "#1b1035", sf: "#2a1a52", ac: "#ff5fa2", tx: "#ffe7f4" },
-                        { name: qsTr("Techno"),          bg: "#05010a", sf: "#12032a", ac: "#00ffd5", tx: "#d7f9ff" },
-                        { name: qsTr("High contrast"),   bg: "#000000", sf: "#0b0b0b", ac: "#ffff00", tx: "#ffffff" },
-                        { name: qsTr("Forest"),          bg: "#10201a", sf: "#17322a", ac: "#6ee7a8", tx: "#e2f5ea" },
-                        { name: qsTr("Ember"),           bg: "#1d1210", sf: "#2e1d19", ac: "#ff7a45", tx: "#ffe9df" },
-                        { name: qsTr("Slate"),           bg: "#2e3440", sf: "#3b4252", ac: "#88c0d0", tx: "#eceff4" },
-                        { name: qsTr("Sepia"),           bg: "#f4ecd8", sf: "#fffaf0", ac: "#a2673f", tx: "#3b2f2a" }
-                    ]
-                }
-            }
-
             // Written out one per role rather than generated from a list of property names:
             // a dynamic lookup like SystemTheme[key] does not register as a binding
             // dependency, so those rows never updated when the value changed.
@@ -769,6 +746,84 @@ ApplicationWindow {
                 text: qsTr("Keeps the last %1 colours you chose.").arg(SystemTheme.recentColoursLimit)
                 color: Theme.textDim
                 font.pixelSize: 10
+            }
+
+            // Saving is what turns a set of colours into something reselectable from the
+            // Palettes menu, so it lives with the colours rather than in the menu.
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                spacing: 8
+                Label {
+                    text: qsTr("Save as")
+                    color: Theme.text
+                    font.pixelSize: 12
+                    Layout.preferredWidth: 92
+                }
+                TextField {
+                    id: paletteName
+                    Layout.fillWidth: true
+                    placeholderText: qsTr("Name this palette")
+                    maximumLength: SystemTheme.paletteNameMaximum
+                    selectByMouse: true
+                    color: Theme.text
+                    placeholderTextColor: Theme.textDim
+                    background: Rectangle {
+                        color: Theme.surfaceHigh
+                        border.color: paletteName.activeFocus ? Theme.accent : Theme.border
+                        border.width: 1
+                        radius: 3
+                    }
+                    onAccepted: if (text.trim() !== "") { SystemTheme.savePalette(text); text = "" }
+                }
+                Button {
+                    text: qsTr("Save")
+                    enabled: paletteName.text.trim() !== ""
+                    onClicked: { SystemTheme.savePalette(paletteName.text); paletteName.text = "" }
+                }
+            }
+
+            // Saved palettes, with a way to remove one. Without this the list could only ever
+            // grow, which is exactly the complaint the recent-colours cap answers elsewhere.
+            Flow {
+                Layout.fillWidth: true
+                visible: SystemTheme.savedPalettes.length > 0
+                spacing: 6
+                Repeater {
+                    model: SystemTheme.savedPalettes
+                    delegate: Rectangle {
+                        required property var modelData
+                        height: 26
+                        width: chipRow.implicitWidth + 16
+                        radius: 13
+                        color: Theme.surfaceHigh
+                        border.color: Theme.border
+                        border.width: 1
+                        RowLayout {
+                            id: chipRow
+                            anchors.centerIn: parent
+                            spacing: 6
+                            Rectangle {
+                                width: 12; height: 12; radius: 6
+                                color: modelData.accent
+                                border.color: Theme.border
+                                border.width: 1
+                            }
+                            Label {
+                                text: modelData.name
+                                color: Theme.text
+                                font.pixelSize: 11
+                            }
+                            Label {
+                                text: "\u00d7"
+                                color: Theme.textDim
+                                font.pixelSize: 14
+                                TapHandler { onTapped: SystemTheme.deletePalette(modelData.name) }
+                            }
+                        }
+                        TapHandler { onTapped: SystemTheme.applySavedPalette(modelData.name) }
+                    }
+                }
             }
 
             RowLayout {
