@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QQuickFramebufferObject>
+#include <QMutex>
 #include <QSize>
 #include <QString>
 #include <QtQml/qqmlregistration.h>
@@ -22,6 +23,22 @@ class ProjectMItem : public QQuickFramebufferObject
     Q_PROPERTY(QString presetPath READ presetPath WRITE setPresetPath NOTIFY presetPathChanged)
     Q_PROPERTY(AudioEngine *audioEngine READ audioEngine WRITE setAudioEngine NOTIFY audioEngineChanged)
 
+    // Preset browsing. The corpus is ~9,800 presets, so this is a cursor over a library
+    // rather than a list the user is ever shown in full.
+    Q_PROPERTY(QString presetsPath READ presetsPath WRITE setPresetsPath NOTIFY presetsPathChanged)
+    Q_PROPERTY(QString curatedList READ curatedList WRITE setCuratedList NOTIFY curatedListChanged)
+    Q_PROPERTY(QString presetName READ presetName NOTIFY presetChanged)
+    Q_PROPERTY(int presetIndex READ presetIndex NOTIFY presetChanged)
+    Q_PROPERTY(int presetCount READ presetCount NOTIFY presetChanged)
+    Q_PROPERTY(bool presetLocked READ presetLocked WRITE setPresetLocked NOTIFY presetLockedChanged)
+    Q_PROPERTY(bool shuffle READ shuffle WRITE setShuffle NOTIFY shuffleChanged)
+    Q_PROPERTY(qreal presetDuration READ presetDuration WRITE setPresetDuration NOTIFY presetDurationChanged)
+
+    // The frame-time overlay was always meant to become the input to automatic render-scale
+    // selection rather than just a readout. This is that.
+    Q_PROPERTY(bool adaptiveQuality READ adaptiveQuality WRITE setAdaptiveQuality NOTIFY adaptiveQualityChanged)
+    Q_PROPERTY(qreal targetFps READ targetFps WRITE setTargetFps NOTIFY targetFpsChanged)
+
     // Stats for the frame-time overlay. Observed smoothness over RustDesk tells you about
     // the video stream, not about us, so the app has to report its own numbers.
     Q_PROPERTY(qreal frameTimeMs READ frameTimeMs NOTIFY statsChanged)
@@ -42,18 +59,55 @@ public:
     AudioEngine *audioEngine() const { return m_audioEngine; }
     void setAudioEngine(AudioEngine *engine);
 
+    QString presetsPath() const { return m_presetsPath; }
+    void setPresetsPath(const QString &path);
+    QString curatedList() const { return m_curatedList; }
+    void setCuratedList(const QString &path);
+    QString presetName() const { return m_presetName; }
+    int presetIndex() const { return m_presetIndex; }
+    int presetCount() const { return m_presetCount; }
+    bool presetLocked() const { return m_presetLocked; }
+    void setPresetLocked(bool locked);
+    bool shuffle() const { return m_shuffle; }
+    void setShuffle(bool shuffle);
+    qreal presetDuration() const { return m_presetDuration; }
+    void setPresetDuration(qreal seconds);
+
+    bool adaptiveQuality() const { return m_adaptiveQuality; }
+    void setAdaptiveQuality(bool enabled);
+    qreal targetFps() const { return m_targetFps; }
+    void setTargetFps(qreal fps);
+
+    Q_INVOKABLE void nextPreset();
+    Q_INVOKABLE void previousPreset();
+    Q_INVOKABLE void randomPreset();
+
+    // Drained by the renderer, which is the only thread allowed to touch projectM.
+    enum Command { CommandNext = 1, CommandPrevious, CommandRandom, CommandReload };
+    QList<int> takeCommands();
+
     qreal frameTimeMs() const { return m_frameTimeMs; }
     qreal fps() const { return m_fps; }
     QSize renderSize() const { return m_renderSize; }
 
 public slots:
-    // Called from the render thread via a queued connection, so it lands on the GUI thread.
+    // Both called from the render thread via a queued connection, so they land on the GUI thread.
     void applyStats(qreal frameTimeMs, qreal fps, int width, int height);
+    void applyPreset(const QString &name, int index, int count);
+    void applyAdaptiveScale(qreal scale);
 
 signals:
     void renderScaleChanged();
     void presetPathChanged();
     void audioEngineChanged();
+    void presetsPathChanged();
+    void curatedListChanged();
+    void presetChanged();
+    void presetLockedChanged();
+    void shuffleChanged();
+    void presetDurationChanged();
+    void adaptiveQualityChanged();
+    void targetFpsChanged();
     void statsChanged();
 
 private:
@@ -63,4 +117,19 @@ private:
     qreal m_frameTimeMs = 0.0;
     qreal m_fps = 0.0;
     QSize m_renderSize;
+
+    QString m_presetsPath;
+    QString m_curatedList;
+    QString m_presetName;
+    int m_presetIndex = 0;
+    int m_presetCount = 0;
+    bool m_presetLocked = false;
+    bool m_shuffle = true;
+    qreal m_presetDuration = 30.0;
+
+    bool m_adaptiveQuality = true;
+    qreal m_targetFps = 30.0;
+
+    QMutex m_commandMutex;
+    QList<int> m_commands;
 };

@@ -4,11 +4,18 @@
 #include <QOpenGLContext>
 #include <QOpenGLFramebufferObject>
 #include <QOpenGLFunctions>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QTextStream>
 #include <QQuickWindow>
 #include <QtMath>
 #include <QDebug>
 
 #include <projectM-4/projectM.h>
+#include <projectM-4/playlist.h>
+
+#include <QRandomGenerator>
 
 #include "AudioEngine.h"
 
@@ -25,6 +32,8 @@ class ProjectMRenderer : public QQuickFramebufferObject::Renderer
 public:
     ~ProjectMRenderer() override
     {
+        if (m_playlist)
+            projectm_playlist_destroy(m_playlist);
         if (m_pm)
             projectm_destroy(m_pm);
     }
@@ -44,6 +53,14 @@ public:
             // irrelevant (48x32 and 16x12 both land at ~87ms); the workload is fragment-bound.
             projectm_set_fps(m_pm, 60);
             projectm_set_preset_duration(m_pm, 30.0);
+
+            // The playlist library owns preset ordering, shuffle and the automatic advance
+            // when a preset's time is up. Connecting it means projectM asks it for the next
+            // preset itself, so we do not have to drive a timer.
+            m_playlist = projectm_playlist_create(m_pm);
+            projectm_playlist_set_shuffle(m_playlist, true);
+            projectm_playlist_connect(m_playlist, m_pm);
+
             m_pendingPreset = true;
         }
 
@@ -83,6 +100,21 @@ public:
             m_pendingPreset = true;
         }
 
+        const QString wantedLibrary = pmItem->presetsPath();
+        const QString wantedCurated = pmItem->curatedList();
+        if (wantedLibrary != m_presetsPath || wantedCurated != m_curatedList) {
+            m_presetsPath = wantedLibrary;
+            m_curatedList = wantedCurated;
+            m_pendingLibrary = true;
+        }
+
+        m_adaptive = pmItem->adaptiveQuality();
+        m_targetFps = pmItem->targetFps();
+        m_wantLocked = pmItem->presetLocked();
+        m_wantShuffle = pmItem->shuffle();
+        m_wantDuration = pmItem->presetDuration();
+        m_commands.append(pmItem->takeCommands());
+
     }
 
     void render() override
@@ -92,6 +124,11 @@ public:
             return;
         }
 
+        if (m_pendingLibrary) {
+            m_pendingLibrary = false;
+            loadLibrary();
+        }
+
         if (m_pendingPreset) {
             m_pendingPreset = false;
             if (!m_presetPath.isEmpty()) {
@@ -99,6 +136,9 @@ public:
                 qInfo().noquote() << "loaded preset:" << m_presetPath;
             }
         }
+
+        applySettings();
+        runCommands();
 
         feedAudio();
 
@@ -153,6 +193,9 @@ public:
 
         // Push stats straight to the GUI thread a few times a second. A queued invocation is
         // safe across threads; doing it every frame would just flood the event loop.
+        publishPreset();
+        adaptQuality();
+
         if (!m_statsPosted.isValid() || m_statsPosted.elapsed() >= 200) {
             m_statsPosted.restart();
             if (m_item) {
@@ -212,6 +255,160 @@ public:
     }
 
 private:
+    void loadLibrary()
+    {
+        if (!m_playlist || m_presetsPath.isEmpty())
+            return;
+
+        projectm_playlist_clear(m_playlist);
+
+        uint32_t added = 0;
+        // A curated list keeps the default experience to a few hundred presets. The full
+        // corpus stays one menu item away rather than being the thing a new user lands in.
+        if (!m_curatedList.isEmpty()) {
+            QFile listFile(m_curatedList);
+            if (listFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                const QDir base(m_presetsPath);
+                QTextStream in(&listFile);
+                while (!in.atEnd()) {
+                    const QString line = in.readLine().trimmed();
+                    if (line.isEmpty() || line.startsWith(QLatin1Char('#')))
+                        continue;
+                    const QString full = base.absoluteFilePath(line);
+                    if (projectm_playlist_add_preset(m_playlist, full.toUtf8().constData(), false))
+                        ++added;
+                }
+                qInfo("preset library: %u curated presets", added);
+            } else {
+                qWarning("preset library: cannot read curated list %s", qPrintable(m_curatedList));
+            }
+        }
+
+        if (added == 0) {
+            added = projectm_playlist_add_path(
+                m_playlist, m_presetsPath.toUtf8().constData(), true, false);
+            qInfo("preset library: %u presets from %s", added, qPrintable(m_presetsPath));
+        }
+
+        if (added > 0) {
+            // Start somewhere other than the first preset every launch; the corpus is
+            // alphabetical and always opening on the same one feels broken.
+            projectm_playlist_set_position(m_playlist, QRandomGenerator::global()->bounded(int(added)), true);
+        }
+        m_presetDirty = true;
+    }
+
+    void applySettings()
+    {
+        if (projectm_get_preset_locked(m_pm) != m_wantLocked)
+            projectm_set_preset_locked(m_pm, m_wantLocked);
+        if (m_playlist && projectm_playlist_get_shuffle(m_playlist) != m_wantShuffle)
+            projectm_playlist_set_shuffle(m_playlist, m_wantShuffle);
+        if (!qFuzzyCompare(m_appliedDuration, m_wantDuration)) {
+            m_appliedDuration = m_wantDuration;
+            projectm_set_preset_duration(m_pm, m_wantDuration);
+        }
+    }
+
+    void runCommands()
+    {
+        if (!m_playlist || m_commands.isEmpty())
+            return;
+        const uint32_t size = projectm_playlist_size(m_playlist);
+        for (int command : std::as_const(m_commands)) {
+            switch (command) {
+            case ProjectMItem::CommandNext:
+                projectm_playlist_play_next(m_playlist, false);
+                break;
+            case ProjectMItem::CommandPrevious:
+                projectm_playlist_play_previous(m_playlist, false);
+                break;
+            case ProjectMItem::CommandRandom:
+                if (size > 0) {
+                    projectm_playlist_set_position(
+                        m_playlist, QRandomGenerator::global()->bounded(int(size)), false);
+                }
+                break;
+            case ProjectMItem::CommandReload:
+                m_pendingLibrary = true;
+                break;
+            }
+        }
+        m_commands.clear();
+        m_presetDirty = true;
+    }
+
+    // Steps the render scale to hold the target frame rate. Deliberately slow and
+    // hysteretic: a visualiser whose resolution visibly pumps up and down is worse than one
+    // that is simply a bit soft. Down-steps react faster than up-steps, because dropping
+    // frames is more objectionable than running below the achievable quality.
+    void adaptQuality()
+    {
+        if (!m_adaptive || !m_item || m_fps <= 0.0)
+            return;
+
+        // A preset switch recompiles shaders and spikes frame time; ignore that window.
+        if (m_presetSettleTimer.isValid() && m_presetSettleTimer.elapsed() < 1500)
+            return;
+
+        const qreal current = m_renderScale;
+        qreal proposed = current;
+
+        if (m_fps < m_targetFps * 0.85) {
+            if (!m_downTimer.isValid())
+                m_downTimer.start();
+            m_upTimer.invalidate();
+            if (m_downTimer.elapsed() > 1500) {
+                proposed = qMax(0.2, current - 0.1);
+                m_downTimer.restart();
+            }
+        } else if (m_fps > m_targetFps * 1.35) {
+            if (!m_upTimer.isValid())
+                m_upTimer.start();
+            m_downTimer.invalidate();
+            if (m_upTimer.elapsed() > 5000) {
+                proposed = qMin(1.0, current + 0.1);
+                m_upTimer.restart();
+            }
+        } else {
+            m_downTimer.invalidate();
+            m_upTimer.invalidate();
+        }
+
+        if (!qFuzzyCompare(proposed, current)) {
+            QMetaObject::invokeMethod(m_item, "applyAdaptiveScale", Qt::QueuedConnection,
+                                      Q_ARG(qreal, proposed));
+        }
+    }
+
+    // Polled rather than driven by a callback so that projectM's own automatic advance,
+    // which happens without us asking, is reported too.
+    void publishPreset()
+    {
+        if (!m_playlist || !m_item)
+            return;
+        const uint32_t index = projectm_playlist_get_position(m_playlist);
+        const uint32_t count = projectm_playlist_size(m_playlist);
+        if (!m_presetDirty && index == m_lastIndex && count == m_lastCount)
+            return;
+
+        m_presetDirty = false;
+        m_lastIndex = index;
+        m_lastCount = count;
+        m_presetSettleTimer.restart();
+
+        QString name;
+        if (count > 0) {
+            if (char *item = projectm_playlist_item(m_playlist, index)) {
+                name = QFileInfo(QString::fromUtf8(item)).completeBaseName();
+                projectm_playlist_free_string(item);
+            }
+        }
+        QMetaObject::invokeMethod(m_item, "applyPreset", Qt::QueuedConnection,
+                                  Q_ARG(QString, name), Q_ARG(int, int(index)),
+                                  Q_ARG(int, int(count)));
+    }
+
     QSize scaledSize(const QSize &itemSize) const
     {
         return QSize(qMax(16, qRound(itemSize.width() * m_renderScale)),
@@ -246,8 +443,25 @@ private:
     }
 
     projectm_handle m_pm = nullptr;
+    projectm_playlist_handle m_playlist = nullptr;
     ProjectMItem *m_item = nullptr;
     AudioRingBuffer *m_ring = nullptr;
+    QString m_presetsPath;
+    QString m_curatedList;
+    QList<int> m_commands;
+    bool m_pendingLibrary = false;
+    bool m_presetDirty = false;
+    bool m_wantLocked = false;
+    bool m_wantShuffle = true;
+    qreal m_wantDuration = 30.0;
+    qreal m_appliedDuration = 30.0;
+    uint32_t m_lastIndex = 0;
+    uint32_t m_lastCount = 0;
+    bool m_adaptive = true;
+    qreal m_targetFps = 30.0;
+    QElapsedTimer m_downTimer;
+    QElapsedTimer m_upTimer;
+    QElapsedTimer m_presetSettleTimer;
     qreal m_renderScale = 0.5;
     QSize m_fboSize;
     QString m_presetPath;
@@ -304,6 +518,117 @@ void ProjectMItem::setAudioEngine(AudioEngine *engine)
     m_audioEngine = engine;
     emit audioEngineChanged();
     update();
+}
+
+void ProjectMItem::setPresetsPath(const QString &path)
+{
+    if (path == m_presetsPath)
+        return;
+    m_presetsPath = path;
+    emit presetsPathChanged();
+    update();
+}
+
+void ProjectMItem::setCuratedList(const QString &path)
+{
+    if (path == m_curatedList)
+        return;
+    m_curatedList = path;
+    emit curatedListChanged();
+    update();
+}
+
+void ProjectMItem::setPresetLocked(bool locked)
+{
+    if (locked == m_presetLocked)
+        return;
+    m_presetLocked = locked;
+    emit presetLockedChanged();
+    update();
+}
+
+void ProjectMItem::setShuffle(bool shuffle)
+{
+    if (shuffle == m_shuffle)
+        return;
+    m_shuffle = shuffle;
+    emit shuffleChanged();
+    update();
+}
+
+void ProjectMItem::setPresetDuration(qreal seconds)
+{
+    seconds = qBound(5.0, seconds, 600.0);
+    if (qFuzzyCompare(seconds, m_presetDuration))
+        return;
+    m_presetDuration = seconds;
+    emit presetDurationChanged();
+    update();
+}
+
+void ProjectMItem::nextPreset()
+{
+    QMutexLocker lock(&m_commandMutex);
+    m_commands.append(CommandNext);
+    lock.unlock();
+    update();
+}
+
+void ProjectMItem::previousPreset()
+{
+    QMutexLocker lock(&m_commandMutex);
+    m_commands.append(CommandPrevious);
+    lock.unlock();
+    update();
+}
+
+void ProjectMItem::randomPreset()
+{
+    QMutexLocker lock(&m_commandMutex);
+    m_commands.append(CommandRandom);
+    lock.unlock();
+    update();
+}
+
+QList<int> ProjectMItem::takeCommands()
+{
+    QMutexLocker lock(&m_commandMutex);
+    return std::move(m_commands);
+}
+
+void ProjectMItem::setAdaptiveQuality(bool enabled)
+{
+    if (enabled == m_adaptiveQuality)
+        return;
+    m_adaptiveQuality = enabled;
+    emit adaptiveQualityChanged();
+    update();
+}
+
+void ProjectMItem::setTargetFps(qreal fps)
+{
+    fps = qBound(15.0, fps, 60.0);
+    if (qFuzzyCompare(fps, m_targetFps))
+        return;
+    m_targetFps = fps;
+    emit targetFpsChanged();
+    update();
+}
+
+void ProjectMItem::applyAdaptiveScale(qreal scale)
+{
+    // Ignore a suggestion that raced with the user turning the feature off.
+    if (!m_adaptiveQuality)
+        return;
+    setRenderScale(scale);
+}
+
+void ProjectMItem::applyPreset(const QString &name, int index, int count)
+{
+    m_presetName = name;
+    m_presetIndex = index;
+    m_presetCount = count;
+    emit presetChanged();
 }
 
 void ProjectMItem::applyStats(qreal frameTimeMs, qreal fps, int width, int height)

@@ -18,6 +18,12 @@ find_package(projectM4 REQUIRED CONFIG
           "${CMAKE_SOURCE_DIR}/build/projectm-install/lib/cmake/projectM4"
     NO_DEFAULT_PATH)
 
+# The playlist library owns preset ordering, shuffle and the automatic advance.
+find_package(projectM4Playlist REQUIRED CONFIG
+    PATHS "${CMAKE_SOURCE_DIR}/build/projectm-master-install/lib/cmake/projectM4Playlist"
+          "${CMAKE_SOURCE_DIR}/build/projectm-install/lib/cmake/projectM4Playlist"
+    NO_DEFAULT_PATH)
+
 # projectM only gained an explicit render target in 4.2.0; without it the visualizer
 # renders to the default framebuffer and the QML item stays black.
 include(CheckCXXSourceCompiles)
@@ -63,6 +69,7 @@ qt_add_qml_module(player
 )
 
 target_include_directories(player PRIVATE src)
+target_compile_definitions(player PRIVATE PLAYER_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 if(PROJECTM_HAS_RENDER_FRAME_FBO)
     target_compile_definitions(player PRIVATE PROJECTM_HAS_RENDER_FRAME_FBO)
@@ -75,4 +82,5 @@ target_link_libraries(player PRIVATE
     PkgConfig::GST
     PkgConfig::TAGLIB
     libprojectM::projectM
+    libprojectM::playlist
 )

@@ -48,13 +48,33 @@ int main(int argc, char *argv[])
     parser.addOption(autoplayOption);
     QCommandLineOption miniOption("mini", "Start in mini-player mode.");
     parser.addOption(miniOption);
+    QCommandLineOption presetsOption("presets", "Directory holding the preset library.", "dir");
+    parser.addOption(presetsOption);
     parser.addPositionalArgument("files", "Audio files or folders to add to the playlist.",
                                  "[files...]");
     parser.process(app);
 
+    // Find the preset library without requiring an install step during development.
+    QString presetsDir = parser.isSet(presetsOption) ? parser.value(presetsOption) : QString();
+    if (presetsDir.isEmpty()) {
+        for (const QString &candidate : {QStringLiteral("assets/presets"),
+                                         QCoreApplication::applicationDirPath() + "/assets/presets",
+                                         QStringLiteral(PLAYER_SOURCE_DIR "/assets/presets")}) {
+            if (QFileInfo::exists(candidate)) {
+                presetsDir = candidate;
+                break;
+            }
+        }
+    }
+    QString curatedList = QStringLiteral(PLAYER_SOURCE_DIR "/assets/presets-curated.txt");
+    if (!QFileInfo::exists(curatedList))
+        curatedList.clear();
+
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("initialPreset", parser.value(presetOption));
     engine.rootContext()->setContextProperty("initialScale", parser.value(scaleOption).toDouble());
+    engine.rootContext()->setContextProperty("initialPresetsPath", presetsDir);
+    engine.rootContext()->setContextProperty("initialCuratedList", curatedList);
 
     // Qt 6.4 puts QML module resources under qrc:/<URI>/; the qrc:/qt/qml/<URI>/ layout
     // only arrives in 6.5. Noble ships 6.4.2, so this path is version-sensitive.

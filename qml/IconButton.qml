@@ -76,6 +76,31 @@ AbstractButton {
                     ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = Math.max(1, w * 0.1)
                     ctx.strokeRect(w * 0.05, h * 0.05, w * 0.9, h * 0.9)
                     ctx.fillRect(w * 0.05, h * 0.62, w * 0.9, h * 0.33); break
+                case "lock":
+                    ctx.fillRect(w * 0.12, h * 0.45, w * 0.76, h * 0.55)
+                    ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = Math.max(1, w * 0.12)
+                    ctx.beginPath(); ctx.arc(w / 2, h * 0.42, w * 0.24, Math.PI, 0); ctx.stroke()
+                    break
+                case "unlock":
+                    ctx.fillRect(w * 0.12, h * 0.45, w * 0.76, h * 0.55)
+                    ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = Math.max(1, w * 0.12)
+                    ctx.beginPath(); ctx.arc(w * 0.74, h * 0.42, w * 0.24, Math.PI, 0); ctx.stroke()
+                    break
+                case "random":
+                    ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = Math.max(1, w * 0.09)
+                    ctx.strokeRect(w * 0.08, h * 0.08, w * 0.84, h * 0.84)
+                    ctx.beginPath(); ctx.arc(w * 0.30, h * 0.30, w * 0.08, 0, 6.3); ctx.fill()
+                    ctx.beginPath(); ctx.arc(w * 0.70, h * 0.70, w * 0.08, 0, 6.3); ctx.fill()
+                    ctx.beginPath(); ctx.arc(w * 0.50, h * 0.50, w * 0.08, 0, 6.3); ctx.fill()
+                    break
+                case "expand":
+                    ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = Math.max(1, w * 0.12)
+                    ctx.beginPath()
+                    ctx.moveTo(w * 0.05, h * 0.35); ctx.lineTo(w * 0.05, h * 0.05); ctx.lineTo(w * 0.35, h * 0.05)
+                    ctx.moveTo(w * 0.65, h * 0.05); ctx.lineTo(w * 0.95, h * 0.05); ctx.lineTo(w * 0.95, h * 0.35)
+                    ctx.moveTo(w * 0.95, h * 0.65); ctx.lineTo(w * 0.95, h * 0.95); ctx.lineTo(w * 0.65, h * 0.95)
+                    ctx.moveTo(w * 0.35, h * 0.95); ctx.lineTo(w * 0.05, h * 0.95); ctx.lineTo(w * 0.05, h * 0.65)
+                    ctx.stroke(); break
                 case "menu":
                     for (let j = 0; j < 3; ++j)
                         ctx.fillRect(0, h * (0.1 + j * 0.36), w, h * 0.16)
