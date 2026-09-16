@@ -15,6 +15,27 @@ ApplicationWindow {
                                              : qsTr("Player")
     color: Theme.background
 
+    // Bind the window's palette to the tokens. Qt Quick Controls paint from the palette, and
+    // an item created before QGuiApplication::setPalette() keeps its resolved palette - so a
+    // theme changed at runtime reached the things we style by hand but left stock controls
+    // (buttons, checkboxes, scrollbars) on the old colours. A window palette propagates down
+    // the item tree and updates them live.
+    palette.window: Theme.background
+    palette.windowText: Theme.text
+    palette.base: Theme.surface
+    palette.alternateBase: Theme.surfaceHigh
+    palette.text: Theme.text
+    palette.button: Theme.surfaceHigh
+    palette.buttonText: Theme.text
+    palette.mid: Theme.border
+    palette.dark: Theme.border
+    palette.light: Theme.surfaceHigh
+    palette.highlight: Theme.accent
+    palette.highlightedText: Theme.dark ? "#0f1115" : "#ffffff"
+    palette.placeholderText: Theme.textDim
+    palette.toolTipBase: Theme.surfaceHigh
+    palette.toolTipText: Theme.text
+
     // A real minimum size with a defined collapse order, decided up front so the mini-player
     // is a layout state rather than a later refactor of everything that assumed a big window.
     // The mini player is exactly as tall as its transport bar. Letting it be dragged taller
@@ -105,6 +126,7 @@ ApplicationWindow {
         case "accent":     SystemTheme.customAccent = picked; break
         case "text":       SystemTheme.customText = picked; break
         }
+        SystemTheme.rememberColour(picked)
         if (SystemTheme.preference !== SystemTheme.Custom)
             SystemTheme.preference = SystemTheme.Custom
     }
@@ -607,6 +629,83 @@ ApplicationWindow {
                 font.pixelSize: 11
             }
 
+            // Ready-made starting points. These are our renditions of well-known palettes
+            // rather than exact reproductions - the four roles here do not map one-to-one
+            // onto anybody else's scheme.
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                Label {
+                    text: qsTr("Palette")
+                    color: Theme.text
+                    font.pixelSize: 12
+                    Layout.preferredWidth: 92
+                }
+                ComboBox {
+                    id: palettePicker
+                    Layout.fillWidth: true
+                    currentIndex: -1
+                    // An explicit delegate rather than textRole: against a JavaScript array of
+                    // objects the roles did not resolve and every entry rendered blank. It
+                    // also lets each row show what it will actually look like.
+                    displayText: currentIndex < 0 ? qsTr("Choose a palette…")
+                                                  : model[currentIndex].name
+                    delegate: ItemDelegate {
+                        id: paletteEntry
+                        required property var modelData
+                        required property int index
+                        width: palettePicker.width
+                        highlighted: palettePicker.highlightedIndex === index
+                        background: Rectangle {
+                            color: paletteEntry.highlighted ? Theme.accent : Theme.surface
+                        }
+                        contentItem: RowLayout {
+                            spacing: 8
+                            Row {
+                                spacing: 2
+                                Repeater {
+                                    model: [paletteEntry.modelData.bg, paletteEntry.modelData.sf,
+                                            paletteEntry.modelData.ac, paletteEntry.modelData.tx]
+                                    delegate: Rectangle {
+                                        required property string modelData
+                                        width: 14; height: 14; radius: 2
+                                        color: modelData
+                                        border.color: Theme.border
+                                        border.width: 1
+                                    }
+                                }
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                text: paletteEntry.modelData.name
+                                color: paletteEntry.highlighted
+                                       ? (Theme.dark ? "#0f1115" : "#ffffff") : Theme.text
+                                font.pixelSize: 12
+                                elide: Text.ElideRight
+                            }
+                        }
+                        onClicked: {
+                            palettePicker.currentIndex = index
+                            SystemTheme.applyPalettePreset(modelData.bg, modelData.sf,
+                                                           modelData.ac, modelData.tx)
+                            palettePicker.popup.close()
+                        }
+                    }
+                    model: [
+                        { name: qsTr("Midnight"),        bg: "#0f1115", sf: "#171a21", ac: "#4da3ff", tx: "#e8eaed" },
+                        { name: qsTr("Daylight"),        bg: "#f2f3f5", sf: "#ffffff", ac: "#1f6feb", tx: "#1b1e23" },
+                        { name: qsTr("Pastel"),          bg: "#fbf1f6", sf: "#ffffff", ac: "#e39ec1", tx: "#4a3b46" },
+                        { name: qsTr("Funky"),           bg: "#1b1035", sf: "#2a1a52", ac: "#ff5fa2", tx: "#ffe7f4" },
+                        { name: qsTr("Techno"),          bg: "#05010a", sf: "#12032a", ac: "#00ffd5", tx: "#d7f9ff" },
+                        { name: qsTr("High contrast"),   bg: "#000000", sf: "#0b0b0b", ac: "#ffff00", tx: "#ffffff" },
+                        { name: qsTr("Forest"),          bg: "#10201a", sf: "#17322a", ac: "#6ee7a8", tx: "#e2f5ea" },
+                        { name: qsTr("Ember"),           bg: "#1d1210", sf: "#2e1d19", ac: "#ff7a45", tx: "#ffe9df" },
+                        { name: qsTr("Slate"),           bg: "#2e3440", sf: "#3b4252", ac: "#88c0d0", tx: "#eceff4" },
+                        { name: qsTr("Sepia"),           bg: "#f4ecd8", sf: "#fffaf0", ac: "#a2673f", tx: "#3b2f2a" }
+                    ]
+                }
+            }
+
             // Written out one per role rather than generated from a list of property names:
             // a dynamic lookup like SystemTheme[key] does not register as a binding
             // dependency, so those rows never updated when the value changed.
@@ -637,10 +736,46 @@ ApplicationWindow {
 
             RowLayout {
                 Layout.fillWidth: true
+                visible: SystemTheme.recentColours.length > 0
+                spacing: 8
+                Label {
+                    text: qsTr("Recent")
+                    color: Theme.text
+                    font.pixelSize: 12
+                    Layout.preferredWidth: 92
+                }
+                Repeater {
+                    model: SystemTheme.recentColours
+                    delegate: Rectangle {
+                        required property string modelData
+                        implicitWidth: 28
+                        implicitHeight: 24
+                        radius: 4
+                        color: modelData
+                        border.color: Theme.border
+                        border.width: 1
+                        TapHandler { onTapped: recentMenu.openFor(modelData) }
+                        ToolTip.visible: hover.hovered
+                        ToolTip.text: modelData.toUpperCase()
+                        HoverHandler { id: hover }
+                    }
+                }
+                Item { Layout.fillWidth: true }
+            }
+
+            Label {
+                Layout.fillWidth: true
+                visible: SystemTheme.recentColours.length > 0
+                text: qsTr("Keeps the last %1 colours you chose.").arg(SystemTheme.recentColoursLimit)
+                color: Theme.textDim
+                font.pixelSize: 10
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
                 Layout.topMargin: 4
                 Button {
-                    text: qsTr("Start from the current theme")
-                    flat: true
+                    text: qsTr("Reset to defaults")
                     onClicked: SystemTheme.seedCustomFromCurrent()
                 }
                 Item { Layout.fillWidth: true }
@@ -653,6 +788,17 @@ ApplicationWindow {
             }
         }
 
+    }
+
+    // A recent colour has no role of its own, so ask which one it should become.
+    Menu {
+        id: recentMenu
+        property color pending: "black"
+        function openFor(colour) { pending = colour; popup() }
+        MenuItem { text: qsTr("Use as background"); onTriggered: root.applyCustomColour("background", recentMenu.pending) }
+        MenuItem { text: qsTr("Use as panels");     onTriggered: root.applyCustomColour("surface", recentMenu.pending) }
+        MenuItem { text: qsTr("Use as highlight");  onTriggered: root.applyCustomColour("accent", recentMenu.pending) }
+        MenuItem { text: qsTr("Use as text");       onTriggered: root.applyCustomColour("text", recentMenu.pending) }
     }
 
     Dialog {

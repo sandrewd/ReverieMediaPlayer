@@ -3,6 +3,7 @@
 #include <QColor>
 #include <QPalette>
 #include <QObject>
+#include <QStringList>
 #include <QProcess>
 #include <QTimer>
 #include <QtQml/qqmlregistration.h>
@@ -26,6 +27,8 @@ class SystemTheme : public QObject
     Q_PROPERTY(QColor customSurface READ customSurface WRITE setCustomSurface NOTIFY customChanged)
     Q_PROPERTY(QColor customAccent READ customAccent WRITE setCustomAccent NOTIFY customChanged)
     Q_PROPERTY(QColor customText READ customText WRITE setCustomText NOTIFY customChanged)
+    Q_PROPERTY(QStringList recentColours READ recentColours NOTIFY recentColoursChanged)
+    Q_PROPERTY(int recentColoursLimit READ recentColoursLimit CONSTANT)
 
 public:
     enum Preference { FollowSystem, AlwaysDark, AlwaysLight, Custom };
@@ -43,6 +46,8 @@ public:
     QColor customSurface() const { return m_customSurface; }
     QColor customAccent() const { return m_customAccent; }
     QColor customText() const { return m_customText; }
+    QStringList recentColours() const { return m_recentColours; }
+    int recentColoursLimit() const { return kRecentLimit; }
     void setCustomBackground(const QColor &colour);
     void setCustomSurface(const QColor &colour);
     void setCustomAccent(const QColor &colour);
@@ -52,11 +57,21 @@ public:
     // something that already works rather than from black.
     Q_INVOKABLE void seedCustomFromCurrent();
 
+    // Applies four colours at once and switches to the custom theme.
+    Q_INVOKABLE void applyPalettePreset(const QColor &background, const QColor &surface,
+                                        const QColor &accent, const QColor &text);
+
+    // A deliberately short history of colours the user has chosen, newest first. Capped, so
+    // it cannot grow without bound; picking a colour already in the list moves it to the
+    // front rather than duplicating it.
+    Q_INVOKABLE void rememberColour(const QColor &colour);
+
 signals:
     void darkChanged();
     void systemIsDarkChanged();
     void preferenceChanged();
     void customChanged();
+    void recentColoursChanged();
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -88,6 +103,8 @@ private:
     QColor m_customSurface;
     QColor m_customAccent;
     QColor m_customText;
+    static constexpr int kRecentLimit = 5;
+    QStringList m_recentColours;
     // The desktop's own palette, captured before we ever impose one. Qt has no API to read
     // the platform palette back once an application palette has been set, so this is the only
     // chance to have it.

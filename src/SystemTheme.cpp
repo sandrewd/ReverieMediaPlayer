@@ -32,6 +32,10 @@ SystemTheme::SystemTheme(QObject *parent)
         m_platformPaletteIsDark = paletteHint();
     }
 
+    m_recentColours = settings.value(QStringLiteral("appearance/recentColours")).toStringList();
+    while (m_recentColours.size() > kRecentLimit)
+        m_recentColours.removeLast();
+
     m_schemeHint = querySchemeHint();
     m_themeNameHint = queryThemeNameHint();
     m_systemIsDark = detectSystemDark();
@@ -178,6 +182,33 @@ void SystemTheme::setCustomText(const QColor &colour)
     QSettings().setValue(QStringLiteral("appearance/text"), colour.name());
     applyPalette();
     emit customChanged();
+}
+
+void SystemTheme::applyPalettePreset(const QColor &background, const QColor &surface,
+                                     const QColor &accent, const QColor &text)
+{
+    setCustomBackground(background);
+    setCustomSurface(surface);
+    setCustomAccent(accent);
+    setCustomText(text);
+    setPreference(Custom);
+}
+
+void SystemTheme::rememberColour(const QColor &colour)
+{
+    if (!colour.isValid())
+        return;
+    const QString name = colour.name();
+
+    // Moving an existing entry to the front keeps the list useful: five slots filled with the
+    // same colour would be worse than useless.
+    m_recentColours.removeAll(name);
+    m_recentColours.prepend(name);
+    while (m_recentColours.size() > kRecentLimit)
+        m_recentColours.removeLast();
+
+    QSettings().setValue(QStringLiteral("appearance/recentColours"), m_recentColours);
+    emit recentColoursChanged();
 }
 
 void SystemTheme::seedCustomFromCurrent()
