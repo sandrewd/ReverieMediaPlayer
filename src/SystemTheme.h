@@ -74,6 +74,7 @@ private:
     // -1 unknown, 0 light, 1 dark
     static int paletteHint();
     static int querySchemeHint();
+    static int queryThemeNameHint();
 
     bool m_systemIsDark = true;
     Preference m_preference = FollowSystem;
@@ -91,5 +92,6 @@ private:
     bool m_applyingPalette = false;
 
     QProcess m_monitor;
+    QProcess m_xfconfMonitor;
     QTimer m_poll;
 };

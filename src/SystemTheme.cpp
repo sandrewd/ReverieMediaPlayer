@@ -26,8 +26,14 @@ SystemTheme::SystemTheme(QObject *parent)
         m_platformPalette = qApp->palette();
 
     m_schemeHint = querySchemeHint();
+    m_themeNameHint = queryThemeNameHint();
     m_systemIsDark = detectSystemDark();
-    applyPalette();
+
+    // Only impose a palette when the user has actually chosen one. Calling setPalette() at
+    // all marks it explicitly set, after which Qt no longer refreshes it from the platform
+    // theme - which would silently break following the system.
+    if (m_preference != FollowSystem)
+        applyPalette();
 
     // Three ways of noticing a theme change, because no single one is reliable here.
     // Qt delivers a palette change when the platform theme notices; that did not fire on
@@ -45,9 +51,11 @@ SystemTheme::SystemTheme(QObject *parent)
 
 SystemTheme::~SystemTheme()
 {
-    if (m_monitor.state() != QProcess::NotRunning) {
-        m_monitor.terminate();
-        m_monitor.waitForFinished(300);
+    for (QProcess *process : {&m_monitor, &m_xfconfMonitor}) {
+        if (process->state() != QProcess::NotRunning) {
+            process->terminate();
+            process->waitForFinished(300);
+        }
     }
 }
 
@@ -64,6 +72,21 @@ void SystemTheme::startMonitor()
     });
     m_monitor.start(QStringLiteral("gsettings"),
                     {QStringLiteral("monitor"), QStringLiteral("org.gnome.desktop.interface")});
+
+    // XFCE's own theme setting, which its appearance dialog writes and which gsettings may
+    // never see.
+    connect(&m_xfconfMonitor, &QProcess::readyReadStandardOutput, this, [this]() {
+        const QString output = QString::fromUtf8(m_xfconfMonitor.readAllStandardOutput());
+        if (output.contains(QStringLiteral("dark"), Qt::CaseInsensitive))
+            m_themeNameHint = 1;
+        else if (!output.trimmed().isEmpty())
+            m_themeNameHint = 0;
+        redetect();
+    });
+    m_xfconfMonitor.start(QStringLiteral("xfconf-query"),
+                          {QStringLiteral("-c"), QStringLiteral("xsettings"),
+                           QStringLiteral("-p"), QStringLiteral("/Net/ThemeName"),
+                           QStringLiteral("-m")});
 }
 
 void SystemTheme::applyMonitorLine(const QString &line)
@@ -174,7 +197,9 @@ void SystemTheme::applyPalette()
     m_applyingPalette = true;
 
     if (m_preference == FollowSystem) {
-        // Nothing to impose: the desktop's own palette is the right answer.
+        // Best effort: Qt has no way to un-set an application palette, so a session that has
+        // been on a custom theme keeps a pinned palette until restart. Startup avoids calling
+        // this at all in the common case, which is what keeps following the system working.
         qApp->setPalette(m_platformPalette);
         m_applyingPalette = false;
         return;
@@ -221,6 +246,7 @@ void SystemTheme::redetect()
     if (detected == m_systemIsDark)
         return;
     m_systemIsDark = detected;
+    qInfo("desktop theme now %s", detected ? "dark" : "light");
     emit systemIsDarkChanged();
     if (m_preference == FollowSystem)
         emit darkChanged();
@@ -235,6 +261,29 @@ int SystemTheme::paletteHint()
     if (!window.isValid() || !text.isValid() || window.lightness() == text.lightness())
         return -1;
     return window.lightness() < text.lightness() ? 1 : 0;
+}
+
+int SystemTheme::queryThemeNameHint()
+{
+    // XFCE stores the active theme in xfconf and may never touch the gsettings keys, so ask
+    // it directly as well.
+    for (const auto &probe : {
+             std::pair<QString, QStringList>{QStringLiteral("xfconf-query"),
+                 {QStringLiteral("-c"), QStringLiteral("xsettings"), QStringLiteral("-p"),
+                  QStringLiteral("/Net/ThemeName")}},
+             std::pair<QString, QStringList>{QStringLiteral("gsettings"),
+                 {QStringLiteral("get"), QStringLiteral("org.gnome.desktop.interface"),
+                  QStringLiteral("gtk-theme")}}}) {
+        QProcess process;
+        process.start(probe.first, probe.second);
+        if (!process.waitForFinished(500))
+            continue;
+        const QString value = QString::fromUtf8(process.readAllStandardOutput()).trimmed();
+        if (value.isEmpty())
+            continue;
+        return value.contains(QStringLiteral("dark"), Qt::CaseInsensitive) ? 1 : 0;
+    }
+    return -1;
 }
 
 int SystemTheme::querySchemeHint()
@@ -255,18 +304,20 @@ int SystemTheme::querySchemeHint()
 
 bool SystemTheme::detectSystemDark() const
 {
-    // An explicit desktop preference wins: it is the thing the user actually toggled.
-    if (m_schemeHint >= 0)
-        return m_schemeHint == 1;
-
-    // Otherwise trust the palette Qt will actually paint with, which the qgtk3 platform
-    // theme derives from the GTK theme.
+    // The palette Qt paints with comes from the qgtk3 platform theme, so it reflects the GTK
+    // theme actually in force. That is a stronger signal than any stored preference, and it
+    // is checked first - on Mint XFCE `color-scheme` sits at 'prefer-dark' even after the
+    // user switches to a light theme, so trusting it first pinned the application to dark.
     const int fromPalette = paletteHint();
     if (fromPalette >= 0)
         return fromPalette == 1;
 
+    // The theme's own name is the next best thing: it is what XFCE actually changes.
     if (m_themeNameHint >= 0)
         return m_themeNameHint == 1;
+
+    if (m_schemeHint >= 0)
+        return m_schemeHint == 1;
 
     // A visualiser is the centrepiece here, so when nothing can be determined, dark.
     return true;
