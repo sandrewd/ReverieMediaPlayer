@@ -8,6 +8,9 @@ AbstractButton {
 
     property string glyph: "play"
     property bool primary: false
+    // Buttons sitting over the visualiser cannot borrow the shell's text colour: whatever the
+    // theme, the thing behind them is arbitrary video and may be any brightness.
+    property bool overVideo: false
     property int size: primary ? Theme.controlSize : Theme.controlSizeSmall
 
     implicitWidth: size
@@ -19,7 +22,9 @@ AbstractButton {
         radius: width / 2
         color: control.primary
             ? (control.down ? Theme.accentDim : Theme.accent)
-            : (control.hovered ? Theme.surfaceHigh : "transparent")
+            : control.overVideo
+                ? (control.hovered ? "#66ffffff" : "transparent")
+                : (control.hovered ? Theme.surfaceHigh : "transparent")
         Behavior on color { ColorAnimation { duration: 90 } }
     }
 
@@ -29,10 +34,17 @@ AbstractButton {
             anchors.centerIn: parent
             width: control.size * 0.42
             height: control.size * 0.42
+
+            // Repaint when the colour changes, not just the glyph: the theme can now switch
+            // while the application is running.
+            property color glyphColor: control.primary ? "#0f1115"
+                                     : control.overVideo ? Theme.overlayText : Theme.text
+            onGlyphColorChanged: canvas.requestPaint()
+
             onPaint: {
                 const ctx = getContext("2d")
                 ctx.reset()
-                ctx.fillStyle = control.primary ? "#0f1115" : Theme.text
+                ctx.fillStyle = canvas.glyphColor
                 const w = width, h = height
                 switch (control.glyph) {
                 case "play":

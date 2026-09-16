@@ -251,33 +251,47 @@ ApplicationWindow {
 
     // --- chrome ------------------------------------------------------------------------
 
-    RowLayout {
-        // Keep clear of the playlist panel: this chrome belongs to the visualiser area.
+    Rectangle {
+        // Keep clear of the playlist panel: this chrome belongs to the visualiser area. It
+        // carries its own backdrop because the preset behind it can be any colour.
         anchors { right: parent.right; top: parent.top; margins: 10 }
+        // The edge handle is vertically centred, so it never reaches this corner.
         anchors.rightMargin: root.showPlaylist ? 350 : 10
         visible: !root.mini && (!root.fullscreen || root.controlsVisible)
         opacity: root.controlsVisible ? 1.0 : 0.0
         Behavior on opacity { NumberAnimation { duration: 180 } }
+        width: chromeRow.implicitWidth + 12
+        height: chromeRow.implicitHeight + 8
+        radius: Theme.radius
+        color: Theme.overlayBackground
+
+    RowLayout {
+        id: chromeRow
+        anchors.centerIn: parent
         spacing: 4
 
         IconButton {
             glyph: "expand"
+            overVideo: true
             onClicked: root.fullscreen = !root.fullscreen
             ToolTip.visible: hovered
             ToolTip.text: qsTr("Fullscreen visualiser")
         }
         IconButton {
             glyph: "mini"
+            overVideo: true
             onClicked: root.mini = true
             ToolTip.visible: hovered
             ToolTip.text: qsTr("Mini player")
         }
         IconButton {
             glyph: "menu"
+            overVideo: true
             onClicked: optionsMenu.popup()
             ToolTip.visible: hovered
             ToolTip.text: qsTr("Options")
         }
+    }
     }
 
     IconButton {
