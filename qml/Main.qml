@@ -98,6 +98,11 @@ ApplicationWindow {
             playIndex(PlaylistModel.previousIndex(true))
     }
 
+    Component.onCompleted: {
+        PresetLibrary.rootPath = initialPresetsPath
+        PresetLibrary.curatedList = initialCuratedList
+    }
+
     Connections {
         target: AudioEngine
         function onEndOfStream() { root.playNext() }
@@ -125,10 +130,21 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 
+                // The visualiser area is black in its own right, not just when projectM
+                // happens to have cleared its buffer. Covers startup, resizes and every frame
+                // where there is no texture yet, in either theme.
+                Rectangle {
+                    anchors.fill: parent
+                    color: "black"
+                }
+
                 ProjectMItem {
                     id: visualizer
                     anchors.fill: parent
                     audioEngine: AudioEngine
+                    // Black unless audio is actually flowing. Pausing counts as not playing.
+                    active: AudioEngine.state === AudioEngine.Playing
+                            || AudioEngine.state === AudioEngine.Buffering
                     renderScale: initialScale
                     presetPath: initialPreset
                     presetsPath: initialPresetsPath
@@ -139,6 +155,10 @@ ApplicationWindow {
                 // player uses. Moving the mouse brings the controls back.
                 TapHandler {
                     onDoubleTapped: root.fullscreen = !root.fullscreen
+                }
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    onTapped: presetMenu.popup()
                 }
                 HoverHandler {
                     id: visualizerHover
@@ -180,20 +200,10 @@ ApplicationWindow {
                     anchors.centerIn: parent
                     visible: PlaylistModel.count === 0
                     text: qsTr("Drop music here")
-                    color: Theme.textDim
+                    color: Theme.overlayTextDim
                     font.pixelSize: 16
                 }
 
-                PresetBar {
-                    id: presetBar
-                    visualizer: visualizer
-                    showQuality: true
-                    anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom }
-                    anchors.bottomMargin: 14
-                    opacity: root.controlsVisible ? 1.0 : 0.0
-                    visible: opacity > 0.01
-                    Behavior on opacity { NumberAnimation { duration: 180 } }
-                }
             }
 
             Rectangle {
@@ -269,6 +279,100 @@ ApplicationWindow {
         onClicked: root.mini = false
         ToolTip.visible: hovered
         ToolTip.text: qsTr("Back to full player")
+    }
+
+    // Right-click the visualiser. Grouped by the categories the preset pack already ships
+    // with, which is the only grouping anyone has actually curated.
+    Menu {
+        id: presetMenu
+
+        function shuffleAll() {
+            visualizer.setPresetList(PresetLibrary.paths(""))
+            visualizer.shuffle = true
+            visualizer.presetLocked = false
+        }
+        function shuffleCategory(category) {
+            visualizer.setPresetList(PresetLibrary.paths(category))
+            visualizer.shuffle = true
+            visualizer.presetLocked = false
+        }
+
+        MenuItem {
+            text: visualizer.presetName !== "" ? visualizer.presetName : qsTr("No visualisation")
+            enabled: false
+        }
+        MenuSeparator {}
+        MenuItem {
+            text: qsTr("Random — rotate through everything")
+            onTriggered: { presetMenu.shuffleAll(); visualizer.randomPreset() }
+        }
+        MenuItem { text: qsTr("Next");     onTriggered: visualizer.nextPreset() }
+        MenuItem { text: qsTr("Previous"); onTriggered: visualizer.previousPreset() }
+        MenuItem {
+            text: qsTr("Stay on this one")
+            checkable: true
+            checked: visualizer.presetLocked
+            onTriggered: visualizer.presetLocked = checked
+        }
+        MenuSeparator {}
+
+        // Categories are appended, so everything above keeps a fixed index.
+        Instantiator {
+            model: PresetLibrary.categories
+            delegate: categoryMenu
+            onObjectAdded: function(index, object) { presetMenu.addMenu(object) }
+            onObjectRemoved: function(index, object) { presetMenu.removeMenu(object) }
+        }
+    }
+
+    Component {
+        id: categoryMenu
+        Menu {
+            id: catMenu
+            required property string modelData
+            title: modelData
+            property bool populated: false
+
+            MenuItem {
+                text: qsTr("Random from %1").arg(catMenu.modelData)
+                onTriggered: {
+                    presetMenu.shuffleCategory(catMenu.modelData)
+                    visualizer.randomPreset()
+                }
+            }
+            MenuSeparator {}
+
+            // Built on first open. Creating ~480 menu items up front is a visible stall on a
+            // software renderer, and most categories are never opened.
+            onAboutToShow: {
+                if (populated)
+                    return
+                populated = true
+                const items = PresetLibrary.presets(catMenu.modelData)
+                for (let i = 0; i < items.length; ++i) {
+                    catMenu.addItem(presetItem.createObject(catMenu, {
+                        text: items[i].name,
+                        category: catMenu.modelData,
+                        presetIndex: i
+                    }))
+                }
+            }
+        }
+    }
+
+    Component {
+        id: presetItem
+        MenuItem {
+            property string category: ""
+            property int presetIndex: 0
+            // Choosing one deliberately means staying on it; the rotation would move off it
+            // in half a minute otherwise.
+            onTriggered: {
+                visualizer.setPresetList(PresetLibrary.paths(category))
+                visualizer.jumpTo(presetIndex)
+                visualizer.presetLocked = true
+            }
+        }
     }
 
     Menu {
@@ -356,7 +460,13 @@ ApplicationWindow {
                 text: qsTr("Curated set")
                 checkable: true
                 checked: visualizer.curatedList !== ""
-                onTriggered: visualizer.curatedList = checked ? initialCuratedList : ""
+                onTriggered: {
+                    const list = checked ? initialCuratedList : ""
+                    visualizer.curatedList = list
+                    PresetLibrary.curatedList = list
+                    // An explicit category selection is no longer valid across a library swap.
+                    visualizer.setPresetList([])
+                }
             }
             MenuItem {
                 text: qsTr("Shuffle presets")

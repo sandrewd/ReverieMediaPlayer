@@ -55,6 +55,8 @@ qt_add_executable(player
     src/MprisAdaptor.h
     src/SystemTheme.cpp
     src/SystemTheme.h
+    src/PresetLibrary.cpp
+    src/PresetLibrary.h
 )
 
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -68,7 +70,6 @@ qt_add_qml_module(player
         qml/IconButton.qml
         qml/TransportBar.qml
         qml/PlaylistPanel.qml
-        qml/PresetBar.qml
 )
 
 target_include_directories(player PRIVATE src)

@@ -109,6 +109,15 @@ public:
             m_pendingLibrary = true;
         }
 
+        m_active = pmItem->active();
+        const QStringList wantedList = pmItem->presetList();
+        if (wantedList != m_explicitPaths) {
+            m_explicitPaths = wantedList;
+            m_pendingLibrary = true;
+        }
+        const int jump = pmItem->takePendingJump();
+        if (jump >= 0)
+            m_pendingJumpIndex = jump;
         m_adaptive = pmItem->adaptiveQuality();
         m_targetFps = pmItem->targetFps();
         m_wantLocked = pmItem->presetLocked();
@@ -140,6 +149,30 @@ public:
 
         applySettings();
         runCommands();
+        publishPreset();
+
+        if (!m_active) {
+            // Clear once, then stop asking for frames. Not calling update() lets the render
+            // thread go quiet, which matters on a software renderer: an idle player should
+            // not be burning two cores drawing something nobody asked for.
+            if (!m_idleCleared) {
+                if (auto *ctx = QOpenGLContext::currentContext()) {
+                    ctx->functions()->glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+                    ctx->functions()->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                }
+                m_idleCleared = true;
+                m_fps = 0.0;
+                m_lastFrameMs = 0.0;
+                if (m_item) {
+                    QMetaObject::invokeMethod(m_item, "applyStats", Qt::QueuedConnection,
+                                              Q_ARG(qreal, 0.0), Q_ARG(qreal, 0.0),
+                                              Q_ARG(int, m_fboSize.width()),
+                                              Q_ARG(int, m_fboSize.height()));
+                }
+            }
+            return;
+        }
+        m_idleCleared = false;
 
         feedAudio();
 
@@ -194,7 +227,6 @@ public:
 
         // Push stats straight to the GUI thread a few times a second. A queued invocation is
         // safe across threads; doing it every frame would just flood the event loop.
-        publishPreset();
         adaptQuality();
 
         if (!m_statsPosted.isValid() || m_statsPosted.elapsed() >= 200) {
@@ -264,9 +296,18 @@ private:
         projectm_playlist_clear(m_playlist);
 
         uint32_t added = 0;
+        // An explicit list wins: this is how the category picker narrows the rotation.
+        if (!m_explicitPaths.isEmpty()) {
+            for (const QString &path : std::as_const(m_explicitPaths)) {
+                if (projectm_playlist_add_preset(m_playlist, path.toUtf8().constData(), false))
+                    ++added;
+            }
+            qInfo("preset library: %u presets from an explicit list", added);
+        }
+
         // A curated list keeps the default experience to a few hundred presets. The full
         // corpus stays one menu item away rather than being the thing a new user lands in.
-        if (!m_curatedList.isEmpty()) {
+        if (added == 0 && !m_curatedList.isEmpty()) {
             QFile listFile(m_curatedList);
             if (listFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
                 const QDir base(m_presetsPath);
@@ -313,7 +354,18 @@ private:
 
     void runCommands()
     {
-        if (!m_playlist || m_commands.isEmpty())
+        if (!m_playlist)
+            return;
+
+        if (m_pendingJumpIndex >= 0) {
+            const uint32_t size = projectm_playlist_size(m_playlist);
+            if (size > 0 && uint32_t(m_pendingJumpIndex) < size)
+                projectm_playlist_set_position(m_playlist, uint32_t(m_pendingJumpIndex), true);
+            m_pendingJumpIndex = -1;
+            m_presetDirty = true;
+        }
+
+        if (m_commands.isEmpty())
             return;
         const uint32_t size = projectm_playlist_size(m_playlist);
         for (int command : std::as_const(m_commands)) {
@@ -420,8 +472,8 @@ private:
     {
         float samples[kSamplesPerFrame * 2];
 
-        // Real audio when the pipeline is delivering it; the synthetic sweep otherwise, so
-        // the visualiser is never a still image while the user is browsing a playlist.
+        // Only ever real audio. If the pipeline has not delivered any yet, feed silence
+        // rather than inventing a signal.
         if (m_ring && m_ring->readLatest(samples, kSamplesPerFrame)) {
             m_audioIsLive = true;
             if (qEnvironmentVariableIsSet("PLAYER_PROBE") && m_frameCount % 60 == 0) {
@@ -436,22 +488,9 @@ private:
             return;
         }
         m_audioIsLive = false;
-        if (qEnvironmentVariableIsSet("PLAYER_PROBE") && m_frameCount % 60 == 0)
-            qInfo("  audio: synthetic fallback (no PCM arriving)");
-
-        const double sweep = 220.0 + 160.0 * std::sin(m_sweepPhase);
-        m_sweepPhase += 0.01;
-
-        for (int i = 0; i < kSamplesPerFrame; ++i) {
-            const double t = m_phase + i / kSampleRate;
-            const double v = 0.55 * std::sin(2.0 * M_PI * sweep * t)
-                           + 0.25 * std::sin(2.0 * M_PI * sweep * 2.0 * t)
-                           + 0.20 * std::sin(2.0 * M_PI * 55.0 * t);
-            samples[i * 2] = static_cast<float>(v);
-            samples[i * 2 + 1] = static_cast<float>(v * 0.85);
-        }
-        m_phase += kSamplesPerFrame / kSampleRate;
-
+        std::memset(samples, 0, sizeof(samples));
+        m_phase = 0.0;
+        m_sweepPhase = 0.0;
         projectm_pcm_add_float(m_pm, samples, kSamplesPerFrame, PROJECTM_STEREO);
     }
 
@@ -462,6 +501,10 @@ private:
     bool m_audioIsLive = false;
     QString m_presetsPath;
     QString m_curatedList;
+    QStringList m_explicitPaths;
+    int m_pendingJumpIndex = -1;
+    bool m_active = true;
+    bool m_idleCleared = false;
     QList<int> m_commands;
     bool m_pendingLibrary = false;
     bool m_presetDirty = false;
@@ -608,6 +651,47 @@ QList<int> ProjectMItem::takeCommands()
 {
     QMutexLocker lock(&m_commandMutex);
     return std::move(m_commands);
+}
+
+void ProjectMItem::setActive(bool active)
+{
+    if (active == m_active)
+        return;
+    m_active = active;
+    emit activeChanged();
+    update();
+}
+
+void ProjectMItem::setPresetList(const QStringList &paths)
+{
+    QMutexLocker lock(&m_commandMutex);
+    if (paths == m_presetList)
+        return;
+    m_presetList = paths;
+    lock.unlock();
+    update();
+}
+
+QStringList ProjectMItem::presetList() const
+{
+    QMutexLocker lock(const_cast<QMutex *>(&m_commandMutex));
+    return m_presetList;
+}
+
+void ProjectMItem::jumpTo(int index)
+{
+    QMutexLocker lock(&m_commandMutex);
+    m_pendingJump = index;
+    lock.unlock();
+    update();
+}
+
+int ProjectMItem::takePendingJump()
+{
+    QMutexLocker lock(&m_commandMutex);
+    const int jump = m_pendingJump;
+    m_pendingJump = -1;
+    return jump;
 }
 
 void ProjectMItem::setAdaptiveQuality(bool enabled)

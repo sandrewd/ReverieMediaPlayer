@@ -2,6 +2,7 @@
 
 #include <QQuickFramebufferObject>
 #include <QMutex>
+#include <QStringList>
 #include <QSize>
 #include <QString>
 #include <QtQml/qqmlregistration.h>
@@ -36,6 +37,9 @@ class ProjectMItem : public QQuickFramebufferObject
 
     // The frame-time overlay was always meant to become the input to automatic render-scale
     // selection rather than just a readout. This is that.
+    // When nothing is playing the visualiser is black. No synthetic audio, no idle animation:
+    // an animating visualiser with silent speakers reads as "music is playing" and is a lie.
+    Q_PROPERTY(bool active READ active WRITE setActive NOTIFY activeChanged)
     Q_PROPERTY(bool adaptiveQuality READ adaptiveQuality WRITE setAdaptiveQuality NOTIFY adaptiveQualityChanged)
     Q_PROPERTY(qreal targetFps READ targetFps WRITE setTargetFps NOTIFY targetFpsChanged)
 
@@ -73,6 +77,8 @@ public:
     qreal presetDuration() const { return m_presetDuration; }
     void setPresetDuration(qreal seconds);
 
+    bool active() const { return m_active; }
+    void setActive(bool active);
     bool adaptiveQuality() const { return m_adaptiveQuality; }
     void setAdaptiveQuality(bool enabled);
     qreal targetFps() const { return m_targetFps; }
@@ -81,6 +87,14 @@ public:
     Q_INVOKABLE void nextPreset();
     Q_INVOKABLE void previousPreset();
     Q_INVOKABLE void randomPreset();
+
+    // Point the visualiser at an explicit set of presets, such as one category, and optionally
+    // jump straight to one of them.
+    Q_INVOKABLE void setPresetList(const QStringList &paths);
+    Q_INVOKABLE void jumpTo(int index);
+
+    QStringList presetList() const;
+    int takePendingJump();
 
     // Drained by the renderer, which is the only thread allowed to touch projectM.
     enum Command { CommandNext = 1, CommandPrevious, CommandRandom, CommandReload };
@@ -106,6 +120,7 @@ signals:
     void presetLockedChanged();
     void shuffleChanged();
     void presetDurationChanged();
+    void activeChanged();
     void adaptiveQualityChanged();
     void targetFpsChanged();
     void statsChanged();
@@ -127,9 +142,12 @@ private:
     bool m_shuffle = true;
     qreal m_presetDuration = 30.0;
 
+    bool m_active = true;
     bool m_adaptiveQuality = true;
     qreal m_targetFps = 30.0;
 
     QMutex m_commandMutex;
     QList<int> m_commands;
+    QStringList m_presetList;
+    int m_pendingJump = -1;
 };
