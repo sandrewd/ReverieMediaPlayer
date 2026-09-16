@@ -88,8 +88,15 @@ private:
     QColor m_customSurface;
     QColor m_customAccent;
     QColor m_customText;
+    // The desktop's own palette, captured before we ever impose one. Qt has no API to read
+    // the platform palette back once an application palette has been set, so this is the only
+    // chance to have it.
     QPalette m_platformPalette;
+    int m_platformPaletteIsDark = -1;
     bool m_applyingPalette = false;
+    // Once we set a palette, Qt stops refreshing it from the platform, so the palette is no
+    // longer usable as a detection signal.
+    bool m_palettePinned = false;
 
     QProcess m_monitor;
     QProcess m_xfconfMonitor;

@@ -22,8 +22,10 @@ SystemTheme::SystemTheme(QObject *parent)
     m_customText = settings.value(QStringLiteral("appearance/text"),
                                   QColor("#e8eaed")).value<QColor>();
 
-    if (qApp)
+    if (qApp) {
         m_platformPalette = qApp->palette();
+        m_platformPaletteIsDark = paletteHint();
+    }
 
     m_schemeHint = querySchemeHint();
     m_themeNameHint = queryThemeNameHint();
@@ -181,10 +183,14 @@ bool SystemTheme::eventFilter(QObject *watched, QEvent *event)
 {
     // Ignore the palette change we caused ourselves, or we would re-detect from our own
     // output and chase our tail.
-    if (event->type() == QEvent::ApplicationPaletteChange && !m_applyingPalette) {
-        m_platformPalette = qApp ? qApp->palette() : m_platformPalette;
+    if (event->type() == QEvent::ApplicationPaletteChange && !m_applyingPalette
+        && !m_palettePinned) {
+        // Only meaningful while the platform still owns the palette.
+        if (qApp) {
+            m_platformPalette = qApp->palette();
+            m_platformPaletteIsDark = paletteHint();
+        }
         redetect();
-        applyPalette();
     }
     return QObject::eventFilter(watched, event);
 }
@@ -196,16 +202,22 @@ void SystemTheme::applyPalette()
 
     m_applyingPalette = true;
 
-    if (m_preference == FollowSystem) {
-        // Best effort: Qt has no way to un-set an application palette, so a session that has
-        // been on a custom theme keeps a pinned palette until restart. Startup avoids calling
-        // this at all in the common case, which is what keeps following the system working.
-        qApp->setPalette(m_platformPalette);
-        m_applyingPalette = false;
-        return;
-    }
-
     const bool isDark = dark();
+
+    if (m_preference == FollowSystem) {
+        // Qt cannot un-set an application palette, so returning to Follow system after a
+        // custom theme has to mean building one rather than clearing one. Where the desktop
+        // has not changed polarity since launch, the palette captured at startup is the real
+        // thing and gets used verbatim - exact GTK colours, not an approximation. If it has
+        // changed, fall through and construct one, which gets the polarity right even though
+        // it will not match an unusual GTK theme shade for shade.
+        if (m_platformPaletteIsDark >= 0 && (m_platformPaletteIsDark == 1) == isDark) {
+            qApp->setPalette(m_platformPalette);
+            m_palettePinned = true;
+            m_applyingPalette = false;
+            return;
+        }
+    }
     const QColor background = m_preference == Custom ? m_customBackground
                                                      : QColor(isDark ? "#0f1115" : "#f2f3f5");
     const QColor surface = m_preference == Custom ? m_customSurface
@@ -237,6 +249,7 @@ void SystemTheme::applyPalette()
     palette.setColor(QPalette::Disabled, QPalette::WindowText, dimText);
 
     qApp->setPalette(palette);
+    m_palettePinned = true;
     m_applyingPalette = false;
 }
 
@@ -305,19 +318,25 @@ int SystemTheme::querySchemeHint()
 bool SystemTheme::detectSystemDark() const
 {
     // The palette Qt paints with comes from the qgtk3 platform theme, so it reflects the GTK
-    // theme actually in force. That is a stronger signal than any stored preference, and it
-    // is checked first - on Mint XFCE `color-scheme` sits at 'prefer-dark' even after the
-    // user switches to a light theme, so trusting it first pinned the application to dark.
-    const int fromPalette = paletteHint();
-    if (fromPalette >= 0)
-        return fromPalette == 1;
+    // theme actually in force - the strongest signal there is, and better than any stored
+    // preference: on Mint XFCE `color-scheme` sits at 'prefer-dark' even after switching to a
+    // light theme. But it is only usable while we have not imposed a palette of our own,
+    // because after that Qt stops refreshing it and it would report our own output back.
+    if (!m_palettePinned) {
+        const int fromPalette = paletteHint();
+        if (fromPalette >= 0)
+            return fromPalette == 1;
+    }
 
-    // The theme's own name is the next best thing: it is what XFCE actually changes.
+    // The theme's own name is what XFCE actually changes, and it keeps working once pinned.
     if (m_themeNameHint >= 0)
         return m_themeNameHint == 1;
 
     if (m_schemeHint >= 0)
         return m_schemeHint == 1;
+
+    if (m_platformPaletteIsDark >= 0)
+        return m_platformPaletteIsDark == 1;
 
     // A visualiser is the centrepiece here, so when nothing can be determined, dark.
     return true;
