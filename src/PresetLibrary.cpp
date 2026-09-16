@@ -103,6 +103,71 @@ QVariantList PresetLibrary::presets(const QString &category) const
     return result;
 }
 
+QString PresetLibrary::artistOf(const QString &presetName)
+{
+    const int separator = presetName.indexOf(QStringLiteral(" - "));
+    return separator > 0 ? presetName.left(separator).trimmed() : QString();
+}
+
+QString PresetLibrary::titleOf(const QString &presetName)
+{
+    const int separator = presetName.indexOf(QStringLiteral(" - "));
+    return separator > 0 ? presetName.mid(separator + 3).trimmed() : presetName;
+}
+
+QVariantList PresetLibrary::artistGroups(const QString &category, int minimum) const
+{
+    QVariantList result;
+    const auto it = m_byCategory.constFind(category);
+    if (it == m_byCategory.constEnd())
+        return result;
+
+    QMap<QString, QVariantList> grouped;
+    QStringList order;
+    for (int i = 0; i < it->size(); ++i) {
+        const QString artist = artistOf(it->at(i).first);
+        if (artist.isEmpty())
+            continue;
+        if (!grouped.contains(artist))
+            order.append(artist);
+        grouped[artist].append(QVariantMap{{QStringLiteral("name"), titleOf(it->at(i).first)},
+                                           {QStringLiteral("index"), i}});
+    }
+
+    order.sort(Qt::CaseInsensitive);
+    for (const QString &artist : std::as_const(order)) {
+        if (grouped.value(artist).size() < minimum)
+            continue;
+        result.append(QVariantMap{{QStringLiteral("artist"), artist},
+                                  {QStringLiteral("items"), grouped.value(artist)}});
+    }
+    return result;
+}
+
+QVariantList PresetLibrary::ungrouped(const QString &category, int minimum) const
+{
+    QVariantList result;
+    const auto it = m_byCategory.constFind(category);
+    if (it == m_byCategory.constEnd())
+        return result;
+
+    QMap<QString, int> counts;
+    for (const auto &entry : *it) {
+        const QString artist = artistOf(entry.first);
+        if (!artist.isEmpty())
+            ++counts[artist];
+    }
+
+    for (int i = 0; i < it->size(); ++i) {
+        const QString artist = artistOf(it->at(i).first);
+        if (!artist.isEmpty() && counts.value(artist) >= minimum)
+            continue;
+        result.append(QVariantMap{{QStringLiteral("name"), it->at(i).first},
+                                  {QStringLiteral("index"), i}});
+    }
+    return result;
+}
+
 QStringList PresetLibrary::paths(const QString &category) const
 {
     QStringList result;

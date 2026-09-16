@@ -282,45 +282,47 @@ ApplicationWindow {
     }
 
     // Right-click the visualiser. Grouped by the categories the preset pack already ships
-    // with, which is the only grouping anyone has actually curated.
+    // with, then by author where an author actually has several presets in that category.
     Menu {
         id: presetMenu
+        width: 420
 
-        function shuffleAll() {
-            visualizer.setPresetList(PresetLibrary.paths(""))
-            visualizer.shuffle = true
-            visualizer.presetLocked = false
-        }
-        function shuffleCategory(category) {
+        function useList(category) {
             visualizer.setPresetList(PresetLibrary.paths(category))
-            visualizer.shuffle = true
-            visualizer.presetLocked = false
         }
 
         MenuItem {
             text: visualizer.presetName !== "" ? visualizer.presetName : qsTr("No visualisation")
             enabled: false
+            ToolTip.visible: hovered && visualizer.presetName !== ""
+            ToolTip.text: visualizer.presetName
         }
         MenuSeparator {}
-        MenuItem {
-            text: qsTr("Random — rotate through everything")
-            onTriggered: { presetMenu.shuffleAll(); visualizer.randomPreset() }
-        }
-        MenuItem { text: qsTr("Next");     onTriggered: visualizer.nextPreset() }
-        MenuItem { text: qsTr("Previous"); onTriggered: visualizer.previousPreset() }
+
+        // Categories are inserted here, above this separator.
+        MenuSeparator {}
         MenuItem {
             text: qsTr("Stay on this one")
             checkable: true
             checked: visualizer.presetLocked
             onTriggered: visualizer.presetLocked = checked
         }
-        MenuSeparator {}
+        MenuItem {
+            text: qsTr("Randomize")
+            onTriggered: {
+                presetMenu.useList("")
+                visualizer.shuffle = true
+                visualizer.presetLocked = false
+                visualizer.randomPreset()
+            }
+        }
 
-        // Categories are appended, so everything above keeps a fixed index.
         Instantiator {
             model: PresetLibrary.categories
             delegate: categoryMenu
-            onObjectAdded: function(index, object) { presetMenu.addMenu(object) }
+            // Index 2 keeps the header and its separator on top and pushes the trailing
+            // separator, lock and Randomize down as categories arrive.
+            onObjectAdded: function(index, object) { presetMenu.insertMenu(2 + index, object) }
             onObjectRemoved: function(index, object) { presetMenu.removeMenu(object) }
         }
     }
@@ -331,29 +333,67 @@ ApplicationWindow {
             id: catMenu
             required property string modelData
             title: modelData
+            width: 560
             property bool populated: false
 
             MenuItem {
-                text: qsTr("Random from %1").arg(catMenu.modelData)
+                text: qsTr("Randomize %1").arg(catMenu.modelData)
                 onTriggered: {
-                    presetMenu.shuffleCategory(catMenu.modelData)
+                    presetMenu.useList(catMenu.modelData)
+                    visualizer.shuffle = true
+                    visualizer.presetLocked = false
                     visualizer.randomPreset()
                 }
             }
             MenuSeparator {}
 
-            // Built on first open. Creating ~480 menu items up front is a visible stall on a
-            // software renderer, and most categories are never opened.
+            // Built on first open. Creating every menu item up front is a visible stall on a
+            // software renderer and most categories are never opened.
             onAboutToShow: {
                 if (populated)
                     return
                 populated = true
-                const items = PresetLibrary.presets(catMenu.modelData)
-                for (let i = 0; i < items.length; ++i) {
+                const category = catMenu.modelData
+
+                const groups = PresetLibrary.artistGroups(category)
+                for (let g = 0; g < groups.length; ++g) {
+                    const sub = artistMenu.createObject(catMenu, {
+                        title: groups[g].artist,
+                        category: category,
+                        entries: groups[g].items
+                    })
+                    catMenu.addMenu(sub)
+                }
+
+                const loose = PresetLibrary.ungrouped(category)
+                for (let i = 0; i < loose.length; ++i) {
                     catMenu.addItem(presetItem.createObject(catMenu, {
-                        text: items[i].name,
-                        category: catMenu.modelData,
-                        presetIndex: i
+                        text: loose[i].name,
+                        category: category,
+                        presetIndex: loose[i].index
+                    }))
+                }
+            }
+        }
+    }
+
+    Component {
+        id: artistMenu
+        Menu {
+            id: artist
+            property string category: ""
+            property var entries: []
+            width: 560
+            property bool populated: false
+            onAboutToShow: {
+                if (populated)
+                    return
+                populated = true
+                for (let i = 0; i < entries.length; ++i) {
+                    artist.addItem(presetItem.createObject(artist, {
+                        text: entries[i].name,
+                        category: artist.category,
+                        presetIndex: entries[i].index
                     }))
                 }
             }
@@ -425,7 +465,7 @@ ApplicationWindow {
             id: overlayToggle
             text: qsTr("Show frame-time overlay")
             checkable: true
-            checked: true
+            checked: false
         }
         MenuSeparator {}
         Menu {

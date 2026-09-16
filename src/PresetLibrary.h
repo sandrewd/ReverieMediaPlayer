@@ -35,6 +35,17 @@ public:
     // Just the paths, in order; an empty category means the whole library.
     Q_INVOKABLE QStringList paths(const QString &category = QString()) const;
 
+    // Milkdrop names follow "Author - Title", so the author is a free second level. Grouping
+    // is only worth it where an author actually has several presets in the category: some
+    // categories are 24 authors deep and would become a wall of one-item submenus.
+    // Returns [{ artist, items: [{ name, index }] }]; index addresses paths(category).
+    Q_INVOKABLE QVariantList artistGroups(const QString &category, int minimum = 3) const;
+    // Everything not covered by a group, as [{ name, index }].
+    Q_INVOKABLE QVariantList ungrouped(const QString &category, int minimum = 3) const;
+
+    static QString artistOf(const QString &presetName);
+    static QString titleOf(const QString &presetName);
+
 signals:
     void libraryChanged();
 
