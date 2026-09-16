@@ -50,6 +50,8 @@ int main(int argc, char *argv[])
     parser.addOption(miniOption);
     QCommandLineOption presetsOption("presets", "Directory holding the preset library.", "dir");
     parser.addOption(presetsOption);
+    QCommandLineOption fullscreenOption("fullscreen", "Start with the visualiser fullscreen.");
+    parser.addOption(fullscreenOption);
     parser.addPositionalArgument("files", "Audio files or folders to add to the playlist.",
                                  "[files...]");
     parser.process(app);
@@ -132,6 +134,8 @@ int main(int argc, char *argv[])
 
     if (parser.isSet(miniOption))
         window->setProperty("mini", true);
+    if (parser.isSet(fullscreenOption))
+        window->setProperty("fullscreen", true);
 
     const QString capturePath = parser.value(captureOption);
     if (!capturePath.isEmpty()) {

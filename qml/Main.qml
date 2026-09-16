@@ -21,13 +21,29 @@ ApplicationWindow {
     minimumHeight: mini ? 62 : Theme.minWindowHeight
 
     property bool mini: false
+    property bool fullscreen: false
     property bool playlistVisible: true
     property bool alwaysOnTop: false
+    property bool controlsVisible: true
+
+    // In fullscreen the chrome gets out of the way; windowed, it always stays.
+    Timer {
+        id: idleTimer
+        interval: 2600
+        onTriggered: if (root.fullscreen) root.controlsVisible = false
+    }
+    onControlsVisibleChanged: if (controlsVisible && fullscreen) idleTimer.restart()
 
     // Collapse order as the window narrows: playlist panel first, then the volume slider
     // (inside TransportBar), then the artist line. The transport itself never collapses.
     readonly property bool roomForPlaylist: width >= 700
-    readonly property bool showPlaylist: !mini && playlistVisible && roomForPlaylist
+    readonly property bool showPlaylist: !mini && !fullscreen && playlistVisible && roomForPlaylist
+
+    onFullscreenChanged: {
+        root.visibility = fullscreen ? Window.FullScreen : Window.Windowed
+        if (fullscreen)
+            idleTimer.restart()
+    }
 
     onMiniChanged: {
         if (mini) {
@@ -97,6 +113,18 @@ ApplicationWindow {
                     audioEngine: AudioEngine
                     renderScale: initialScale
                     presetPath: initialPreset
+                    presetsPath: initialPresetsPath
+                    curatedList: initialCuratedList
+                }
+
+                // Double-click the visualiser for fullscreen, the same gesture every video
+                // player uses. Moving the mouse brings the controls back.
+                TapHandler {
+                    onDoubleTapped: root.fullscreen = !root.fullscreen
+                }
+                HoverHandler {
+                    id: visualizerHover
+                    onPointChanged: if (root.fullscreen) { controlsVisible = true; idleTimer.restart() }
                 }
 
                 // Frame-time overlay, required from the first commit: over RustDesk observed
@@ -130,6 +158,17 @@ ApplicationWindow {
                     color: Theme.textDim
                     font.pixelSize: 16
                 }
+
+                PresetBar {
+                    id: presetBar
+                    visualizer: visualizer
+                    showQuality: true
+                    anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom }
+                    anchors.bottomMargin: 14
+                    opacity: root.controlsVisible ? 1.0 : 0.0
+                    visible: opacity > 0.01
+                    Behavior on opacity { NumberAnimation { duration: 180 } }
+                }
             }
 
             Rectangle {
@@ -149,6 +188,7 @@ ApplicationWindow {
 
         TransportBar {
             Layout.fillWidth: true
+            visible: !root.fullscreen || root.controlsVisible
             compact: root.mini
             onRequestNext: root.playNext()
             onRequestPrevious: root.playPrevious()
@@ -161,7 +201,9 @@ ApplicationWindow {
         // Keep clear of the playlist panel: this chrome belongs to the visualiser area.
         anchors { right: parent.right; top: parent.top; margins: 10 }
         anchors.rightMargin: root.showPlaylist ? 350 : 10
-        visible: !root.mini
+        visible: !root.mini && (!root.fullscreen || root.controlsVisible)
+        opacity: root.controlsVisible ? 1.0 : 0.0
+        Behavior on opacity { NumberAnimation { duration: 180 } }
         spacing: 4
 
         IconButton {
@@ -171,6 +213,12 @@ ApplicationWindow {
             ToolTip.visible: hovered
             ToolTip.text: root.roomForPlaylist ? qsTr("Show or hide the playlist")
                                                : qsTr("Window too narrow for the playlist")
+        }
+        IconButton {
+            glyph: "expand"
+            onClicked: root.fullscreen = !root.fullscreen
+            ToolTip.visible: hovered
+            ToolTip.text: qsTr("Fullscreen visualiser")
         }
         IconButton {
             glyph: "mini"
@@ -230,10 +278,48 @@ ApplicationWindow {
         MenuSeparator {}
         Menu {
             title: qsTr("Visual quality")
-            MenuItem { text: qsTr("Low (25%)");    onTriggered: visualizer.renderScale = 0.25 }
-            MenuItem { text: qsTr("Medium (50%)"); onTriggered: visualizer.renderScale = 0.5 }
-            MenuItem { text: qsTr("High (75%)");   onTriggered: visualizer.renderScale = 0.75 }
-            MenuItem { text: qsTr("Full (100%)");  onTriggered: visualizer.renderScale = 1.0 }
+            MenuItem {
+                text: qsTr("Automatic")
+                checkable: true
+                checked: visualizer.adaptiveQuality
+                onTriggered: visualizer.adaptiveQuality = checked
+            }
+            MenuSeparator {}
+            MenuItem {
+                text: qsTr("Low (25%)")
+                onTriggered: { visualizer.adaptiveQuality = false; visualizer.renderScale = 0.25 }
+            }
+            MenuItem {
+                text: qsTr("Medium (50%)")
+                onTriggered: { visualizer.adaptiveQuality = false; visualizer.renderScale = 0.5 }
+            }
+            MenuItem {
+                text: qsTr("High (75%)")
+                onTriggered: { visualizer.adaptiveQuality = false; visualizer.renderScale = 0.75 }
+            }
+            MenuItem {
+                text: qsTr("Full (100%)")
+                onTriggered: { visualizer.adaptiveQuality = false; visualizer.renderScale = 1.0 }
+            }
+        }
+        Menu {
+            title: qsTr("Presets")
+            MenuItem {
+                text: qsTr("Curated set")
+                checkable: true
+                checked: visualizer.curatedList !== ""
+                onTriggered: visualizer.curatedList = checked ? initialCuratedList : ""
+            }
+            MenuItem {
+                text: qsTr("Shuffle presets")
+                checkable: true
+                checked: visualizer.shuffle
+                onTriggered: visualizer.shuffle = checked
+            }
+            MenuSeparator {}
+            MenuItem { text: qsTr("Change every 15 seconds"); onTriggered: visualizer.presetDuration = 15 }
+            MenuItem { text: qsTr("Change every 30 seconds"); onTriggered: visualizer.presetDuration = 30 }
+            MenuItem { text: qsTr("Change every 2 minutes");  onTriggered: visualizer.presetDuration = 120 }
         }
     }
 
@@ -303,5 +389,16 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+L";      onActivated: root.playlistVisible = !root.playlistVisible }
     Shortcut { sequence: "Up";          onActivated: AudioEngine.volume = Math.min(1, AudioEngine.volume + 0.05) }
     Shortcut { sequence: "Down";        onActivated: AudioEngine.volume = Math.max(0, AudioEngine.volume - 0.05) }
-    Shortcut { sequence: "Escape";      onActivated: if (root.mini) root.mini = false }
+    Shortcut { sequence: "F";           onActivated: root.fullscreen = !root.fullscreen }
+    Shortcut { sequence: "N";           onActivated: visualizer.nextPreset() }
+    Shortcut { sequence: "P";           onActivated: visualizer.previousPreset() }
+    Shortcut { sequence: "R";           onActivated: visualizer.randomPreset() }
+    Shortcut { sequence: "L";           onActivated: visualizer.presetLocked = !visualizer.presetLocked }
+    Shortcut {
+        sequence: "Escape"
+        onActivated: {
+            if (root.fullscreen) root.fullscreen = false
+            else if (root.mini) root.mini = false
+        }
+    }
 }
