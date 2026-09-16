@@ -62,8 +62,8 @@ public:
     bool canQuit() const { return true; }
     bool canRaise() const { return true; }
     bool hasTrackList() const { return false; }
-    QString identity() const { return QStringLiteral("Player"); }
-    QString desktopEntry() const { return QStringLiteral("player"); }
+    QString identity() const { return QStringLiteral("Reverie Media Player"); }
+    QString desktopEntry() const { return QStringLiteral("reverie"); }
     QStringList supportedUriSchemes() const;
     QStringList supportedMimeTypes() const;
 

@@ -11,8 +11,9 @@ ApplicationWindow {
     width: 1100
     height: 680
     visible: true
-    title: PlaylistModel.currentTitle !== "" ? PlaylistModel.currentTitle + " — Player"
-                                             : qsTr("Player")
+    title: PlaylistModel.currentTitle !== ""
+           ? PlaylistModel.currentTitle + " — Reverie"
+           : qsTr("Reverie Media Player")
     color: Theme.background
 
     // Bind the window's palette to the tokens. Qt Quick Controls paint from the palette, and
@@ -547,6 +548,49 @@ ApplicationWindow {
             checked: PlaylistModel.persistAcrossLaunches
             onTriggered: PlaylistModel.persistAcrossLaunches = checked
         }
+        MenuItem {
+            text: qsTr("Keep window on top")
+            checkable: true
+            checked: root.alwaysOnTop
+            onTriggered: root.alwaysOnTop = checked
+        }
+        MenuItem {
+            id: overlayToggle
+            text: qsTr("Show frame-time overlay")
+            checkable: true
+            checked: false
+        }
+        MenuSeparator {}
+        MenuItem {
+            text: qsTr("Visual quality…")
+            onTriggered: qualityDialog.open()
+        }
+        Menu {
+            title: qsTr("Presets")
+            MenuItem {
+                text: qsTr("Curated set")
+                checkable: true
+                checked: visualizer.curatedList !== ""
+                onTriggered: {
+                    const list = checked ? initialCuratedList : ""
+                    visualizer.curatedList = list
+                    PresetLibrary.curatedList = list
+                    // An explicit category selection is no longer valid across a library swap.
+                    visualizer.setPresetList([])
+                }
+            }
+            MenuItem {
+                text: qsTr("Shuffle presets")
+                checkable: true
+                checked: visualizer.shuffle
+                onTriggered: visualizer.shuffle = checked
+            }
+            MenuSeparator {}
+            MenuItem { text: qsTr("Change every 15 seconds"); onTriggered: visualizer.presetDuration = 15 }
+            MenuItem { text: qsTr("Change every 30 seconds"); onTriggered: visualizer.presetDuration = 30 }
+            MenuItem { text: qsTr("Change every 2 minutes");  onTriggered: visualizer.presetDuration = 120 }
+        }
+
         Menu {
             title: qsTr("Appearance")
 
@@ -634,47 +678,12 @@ ApplicationWindow {
                 }
             }
         }
-        MenuItem {
-            text: qsTr("Keep window on top")
-            checkable: true
-            checked: root.alwaysOnTop
-            onTriggered: root.alwaysOnTop = checked
-        }
-        MenuItem {
-            id: overlayToggle
-            text: qsTr("Show frame-time overlay")
-            checkable: true
-            checked: false
-        }
+
         MenuSeparator {}
+
         MenuItem {
-            text: qsTr("Visual quality…")
-            onTriggered: qualityDialog.open()
-        }
-        Menu {
-            title: qsTr("Presets")
-            MenuItem {
-                text: qsTr("Curated set")
-                checkable: true
-                checked: visualizer.curatedList !== ""
-                onTriggered: {
-                    const list = checked ? initialCuratedList : ""
-                    visualizer.curatedList = list
-                    PresetLibrary.curatedList = list
-                    // An explicit category selection is no longer valid across a library swap.
-                    visualizer.setPresetList([])
-                }
-            }
-            MenuItem {
-                text: qsTr("Shuffle presets")
-                checkable: true
-                checked: visualizer.shuffle
-                onTriggered: visualizer.shuffle = checked
-            }
-            MenuSeparator {}
-            MenuItem { text: qsTr("Change every 15 seconds"); onTriggered: visualizer.presetDuration = 15 }
-            MenuItem { text: qsTr("Change every 30 seconds"); onTriggered: visualizer.presetDuration = 30 }
-            MenuItem { text: qsTr("Change every 2 minutes");  onTriggered: visualizer.presetDuration = 120 }
+            text: qsTr("About…")
+            onTriggered: aboutDialog.open()
         }
     }
 
@@ -1039,6 +1048,139 @@ ApplicationWindow {
         Component.onCompleted: standardButton(Dialog.Ok).enabled = Qt.binding(function() {
             return streamDialog.acceptable
         })
+    }
+
+    Dialog {
+        id: aboutDialog
+        title: qsTr("About Reverie")
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(460, root.width - 60)
+        standardButtons: Dialog.Close
+        closePolicy: Popup.CloseOnEscape
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 10
+
+            Label {
+                text: qsTr("Reverie Media Player")
+                color: Theme.text
+                font.pixelSize: 20
+                font.weight: Font.DemiBold
+            }
+            Label {
+                text: qsTr("A music player with the visualisations built in.")
+                color: Theme.textDim
+                font.pixelSize: 12
+            }
+
+            GridLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                columns: 2
+                columnSpacing: 14
+                rowSpacing: 4
+
+                Label { text: qsTr("Version");    color: Theme.textDim; font.pixelSize: 11 }
+                Label { text: AppInfo.version;    color: Theme.text; font.pixelSize: 11; font.family: "monospace" }
+                Label { text: qsTr("Built");      color: Theme.textDim; font.pixelSize: 11 }
+                Label { text: AppInfo.buildDate;  color: Theme.text; font.pixelSize: 11; font.family: "monospace" }
+                Label { text: qsTr("Commit");     color: Theme.textDim; font.pixelSize: 11 }
+                Label { text: AppInfo.commit;     color: Theme.text; font.pixelSize: 11; font.family: "monospace" }
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: '<a href="' + AppInfo.homepage + '">' + AppInfo.homepage + '</a>'
+                color: Theme.textDim
+                linkColor: Theme.accent
+                font.pixelSize: 11
+                textFormat: Text.StyledText
+                elide: Text.ElideRight
+                onLinkActivated: function(link) { Qt.openUrlExternally(link) }
+            }
+
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("Reverie is released under the %1 licence.").arg(AppInfo.license)
+                color: Theme.textDim
+                font.pixelSize: 11
+            }
+
+            Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.border }
+
+            // Attribution is the actual obligation of the stack in §3, so this is a real
+            // credits list rather than a version dump. Everything here was read off the
+            // licence files that ship with each dependency, not assumed from its name.
+            ScrollView {
+                id: creditsView
+                Layout.fillWidth: true
+                Layout.preferredHeight: 190
+                clip: true
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
+                ColumnLayout {
+                    // availableWidth, not parent.width: inside a ScrollView the content item's
+                    // parent is the flickable, whose width is the content width rather than the
+                    // viewport, so wrapped text was being cut off instead of wrapping.
+                    width: creditsView.availableWidth
+                    spacing: 8
+
+                    Label {
+                        text: qsTr("Built with")
+                        color: Theme.text
+                        font.pixelSize: 12
+                        font.weight: Font.DemiBold
+                    }
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: 3
+                        columnSpacing: 12
+                        rowSpacing: 3
+
+                        Label { text: "Qt";        color: Theme.textDim; font.pixelSize: 11 }
+                        Label { text: AppInfo.qtVersion; color: Theme.text; font.pixelSize: 11; font.family: "monospace" }
+                        Label { text: "LGPL-3.0";  color: Theme.textDim; font.pixelSize: 11 }
+
+                        Label { text: "GStreamer"; color: Theme.textDim; font.pixelSize: 11 }
+                        Label { text: AppInfo.gstreamerVersion; color: Theme.text; font.pixelSize: 11; font.family: "monospace" }
+                        Label { text: "LGPL-2.1";  color: Theme.textDim; font.pixelSize: 11 }
+
+                        Label { text: "projectM";  color: Theme.textDim; font.pixelSize: 11 }
+                        Label { text: AppInfo.projectMVersion; color: Theme.text; font.pixelSize: 11; font.family: "monospace" }
+                        Label { text: "LGPL-2.1";  color: Theme.textDim; font.pixelSize: 11 }
+
+                        Label { text: "TagLib";    color: Theme.textDim; font.pixelSize: 11 }
+                        Label { text: AppInfo.taglibVersion; color: Theme.text; font.pixelSize: 11; font.family: "monospace" }
+                        Label { text: "LGPL-2.1 / MPL-1.1"; color: Theme.textDim; font.pixelSize: 11 }
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        text: qsTr("All four are linked dynamically. projectM additionally bundles projectm-eval and hlslparser, both MIT, and further third-party components listed in its own repository.")
+                        color: Theme.textDim
+                        font.pixelSize: 10
+                    }
+
+                    Label {
+                        Layout.topMargin: 4
+                        text: qsTr("Visualisations")
+                        color: Theme.text
+                        font.pixelSize: 12
+                        font.weight: Font.DemiBold
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        text: qsTr("The bundled presets are the Milkdrop \u201cCream of the Crop\u201d collection, curated and sorted by ISOSCELES and distributed with projectM. Per that collection\u2019s own notice, the presets were in almost all cases never released under a specific licence and are treated as public domain, with each preset author retaining copyright in their own work.")
+                        color: Theme.textDim
+                        font.pixelSize: 10
+                    }
+                }
+            }
+        }
     }
 
     FileDialog {

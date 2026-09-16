@@ -3,7 +3,10 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
+#include <QDir>
+#include <QFile>
 #include <QFileInfo>
+#include <QStandardPaths>
 #include <QUrl>
 
 #include "PlaylistModel.h"
@@ -12,6 +15,33 @@
 
 #include <QSurfaceFormat>
 #include <QTimer>
+
+namespace {
+
+// The application used to be called "player". Copy the old settings and saved session across
+// the first time we run under the new name, and leave the originals alone: if this turns out
+// to be wrong, nothing has been destroyed.
+void migrateLegacySettings()
+{
+    const QString configRoot = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
+    const QString legacyConfig = configRoot + QStringLiteral("/player/player.conf");
+    const QString currentConfig = configRoot + QStringLiteral("/reverie/reverie.conf");
+    if (QFileInfo::exists(legacyConfig) && !QFileInfo::exists(currentConfig)) {
+        QDir().mkpath(QFileInfo(currentConfig).absolutePath());
+        if (QFile::copy(legacyConfig, currentConfig))
+            qInfo("migrated settings from the previous application name");
+    }
+
+    const QString dataRoot = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
+    const QString legacySession = dataRoot + QStringLiteral("/player/player/session.m3u");
+    const QString currentSession = dataRoot + QStringLiteral("/reverie/reverie/session.m3u");
+    if (QFileInfo::exists(legacySession) && !QFileInfo::exists(currentSession)) {
+        QDir().mkpath(QFileInfo(currentSession).absolutePath());
+        QFile::copy(legacySession, currentSession);
+    }
+}
+
+} // namespace
 
 int main(int argc, char *argv[])
 {
@@ -28,10 +58,16 @@ int main(int argc, char *argv[])
     QSurfaceFormat::setDefaultFormat(format);
 
     QGuiApplication app(argc, argv);
-    // QSettings and QStandardPaths both key off these, so the persistence toggle and the
-    // saved session live under ~/.config/player and ~/.local/share/player.
-    app.setOrganizationName("player");
-    app.setApplicationName("player");
+    // QSettings and QStandardPaths key off these. applicationName stays lowercase and
+    // space-free because it becomes a directory and a filename; the display name is separate.
+    app.setOrganizationName("reverie");
+    app.setApplicationName("reverie");
+    app.setApplicationDisplayName("Reverie Media Player");
+    app.setApplicationVersion(PLAYER_VERSION);
+
+    // Carry settings over from the pre-rename identity once, so saved palettes and the
+    // playlist preference survive the change of name.
+    migrateLegacySettings();
 
     QCommandLineParser parser;
     parser.setApplicationDescription("Phase 0 spike: projectM inside QML's scene graph.");

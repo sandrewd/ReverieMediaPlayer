@@ -10,7 +10,7 @@
 
 namespace {
 constexpr const char *kObjectPath = "/org/mpris/MediaPlayer2";
-constexpr const char *kServiceName = "org.mpris.MediaPlayer2.player";
+constexpr const char *kServiceName = "org.mpris.MediaPlayer2.reverie";
 }
 
 MprisPlayer::MprisPlayer(AudioEngine *engine, PlaylistModel *playlist, QObject *parent)

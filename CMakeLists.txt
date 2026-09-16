@@ -1,5 +1,23 @@
 cmake_minimum_required(VERSION 3.22)
-project(player LANGUAGES CXX)
+project(player VERSION 0.3.0 LANGUAGES CXX)
+
+# Shown in About. The homepage is a placeholder until the project actually has a remote -
+# better an obvious placeholder than a plausible-looking URL that goes nowhere.
+set(PLAYER_HOMEPAGE "https://example.invalid/reverie" CACHE STRING
+    "Project homepage shown in the About dialog" FORCE)
+set(PLAYER_LICENSE "MIT" CACHE STRING
+    "Licence Reverie itself is released under, shown in the About dialog")
+
+string(TIMESTAMP PLAYER_BUILD_DATE "%Y-%m-%d" UTC)
+find_package(Git QUIET)
+set(PLAYER_GIT_COMMIT "unknown")
+if(GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
+    execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse --short HEAD
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        OUTPUT_VARIABLE PLAYER_GIT_COMMIT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET)
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -57,6 +75,8 @@ qt_add_executable(player
     src/SystemTheme.h
     src/PresetLibrary.cpp
     src/PresetLibrary.h
+    src/AppInfo.cpp
+    src/AppInfo.h
 )
 
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -73,8 +93,16 @@ qt_add_qml_module(player
         qml/ColourRow.qml
 )
 
+set_target_properties(player PROPERTIES OUTPUT_NAME reverie)
+
 target_include_directories(player PRIVATE src)
-target_compile_definitions(player PRIVATE PLAYER_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+target_compile_definitions(player PRIVATE
+    PLAYER_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+    PLAYER_VERSION="${PROJECT_VERSION}"
+    PLAYER_BUILD_DATE="${PLAYER_BUILD_DATE}"
+    PLAYER_GIT_COMMIT="${PLAYER_GIT_COMMIT}"
+    PLAYER_HOMEPAGE="${PLAYER_HOMEPAGE}"
+    PLAYER_LICENSE="${PLAYER_LICENSE}")
 
 if(PROJECTM_HAS_RENDER_FRAME_FBO)
     target_compile_definitions(player PRIVATE PROJECTM_HAS_RENDER_FRAME_FBO)
