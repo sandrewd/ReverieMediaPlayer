@@ -101,4 +101,5 @@ private:
     QProcess m_monitor;
     QProcess m_xfconfMonitor;
     QTimer m_poll;
+    QTimer m_resurvey;
 };

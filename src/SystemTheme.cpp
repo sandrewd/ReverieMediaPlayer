@@ -30,6 +30,9 @@ SystemTheme::SystemTheme(QObject *parent)
     m_schemeHint = querySchemeHint();
     m_themeNameHint = queryThemeNameHint();
     m_systemIsDark = detectSystemDark();
+    qInfo("theme at startup: %s  (scheme hint %d, theme-name hint %d, palette hint %d)",
+          m_systemIsDark ? "dark" : "light", m_schemeHint, m_themeNameHint,
+          m_platformPaletteIsDark);
 
     // Only impose a palette when the user has actually chosen one. Calling setPalette() at
     // all marks it explicitly set, after which Qt no longer refreshes it from the platform
@@ -49,10 +52,23 @@ SystemTheme::SystemTheme(QObject *parent)
     m_poll.setInterval(1500);
     connect(&m_poll, &QTimer::timeout, this, &SystemTheme::redetect);
     m_poll.start();
+
+    m_resurvey.setInterval(4000);
+    connect(&m_resurvey, &QTimer::timeout, this, [this]() {
+        const int scheme = querySchemeHint();
+        const int name = queryThemeNameHint();
+        if (scheme == m_schemeHint && name == m_themeNameHint)
+            return;
+        m_schemeHint = scheme;
+        m_themeNameHint = name;
+        redetect();
+    });
+    m_resurvey.start();
 }
 
 SystemTheme::~SystemTheme()
 {
+    m_resurvey.stop();
     for (QProcess *process : {&m_monitor, &m_xfconfMonitor}) {
         if (process->state() != QProcess::NotRunning) {
             process->terminate();
@@ -261,8 +277,12 @@ void SystemTheme::redetect()
     m_systemIsDark = detected;
     qInfo("desktop theme now %s", detected ? "dark" : "light");
     emit systemIsDarkChanged();
-    if (m_preference == FollowSystem)
+    if (m_preference == FollowSystem) {
+        // Qt Quick Controls paint from the application palette, so the QML tokens changing is
+        // only half of it: menus and dialogs need the palette rebuilt as well.
+        applyPalette();
         emit darkChanged();
+    }
 }
 
 int SystemTheme::paletteHint()
@@ -317,23 +337,29 @@ int SystemTheme::querySchemeHint()
 
 bool SystemTheme::detectSystemDark() const
 {
-    // The palette Qt paints with comes from the qgtk3 platform theme, so it reflects the GTK
-    // theme actually in force - the strongest signal there is, and better than any stored
-    // preference: on Mint XFCE `color-scheme` sits at 'prefer-dark' even after switching to a
-    // light theme. But it is only usable while we have not imposed a palette of our own,
-    // because after that Qt stops refreshing it and it would report our own output back.
+    // Order matters here, and it took measurement on Mint XFCE to get right.
+    //
+    // The Qt palette looks like the strongest signal - it comes from qgtk3 and describes what
+    // we will actually paint - but it does NOT refresh when the GTK theme changes on this
+    // desktop. Trusting it first made a live switch look like "no change", because the stale
+    // palette answered before anything else got a say. It is now the last resort.
+    //
+    // `color-scheme` cannot carry the light case at all here: switching to a light theme
+    // leaves it at 'default' rather than 'prefer-light'. It is authoritative only when it
+    // states a preference outright, which is the GNOME case.
+    if (m_schemeHint >= 0)
+        return m_schemeHint == 1;
+
+    // The theme *name* is the one signal that moves cleanly in both directions on XFCE:
+    // Mint-L-Dark-Aqua against Mint-L-Aqua.
+    if (m_themeNameHint >= 0)
+        return m_themeNameHint == 1;
+
     if (!m_palettePinned) {
         const int fromPalette = paletteHint();
         if (fromPalette >= 0)
             return fromPalette == 1;
     }
-
-    // The theme's own name is what XFCE actually changes, and it keeps working once pinned.
-    if (m_themeNameHint >= 0)
-        return m_themeNameHint == 1;
-
-    if (m_schemeHint >= 0)
-        return m_schemeHint == 1;
 
     if (m_platformPaletteIsDark >= 0)
         return m_platformPaletteIsDark == 1;
