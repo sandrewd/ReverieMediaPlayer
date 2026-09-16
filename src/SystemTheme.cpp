@@ -4,6 +4,7 @@
 #include <QGuiApplication>
 #include <QPalette>
 #include <QProcess>
+#include <QGuiApplication>
 #include <QSettings>
 
 SystemTheme::SystemTheme(QObject *parent)
@@ -12,8 +13,21 @@ SystemTheme::SystemTheme(QObject *parent)
     QSettings settings;
     m_preference = static_cast<Preference>(
         settings.value(QStringLiteral("appearance/preference"), int(FollowSystem)).toInt());
+    m_customBackground = settings.value(QStringLiteral("appearance/background"),
+                                        QColor("#0f1115")).value<QColor>();
+    m_customSurface = settings.value(QStringLiteral("appearance/surface"),
+                                     QColor("#171a21")).value<QColor>();
+    m_customAccent = settings.value(QStringLiteral("appearance/accent"),
+                                    QColor("#4da3ff")).value<QColor>();
+    m_customText = settings.value(QStringLiteral("appearance/text"),
+                                  QColor("#e8eaed")).value<QColor>();
+
+    if (qApp)
+        m_platformPalette = qApp->palette();
+
     m_schemeHint = querySchemeHint();
     m_systemIsDark = detectSystemDark();
+    applyPalette();
 
     // Three ways of noticing a theme change, because no single one is reliable here.
     // Qt delivers a palette change when the platform theme notices; that did not fire on
@@ -72,8 +86,61 @@ bool SystemTheme::dark() const
     switch (m_preference) {
     case AlwaysDark:  return true;
     case AlwaysLight: return false;
+    // A custom scheme is dark or light according to its own background, which is what the
+    // derived tokens need to know.
+    case Custom:      return m_customBackground.lightness() < 128;
     default:          return m_systemIsDark;
     }
+}
+
+void SystemTheme::setCustomBackground(const QColor &colour)
+{
+    if (!colour.isValid() || colour == m_customBackground)
+        return;
+    m_customBackground = colour;
+    QSettings().setValue(QStringLiteral("appearance/background"), colour);
+    applyPalette();
+    emit customChanged();
+    emit darkChanged();
+}
+
+void SystemTheme::setCustomSurface(const QColor &colour)
+{
+    if (!colour.isValid() || colour == m_customSurface)
+        return;
+    m_customSurface = colour;
+    QSettings().setValue(QStringLiteral("appearance/surface"), colour);
+    applyPalette();
+    emit customChanged();
+}
+
+void SystemTheme::setCustomAccent(const QColor &colour)
+{
+    if (!colour.isValid() || colour == m_customAccent)
+        return;
+    m_customAccent = colour;
+    QSettings().setValue(QStringLiteral("appearance/accent"), colour);
+    applyPalette();
+    emit customChanged();
+}
+
+void SystemTheme::setCustomText(const QColor &colour)
+{
+    if (!colour.isValid() || colour == m_customText)
+        return;
+    m_customText = colour;
+    QSettings().setValue(QStringLiteral("appearance/text"), colour);
+    applyPalette();
+    emit customChanged();
+}
+
+void SystemTheme::seedCustomFromCurrent()
+{
+    const bool isDark = dark();
+    setCustomBackground(QColor(isDark ? "#0f1115" : "#f2f3f5"));
+    setCustomSurface(QColor(isDark ? "#171a21" : "#ffffff"));
+    setCustomAccent(QColor(isDark ? "#4da3ff" : "#1f6feb"));
+    setCustomText(QColor(isDark ? "#e8eaed" : "#1b1e23"));
 }
 
 void SystemTheme::setPreference(Preference preference)
@@ -82,15 +149,70 @@ void SystemTheme::setPreference(Preference preference)
         return;
     m_preference = preference;
     QSettings().setValue(QStringLiteral("appearance/preference"), int(preference));
+    applyPalette();
     emit preferenceChanged();
     emit darkChanged();
 }
 
 bool SystemTheme::eventFilter(QObject *watched, QEvent *event)
 {
-    if (event->type() == QEvent::ApplicationPaletteChange)
+    // Ignore the palette change we caused ourselves, or we would re-detect from our own
+    // output and chase our tail.
+    if (event->type() == QEvent::ApplicationPaletteChange && !m_applyingPalette) {
+        m_platformPalette = qApp ? qApp->palette() : m_platformPalette;
         redetect();
+        applyPalette();
+    }
     return QObject::eventFilter(watched, event);
+}
+
+void SystemTheme::applyPalette()
+{
+    if (!qApp)
+        return;
+
+    m_applyingPalette = true;
+
+    if (m_preference == FollowSystem) {
+        // Nothing to impose: the desktop's own palette is the right answer.
+        qApp->setPalette(m_platformPalette);
+        m_applyingPalette = false;
+        return;
+    }
+
+    const bool isDark = dark();
+    const QColor background = m_preference == Custom ? m_customBackground
+                                                     : QColor(isDark ? "#0f1115" : "#f2f3f5");
+    const QColor surface = m_preference == Custom ? m_customSurface
+                                                  : QColor(isDark ? "#171a21" : "#ffffff");
+    const QColor text = m_preference == Custom ? m_customText
+                                               : QColor(isDark ? "#e8eaed" : "#1b1e23");
+    const QColor accent = m_preference == Custom ? m_customAccent
+                                                 : QColor(isDark ? "#4da3ff" : "#1f6feb");
+
+    QColor dimText = text;
+    dimText.setAlphaF(0.62f);
+
+    QPalette palette;
+    palette.setColor(QPalette::Window, background);
+    palette.setColor(QPalette::WindowText, text);
+    palette.setColor(QPalette::Base, surface);
+    palette.setColor(QPalette::AlternateBase, isDark ? surface.lighter(120) : surface.darker(104));
+    palette.setColor(QPalette::Text, text);
+    palette.setColor(QPalette::Button, surface);
+    palette.setColor(QPalette::ButtonText, text);
+    palette.setColor(QPalette::ToolTipBase, surface);
+    palette.setColor(QPalette::ToolTipText, text);
+    palette.setColor(QPalette::Highlight, accent);
+    palette.setColor(QPalette::HighlightedText,
+                     accent.lightness() > 140 ? QColor("#0f1115") : QColor("#f2f4f6"));
+    palette.setColor(QPalette::PlaceholderText, dimText);
+    palette.setColor(QPalette::Disabled, QPalette::Text, dimText);
+    palette.setColor(QPalette::Disabled, QPalette::ButtonText, dimText);
+    palette.setColor(QPalette::Disabled, QPalette::WindowText, dimText);
+
+    qApp->setPalette(palette);
+    m_applyingPalette = false;
 }
 
 void SystemTheme::redetect()

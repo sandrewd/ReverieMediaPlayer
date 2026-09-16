@@ -37,7 +37,9 @@ int main(int argc, char *argv[])
     parser.setApplicationDescription("Phase 0 spike: projectM inside QML's scene graph.");
     parser.addHelpOption();
     QCommandLineOption presetOption({"p", "preset"}, "Preset file to load.", "file");
-    QCommandLineOption scaleOption({"s", "scale"}, "Initial render scale (0.1-1.0).", "scale", "0.5");
+    // Default of 0 means "not specified": the stored preference wins unless overridden.
+    QCommandLineOption scaleOption({"s", "scale"}, "Override the stored render scale (0.1-1.0).",
+                                   "scale", "0");
     QCommandLineOption secondsOption("seconds", "Exit after N seconds (for benchmarking).", "n", "0");
     QCommandLineOption captureOption("capture", "Grab the window to a PNG and exit.", "file");
     parser.addOption(presetOption);

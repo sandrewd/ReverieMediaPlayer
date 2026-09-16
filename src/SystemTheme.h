@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QColor>
+#include <QPalette>
 #include <QObject>
 #include <QProcess>
 #include <QTimer>
@@ -17,8 +19,16 @@ class SystemTheme : public QObject
     Q_PROPERTY(bool systemIsDark READ systemIsDark NOTIFY systemIsDarkChanged)
     Q_PROPERTY(Preference preference READ preference WRITE setPreference NOTIFY preferenceChanged)
 
+    // Four colours is the whole customisation surface. Everything else - hover states,
+    // borders, dimmed text - is derived, so a user cannot build a theme where text is
+    // invisible against its own background.
+    Q_PROPERTY(QColor customBackground READ customBackground WRITE setCustomBackground NOTIFY customChanged)
+    Q_PROPERTY(QColor customSurface READ customSurface WRITE setCustomSurface NOTIFY customChanged)
+    Q_PROPERTY(QColor customAccent READ customAccent WRITE setCustomAccent NOTIFY customChanged)
+    Q_PROPERTY(QColor customText READ customText WRITE setCustomText NOTIFY customChanged)
+
 public:
-    enum Preference { FollowSystem, AlwaysDark, AlwaysLight };
+    enum Preference { FollowSystem, AlwaysDark, AlwaysLight, Custom };
     Q_ENUM(Preference)
 
     explicit SystemTheme(QObject *parent = nullptr);
@@ -29,15 +39,34 @@ public:
     Preference preference() const { return m_preference; }
     void setPreference(Preference preference);
 
+    QColor customBackground() const { return m_customBackground; }
+    QColor customSurface() const { return m_customSurface; }
+    QColor customAccent() const { return m_customAccent; }
+    QColor customText() const { return m_customText; }
+    void setCustomBackground(const QColor &colour);
+    void setCustomSurface(const QColor &colour);
+    void setCustomAccent(const QColor &colour);
+    void setCustomText(const QColor &colour);
+
+    // Seeds the custom colours from whichever theme is showing, so editing starts from
+    // something that already works rather than from black.
+    Q_INVOKABLE void seedCustomFromCurrent();
+
 signals:
     void darkChanged();
     void systemIsDarkChanged();
     void preferenceChanged();
+    void customChanged();
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
+    // Qt Quick Controls - menus, dialogs, buttons - paint from the application palette, not
+    // from our QML tokens. Without pushing the theme into the palette a user's colours stop
+    // at the edge of every menu.
+    void applyPalette();
+
     void redetect();
     void startMonitor();
     void applyMonitorLine(const QString &line);
@@ -53,6 +82,13 @@ private:
     int m_schemeHint = -1;
     // Fallback read of the GTK theme name, for desktops that only change that.
     int m_themeNameHint = -1;
+
+    QColor m_customBackground;
+    QColor m_customSurface;
+    QColor m_customAccent;
+    QColor m_customText;
+    QPalette m_platformPalette;
+    bool m_applyingPalette = false;
 
     QProcess m_monitor;
     QTimer m_poll;

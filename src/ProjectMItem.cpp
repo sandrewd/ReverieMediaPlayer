@@ -16,6 +16,7 @@
 #include <projectM-4/playlist.h>
 
 #include <QRandomGenerator>
+#include <QSettings>
 #include <cmath>
 
 #ifdef Q_OS_LINUX
@@ -604,6 +605,13 @@ private:
 ProjectMItem::ProjectMItem(QQuickItem *parent)
     : QQuickFramebufferObject(parent)
 {
+    // Quality choices should survive a restart: a user who turned the visualiser down did so
+    // for a reason, and making them do it again every launch is its own bug.
+    QSettings settings;
+    m_adaptiveQuality = settings.value(QStringLiteral("visual/adaptive"), true).toBool();
+    m_renderScale = qBound(0.1, settings.value(QStringLiteral("visual/renderScale"), 0.5).toDouble(), 1.0);
+    m_targetFps = qBound(15.0, settings.value(QStringLiteral("visual/targetFps"), 30.0).toDouble(), 60.0);
+
     m_frameTimer.setTimerType(Qt::PreciseTimer);
     m_frameTimer.setInterval(m_maxFps > 0 ? qMax(1, 1000 / m_maxFps) : 16);
     connect(&m_frameTimer, &QTimer::timeout, this, [this]() { update(); });
@@ -626,6 +634,10 @@ void ProjectMItem::setRenderScale(qreal scale)
     if (qFuzzyCompare(scale, m_renderScale))
         return;
     m_renderScale = scale;
+    // Only a deliberate choice is worth storing. While the adaptive scaler is running this
+    // changes constantly and persisting every step would just thrash the settings file.
+    if (!m_adaptiveQuality)
+        QSettings().setValue(QStringLiteral("visual/renderScale"), m_renderScale);
     emit renderScaleChanged();
     update();
 }
@@ -800,6 +812,9 @@ void ProjectMItem::setAdaptiveQuality(bool enabled)
     if (enabled == m_adaptiveQuality)
         return;
     m_adaptiveQuality = enabled;
+    QSettings().setValue(QStringLiteral("visual/adaptive"), enabled);
+    if (!enabled)
+        QSettings().setValue(QStringLiteral("visual/renderScale"), m_renderScale);
     emit adaptiveQualityChanged();
     update();
 }
@@ -810,6 +825,7 @@ void ProjectMItem::setTargetFps(qreal fps)
     if (qFuzzyCompare(fps, m_targetFps))
         return;
     m_targetFps = fps;
+    QSettings().setValue(QStringLiteral("visual/targetFps"), fps);
     emit targetFpsChanged();
     update();
 }

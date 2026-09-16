@@ -3,22 +3,32 @@ import QtQuick
 import Player
 
 // One place for the visual language. Dark was never specified, it was assumed, so the palette
-// now follows the desktop and can be overridden. The visualiser is the colourful thing on
-// screen in either mode; the shell stays neutral around it.
+// follows the desktop, can be forced either way, or replaced entirely by the user.
+//
+// Only four colours are user-settable. Everything else is derived from them, which means a
+// custom theme cannot end up with invisible text or a border that vanishes into its panel.
 QtObject {
+    readonly property bool custom: SystemTheme.preference === SystemTheme.Custom
     readonly property bool dark: SystemTheme.dark
 
-    readonly property color background:  dark ? "#0f1115" : "#f2f3f5"
-    readonly property color surface:     dark ? "#171a21" : "#ffffff"
-    readonly property color surfaceHigh: dark ? "#1f242d" : "#e7eaee"
-    readonly property color border:      dark ? "#2a3039" : "#d3d8de"
-    readonly property color text:        dark ? "#e8eaed" : "#1b1e23"
-    readonly property color textDim:     dark ? "#9aa0a8" : "#5c636d"
-    readonly property color accent:      dark ? "#4da3ff" : "#1f6feb"
-    readonly property color accentDim:   dark ? "#2e6ea8" : "#9dc4f5"
+    readonly property color background: custom ? SystemTheme.customBackground
+                                               : (dark ? "#0f1115" : "#f2f3f5")
+    readonly property color surface:    custom ? SystemTheme.customSurface
+                                               : (dark ? "#171a21" : "#ffffff")
+    readonly property color text:       custom ? SystemTheme.customText
+                                               : (dark ? "#e8eaed" : "#1b1e23")
+    readonly property color accent:     custom ? SystemTheme.customAccent
+                                               : (dark ? "#4da3ff" : "#1f6feb")
 
-    // Text drawn over the visualiser is always light: the video behind it is dark-ish in
-    // both themes, so following the shell here would make it unreadable in light mode.
+    // Derived. Nudging towards or away from the surface keeps hover states and borders
+    // visible whichever direction the user's theme leans.
+    readonly property color surfaceHigh: dark ? Qt.lighter(surface, 1.45) : Qt.darker(surface, 1.07)
+    readonly property color border:      dark ? Qt.lighter(surface, 2.0)  : Qt.darker(surface, 1.16)
+    readonly property color textDim:     Qt.rgba(text.r, text.g, text.b, 0.62)
+    readonly property color accentDim:   dark ? Qt.darker(accent, 1.7) : Qt.lighter(accent, 1.45)
+
+    // Text drawn over the visualiser is always light: the video behind it is dark-ish in every
+    // theme, so following the shell here would make it unreadable.
     readonly property color overlayText: "#f0f2f4"
     readonly property color overlayTextDim: "#a8b0b8"
     readonly property color overlayBackground: "#b0000000"

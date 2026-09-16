@@ -37,8 +37,11 @@ AbstractButton {
 
             // Repaint when the colour changes, not just the glyph: the theme can now switch
             // while the application is running.
-            property color glyphColor: control.primary ? "#0f1115"
-                                     : control.overVideo ? Theme.overlayText : Theme.text
+            // A primary button is filled with the accent, which the user can now choose, so
+            // the glyph has to be picked against it rather than assumed dark.
+            property color glyphColor: control.primary
+                ? (Theme.accent.hslLightness > 0.55 ? "#0f1115" : "#f2f4f6")
+                : control.overVideo ? Theme.overlayText : Theme.text
             onGlyphColorChanged: canvas.requestPaint()
 
             onPaint: {

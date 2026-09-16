@@ -163,7 +163,9 @@ ApplicationWindow {
                     // buffering does not, since the stream is still playing while it tops up.
                     active: AudioEngine.state === AudioEngine.Playing
                     maxFps: initialMaxFps
-                    renderScale: initialScale
+                    // No binding here: the item loads the user's stored quality in its
+                    // constructor, and a binding would overwrite it on every startup.
+                    Component.onCompleted: if (initialScale > 0) renderScale = initialScale
                     presetPath: initialPreset
                     presetsPath: initialPresetsPath
                     curatedList: initialCuratedList
@@ -479,6 +481,11 @@ ApplicationWindow {
                 checked: SystemTheme.preference === SystemTheme.AlwaysLight
                 onTriggered: SystemTheme.preference = SystemTheme.AlwaysLight
             }
+            MenuSeparator {}
+            MenuItem {
+                text: qsTr("Choose my own colours…")
+                onTriggered: themeDialog.open()
+            }
         }
         MenuItem {
             text: qsTr("Keep window on top")
@@ -493,31 +500,9 @@ ApplicationWindow {
             checked: false
         }
         MenuSeparator {}
-        Menu {
-            title: qsTr("Visual quality")
-            MenuItem {
-                text: qsTr("Automatic")
-                checkable: true
-                checked: visualizer.adaptiveQuality
-                onTriggered: visualizer.adaptiveQuality = checked
-            }
-            MenuSeparator {}
-            MenuItem {
-                text: qsTr("Low (25%)")
-                onTriggered: { visualizer.adaptiveQuality = false; visualizer.renderScale = 0.25 }
-            }
-            MenuItem {
-                text: qsTr("Medium (50%)")
-                onTriggered: { visualizer.adaptiveQuality = false; visualizer.renderScale = 0.5 }
-            }
-            MenuItem {
-                text: qsTr("High (75%)")
-                onTriggered: { visualizer.adaptiveQuality = false; visualizer.renderScale = 0.75 }
-            }
-            MenuItem {
-                text: qsTr("Full (100%)")
-                onTriggered: { visualizer.adaptiveQuality = false; visualizer.renderScale = 1.0 }
-            }
+        MenuItem {
+            text: qsTr("Visual quality…")
+            onTriggered: qualityDialog.open()
         }
         Menu {
             title: qsTr("Presets")
@@ -543,6 +528,196 @@ ApplicationWindow {
             MenuItem { text: qsTr("Change every 15 seconds"); onTriggered: visualizer.presetDuration = 15 }
             MenuItem { text: qsTr("Change every 30 seconds"); onTriggered: visualizer.presetDuration = 30 }
             MenuItem { text: qsTr("Change every 2 minutes");  onTriggered: visualizer.presetDuration = 120 }
+        }
+    }
+
+    Dialog {
+        id: themeDialog
+        title: qsTr("Colours")
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(460, root.width - 60)
+        standardButtons: Dialog.Close
+        closePolicy: Popup.CloseOnEscape
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 10
+
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("Pick four colours and the rest is worked out from them, so nothing ends up unreadable.")
+                color: Theme.textDim
+                font.pixelSize: 11
+            }
+
+            Repeater {
+                model: [
+                    { key: "customBackground", label: qsTr("Background") },
+                    { key: "customSurface",    label: qsTr("Panels") },
+                    { key: "customAccent",     label: qsTr("Highlight") },
+                    { key: "customText",       label: qsTr("Text") }
+                ]
+                delegate: RowLayout {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Label {
+                        text: modelData.label
+                        color: Theme.text
+                        font.pixelSize: 12
+                        Layout.preferredWidth: 92
+                    }
+
+                    // The swatch opens the platform colour chooser, which carries its own
+                    // palette; the field beside it takes a hex value directly, so neither
+                    // route depends on the other.
+                    Rectangle {
+                        implicitWidth: 40
+                        implicitHeight: 26
+                        radius: 4
+                        color: SystemTheme[modelData.key]
+                        border.color: Theme.border
+                        border.width: 1
+                        TapHandler {
+                            onTapped: {
+                                colourPicker.targetKey = modelData.key
+                                colourPicker.selectedColor = SystemTheme[modelData.key]
+                                colourPicker.open()
+                            }
+                        }
+                    }
+
+                    TextField {
+                        Layout.fillWidth: true
+                        text: String(SystemTheme[modelData.key]).toUpperCase()
+                        font.family: "monospace"
+                        font.pixelSize: 12
+                        selectByMouse: true
+                        inputMask: ">\\#HHHHHH;_"
+                        onEditingFinished: {
+                            const value = text.trim()
+                            if (/^#[0-9A-Fa-f]{6}$/.test(value))
+                                SystemTheme[modelData.key] = value
+                        }
+                    }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                Button {
+                    text: qsTr("Start from the current theme")
+                    flat: true
+                    onClicked: SystemTheme.seedCustomFromCurrent()
+                }
+                Item { Layout.fillWidth: true }
+                Button {
+                    text: SystemTheme.preference === SystemTheme.Custom
+                          ? qsTr("Using my colours") : qsTr("Use my colours")
+                    highlighted: SystemTheme.preference !== SystemTheme.Custom
+                    onClicked: SystemTheme.preference = SystemTheme.Custom
+                }
+            }
+        }
+
+        ColorDialog {
+            id: colourPicker
+            property string targetKey: ""
+            onAccepted: if (targetKey !== "") SystemTheme[targetKey] = selectedColor
+        }
+    }
+
+    Dialog {
+        id: qualityDialog
+        title: qsTr("Visual quality")
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(440, root.width - 60)
+        standardButtons: Dialog.Close
+        closePolicy: Popup.CloseOnEscape
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 12
+
+            // The visualiser renders to an offscreen buffer at a fraction of window size and
+            // the scene graph upscales it. On a software renderer this is the only control
+            // that meaningfully changes the frame rate, so it is a real setting, not a hack.
+            CheckBox {
+                id: autoQuality
+                text: qsTr("Adjust automatically to keep it smooth")
+                checked: visualizer.adaptiveQuality
+                onToggled: visualizer.adaptiveQuality = checked
+            }
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: autoQuality.checked
+                      ? qsTr("Quality rises and falls with what the machine can manage.")
+                      : qsTr("Quality stays where you put it, however slow that runs.")
+                color: Theme.textDim
+                font.pixelSize: 11
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                Label {
+                    text: qsTr("Detail")
+                    color: Theme.text
+                    font.pixelSize: 12
+                    Layout.preferredWidth: 54
+                }
+                Slider {
+                    id: scaleSlider
+                    Layout.fillWidth: true
+                    from: 0.10; to: 1.0; stepSize: 0.05
+                    enabled: !autoQuality.checked
+                    value: visualizer.renderScale
+                    onMoved: visualizer.renderScale = value
+                }
+                Label {
+                    text: Math.round(visualizer.renderScale * 100) + "%"
+                    color: Theme.text
+                    font.family: "monospace"
+                    font.pixelSize: 12
+                    Layout.preferredWidth: 46
+                    horizontalAlignment: Text.AlignRight
+                }
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("Rendering at %1×%2, showing %3 fps")
+                        .arg(visualizer.renderSize.width)
+                        .arg(visualizer.renderSize.height)
+                        .arg(visualizer.fps.toFixed(0))
+                color: Theme.textDim
+                font.pixelSize: 11
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                visible: autoQuality.checked
+                Label {
+                    text: qsTr("Aim for")
+                    color: Theme.text
+                    font.pixelSize: 12
+                    Layout.preferredWidth: 54
+                }
+                ComboBox {
+                    Layout.fillWidth: true
+                    model: [qsTr("20 fps — lightest"), qsTr("30 fps — balanced"),
+                            qsTr("45 fps — smoothest")]
+                    currentIndex: visualizer.targetFps >= 40 ? 2
+                                : visualizer.targetFps >= 26 ? 1 : 0
+                    onActivated: visualizer.targetFps = [20, 30, 45][currentIndex]
+                }
+            }
         }
     }
 
