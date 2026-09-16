@@ -14,6 +14,11 @@ Rectangle {
     signal requestPrevious()
     signal requestPlayPause()
     signal requestStop()
+    signal requestRestore()
+
+    // In the mini player the way back belongs in the bar, not floating over it: a loose
+    // button crowds the volume control and the duration label at narrow widths.
+    property bool showRestore: false
 
     color: Theme.surface
     implicitHeight: compact ? 62 : 88
@@ -146,6 +151,14 @@ Rectangle {
             IconButton {
                 glyph: AudioEngine.muted ? "muted" : "volume"
                 onClicked: AudioEngine.muted = !AudioEngine.muted
+            }
+            IconButton {
+                glyph: "mini"
+                size: 26
+                visible: root.showRestore
+                onClicked: root.requestRestore()
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Back to full player")
             }
             Slider {
                 id: volumeSlider

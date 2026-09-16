@@ -17,8 +17,14 @@ ApplicationWindow {
 
     // A real minimum size with a defined collapse order, decided up front so the mini-player
     // is a layout state rather than a later refactor of everything that assumed a big window.
-    minimumWidth: mini ? 360 : Theme.minWindowWidth
-    minimumHeight: mini ? 62 : Theme.minWindowHeight
+    // The mini player is exactly as tall as its transport bar. Letting it be dragged taller
+    // only produces empty space around the controls, so height is pinned to the content and
+    // only width stays adjustable - width is the one dimension that buys anything, since a
+    // longer track title has somewhere to go.
+    readonly property int miniHeight: transportBar.implicitHeight
+    minimumWidth: mini ? 320 : Theme.minWindowWidth
+    minimumHeight: mini ? miniHeight : Theme.minWindowHeight
+    maximumHeight: mini ? miniHeight : 16777215
 
     property bool mini: false
     property bool fullscreen: false
@@ -51,8 +57,8 @@ ApplicationWindow {
     onMiniChanged: {
         if (mini) {
             root.showNormal()
-            root.width = 460
-            root.height = 62
+            root.width = Math.max(minimumWidth, 460)
+            root.height = miniHeight
         } else {
             root.width = 1100
             root.height = 680
@@ -239,9 +245,12 @@ ApplicationWindow {
         }
 
         TransportBar {
+            id: transportBar
             Layout.fillWidth: true
             visible: !root.fullscreen || root.controlsVisible
             compact: root.mini
+            showRestore: root.mini
+            onRequestRestore: root.mini = false
             onRequestNext: root.playNext()
             onRequestPrevious: root.playPrevious()
             onRequestPlayPause: root.togglePlay()
@@ -294,15 +303,6 @@ ApplicationWindow {
     }
     }
 
-    IconButton {
-        anchors { right: parent.right; top: parent.top; margins: 6 }
-        visible: root.mini
-        glyph: "mini"
-        size: 26
-        onClicked: root.mini = false
-        ToolTip.visible: hovered
-        ToolTip.text: qsTr("Back to full player")
-    }
 
     // Right-click the visualiser. Grouped by the categories the preset pack already ships
     // with, then by author where an author actually has several presets in that category.
@@ -324,12 +324,6 @@ ApplicationWindow {
 
         // Categories are inserted here, above this separator.
         MenuSeparator {}
-        MenuItem {
-            text: qsTr("Stay on this one")
-            checkable: true
-            checked: visualizer.presetLocked
-            onTriggered: visualizer.presetLocked = checked
-        }
         MenuItem {
             text: qsTr("Randomize")
             onTriggered: {
@@ -667,7 +661,6 @@ ApplicationWindow {
     Shortcut { sequence: "N";           onActivated: visualizer.nextPreset() }
     Shortcut { sequence: "P";           onActivated: visualizer.previousPreset() }
     Shortcut { sequence: "R";           onActivated: visualizer.randomPreset() }
-    Shortcut { sequence: "L";           onActivated: visualizer.presetLocked = !visualizer.presetLocked }
     Shortcut {
         sequence: "Escape"
         onActivated: {
