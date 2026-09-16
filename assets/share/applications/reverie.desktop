@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Reverie
+GenericName=Media Player
+Comment=A simple media player with built-in visualisations
+Exec=reverie %U
+Icon=reverie
+Terminal=false
+Categories=AudioVideo;Player;
+MimeType=audio/mpeg;audio/flac;audio/ogg;audio/x-vorbis+ogg;audio/mp4;audio/x-wav;audio/x-m4a;audio/opus;audio/x-mpegurl;
+StartupNotify=true
+StartupWMClass=reverie

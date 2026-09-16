@@ -1,5 +1,6 @@
 #include <QCommandLineParser>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
@@ -64,6 +65,18 @@ int main(int argc, char *argv[])
     app.setApplicationName("reverie");
     app.setApplicationDisplayName("Reverie Media Player");
     app.setApplicationVersion(PLAYER_VERSION);
+
+    // The launcher icon is fixed colour and never themed: a .desktop icon is drawn by the
+    // shell with no access to our palette, and an icon that tracked the user's colours would
+    // make two installs look like different applications. Identity stays constant; the
+    // interface is theirs.
+    QIcon icon;
+    for (int size : {16, 22, 24, 32, 48, 64, 128, 256}) {
+        icon.addFile(QStringLiteral(":/branding/%1x%1/apps/reverie.png").arg(size),
+                     QSize(size, size));
+    }
+    if (!icon.isNull())
+        app.setWindowIcon(icon);
 
     // Carry settings over from the pre-rename identity once, so saved palettes and the
     // playlist preference survive the change of name.

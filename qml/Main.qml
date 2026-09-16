@@ -293,12 +293,25 @@ ApplicationWindow {
                     }
                 }
 
-                Label {
+                ColumnLayout {
                     anchors.centerIn: parent
                     visible: PlaylistModel.count === 0
-                    text: qsTr("Drop music here")
-                    color: Theme.overlayTextDim
-                    font.pixelSize: 16
+                    spacing: 14
+                    ReverieMark {
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.preferredWidth: 96
+                        Layout.preferredHeight: 96
+                        // Over the visualiser area, so it uses the overlay tokens rather than
+                        // the accent, which could be any colour against black.
+                        color: Theme.overlayTextDim
+                        opacity: 0.7
+                    }
+                    Label {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: qsTr("Drop music here")
+                        color: Theme.overlayTextDim
+                        font.pixelSize: 16
+                    }
                 }
 
             }
@@ -1063,16 +1076,30 @@ ApplicationWindow {
             anchors.fill: parent
             spacing: 10
 
-            Label {
-                text: qsTr("Reverie Media Player")
-                color: Theme.text
-                font.pixelSize: 20
-                font.weight: Font.DemiBold
-            }
-            Label {
-                text: qsTr("A music player with the visualisations built in.")
-                color: Theme.textDim
-                font.pixelSize: 12
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 12
+                ReverieMark {
+                    Layout.preferredWidth: 48
+                    Layout.preferredHeight: 48
+                }
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 2
+                    Label {
+                        text: qsTr("Reverie Media Player")
+                        color: Theme.text
+                        font.pixelSize: 20
+                        font.weight: Font.DemiBold
+                    }
+                    Label {
+                        // "Media player", not "music player": video is a committed later
+                        // phase, not a feature that will quietly never arrive.
+                        text: qsTr("A media player with the visualisations built in.")
+                        color: Theme.textDim
+                        font.pixelSize: 12
+                    }
+                }
             }
 
             GridLayout {

@@ -81,6 +81,31 @@ qt_add_executable(player
 
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
+# Launcher icon and desktop entry, freedesktop hicolor layout. The PNGs are also compiled
+# into the binary below so an uninstalled build still has a window icon.
+include(GNUInstallDirs)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/share/icons
+        DESTINATION ${CMAKE_INSTALL_DATADIR})
+install(FILES ${CMAKE_SOURCE_DIR}/assets/share/applications/reverie.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+install(TARGETS player RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(CODE "execute_process(COMMAND gtk-update-icon-cache -q -t -f
+        \"$ENV{DESTDIR}${CMAKE_INSTALL_FULL_DATADIR}/icons/hicolor\" ERROR_QUIET)")
+
+qt_add_resources(player "branding"
+    PREFIX "/branding"
+    BASE "${CMAKE_SOURCE_DIR}/assets/share/icons/hicolor"
+    FILES
+        assets/share/icons/hicolor/16x16/apps/reverie.png
+        assets/share/icons/hicolor/22x22/apps/reverie.png
+        assets/share/icons/hicolor/24x24/apps/reverie.png
+        assets/share/icons/hicolor/32x32/apps/reverie.png
+        assets/share/icons/hicolor/48x48/apps/reverie.png
+        assets/share/icons/hicolor/64x64/apps/reverie.png
+        assets/share/icons/hicolor/128x128/apps/reverie.png
+        assets/share/icons/hicolor/256x256/apps/reverie.png
+)
+
 qt_add_qml_module(player
     URI Player
     VERSION 1.0
@@ -91,6 +116,7 @@ qt_add_qml_module(player
         qml/TransportBar.qml
         qml/PlaylistPanel.qml
         qml/ColourRow.qml
+        qml/ReverieMark.qml
 )
 
 set_target_properties(player PROPERTIES OUTPUT_NAME reverie)
