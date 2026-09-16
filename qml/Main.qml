@@ -157,8 +157,13 @@ ApplicationWindow {
     // doing nothing and leaving "Nothing playing" on screen. That was a real dead end: adding
     // a file and pressing Play looked broken until you knew to double-click the row.
     function togglePlay() {
-        if (AudioEngine.source === "" && PlaylistModel.count > 0) {
-            playIndex(PlaylistModel.currentIndex >= 0 ? PlaylistModel.currentIndex : 0)
+        // Resume only when the engine's source is still the track the playlist is pointing
+        // at. If nothing is current - the list was cleared, or the playing track was removed -
+        // the loaded source is an orphan, and resuming it would play audio with no row marked
+        // to say what it is. Start the list instead.
+        const nothingCurrent = PlaylistModel.currentIndex < 0
+        if ((AudioEngine.source === "" || nothingCurrent) && PlaylistModel.count > 0) {
+            playIndex(nothingCurrent ? 0 : PlaylistModel.currentIndex)
             return
         }
         AudioEngine.togglePlayPause()
@@ -177,6 +182,17 @@ ApplicationWindow {
     Component.onCompleted: {
         PresetLibrary.rootPath = initialPresetsPath
         PresetLibrary.curatedList = initialCuratedList
+    }
+
+    // One invariant, enforced in one place: if no row is current, nothing should be playing.
+    // Clearing the playlist and removing the playing track both land here, and both used to
+    // leave audio running with nothing in the list to show for it.
+    Connections {
+        target: PlaylistModel
+        function onCurrentIndexChanged() {
+            if (PlaylistModel.currentIndex < 0 && AudioEngine.state !== AudioEngine.Stopped)
+                AudioEngine.stop()
+        }
     }
 
     Connections {
