@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QElapsedTimer>
 #include <QTimer>
 #include <QUrl>
 #include <QtQml/qqmlregistration.h>
@@ -30,6 +31,12 @@ class AudioEngine : public QObject
     // Tags as the pipeline reports them. For a local file TagLib is authoritative and these
     // are ignored; for an Icecast stream these are the only metadata there is.
     Q_PROPERTY(QString streamTitle READ streamTitle NOTIFY streamTitleChanged)
+    // The station's own name, as announced over ICY. Distinct from whatever the user called
+    // the entry when they added it.
+    Q_PROPERTY(QString streamStation READ streamStation NOTIFY streamStationChanged)
+    // Buffering is not a playback state: the stream is still playing while it tops up, and
+    // folding it into `state` made the transport show a play button during playback.
+    Q_PROPERTY(bool buffering READ buffering NOTIFY bufferingChanged)
 
 public:
     enum State { Stopped, Playing, Paused, Buffering };
@@ -46,6 +53,8 @@ public:
     bool seekable() const { return m_seekable; }
     QString source() const { return m_source; }
     QString streamTitle() const { return m_streamTitle; }
+    QString streamStation() const { return m_streamStation; }
+    bool buffering() const { return m_buffering; }
 
     void setVolume(qreal volume);
     void setMuted(bool muted);
@@ -70,6 +79,8 @@ signals:
     void seekableChanged();
     void sourceChanged();
     void streamTitleChanged();
+    void streamStationChanged();
+    void bufferingChanged();
     void endOfStream();
     void errorOccurred(const QString &message);
 
@@ -79,6 +90,7 @@ private:
     void pollPosition();
     void setState(State state);
     void updateDuration();
+    void updateBuffering();
 
     GstElement *m_pipeline = nullptr;
     GstElement *m_appsink = nullptr;
@@ -94,4 +106,8 @@ private:
     bool m_seekable = false;
     QString m_source;
     QString m_streamTitle;
+    QString m_streamStation;
+    bool m_buffering = false;
+    int m_bufferPercent = 100;
+    QElapsedTimer m_sinceProgress;
 };

@@ -68,8 +68,10 @@ QVariant PlaylistModel::data(const QModelIndex &index, int role) const
     case ArtistRole:       return track.artist;
     case AlbumRole:        return track.album;
     case DurationRole:     return track.durationSec;
-    case DurationTextRole: return formatDuration(track.durationSec);
+    case DurationTextRole: return track.isStream ? QStringLiteral("live")
+                                                 : formatDuration(track.durationSec);
     case IsCurrentRole:    return index.row() == m_currentIndex;
+    case IsStreamRole:     return track.isStream;
     default:               return {};
     }
 }
@@ -84,6 +86,7 @@ QHash<int, QByteArray> PlaylistModel::roleNames() const
         {DurationRole, "duration"},
         {DurationTextRole, "durationText"},
         {IsCurrentRole, "isCurrent"},
+        {IsStreamRole, "isStream"},
     };
 }
 
@@ -134,6 +137,12 @@ QString PlaylistModel::currentArtist() const
 {
     return (m_currentIndex >= 0 && m_currentIndex < m_tracks.size())
         ? m_tracks.at(m_currentIndex).artist : QString();
+}
+
+bool PlaylistModel::isCurrentStream() const
+{
+    return (m_currentIndex >= 0 && m_currentIndex < m_tracks.size())
+        && m_tracks.at(m_currentIndex).isStream;
 }
 
 QString PlaylistModel::currentPath() const
@@ -194,6 +203,25 @@ void PlaylistModel::addFiles(const QList<QUrl> &urls)
     for (const QUrl &url : urls)
         paths.append(url.isLocalFile() ? url.toLocalFile() : url.toString());
     appendPaths(paths);
+}
+
+void PlaylistModel::addStream(const QString &url, const QString &name)
+{
+    const QUrl parsed(url.trimmed());
+    if (!parsed.isValid() || parsed.scheme().isEmpty() || parsed.host().isEmpty())
+        return;
+
+    Track track;
+    track.path = parsed.toString();
+    track.isStream = true;
+    track.title = name.trimmed().isEmpty() ? parsed.host() : name.trimmed();
+
+    beginInsertRows(QModelIndex(), m_tracks.size(), m_tracks.size());
+    m_tracks.append(track);
+    endInsertRows();
+    emit countChanged();
+    if (m_persist)
+        saveSession();
 }
 
 void PlaylistModel::addFolder(const QUrl &folder)
@@ -292,7 +320,15 @@ bool PlaylistModel::saveM3U(const QUrl &destination) const
     out << "#EXTM3U\n";
     for (const Track &track : m_tracks) {
         const QString artist = track.artist.isEmpty() ? QString() : track.artist + QStringLiteral(" - ");
-        out << "#EXTINF:" << track.durationSec << ',' << artist << track.title << '\n';
+        out << "#EXTINF:" << (track.isStream ? -1 : track.durationSec) << ','
+            << artist << track.title << '\n';
+
+        // A stream is a URL and must be written verbatim; making it relative to the playlist
+        // folder would be nonsense.
+        if (track.isStream) {
+            out << track.path << '\n';
+            continue;
+        }
 
         // Relative paths keep a playlist usable when its folder is moved or shared, but only
         // when the track actually lives under that folder. Otherwise relativeFilePath walks
@@ -314,13 +350,27 @@ bool PlaylistModel::loadM3U(const QUrl &source)
 
     const QDir base = QFileInfo(path).dir();
     QStringList paths;
+    QString pendingTitle;
     QTextStream in(&file);
     in.setEncoding(QStringConverter::Utf8);
     while (!in.atEnd()) {
         const QString line = in.readLine().trimmed();
-        if (line.isEmpty() || line.startsWith(QLatin1Char('#')))
+        if (line.isEmpty())
             continue;
-        paths.append(QDir::isAbsolutePath(line) ? line : base.absoluteFilePath(line));
+        if (line.startsWith(QLatin1Char('#'))) {
+            // #EXTINF:<seconds>,<title> - the only place a station name can survive a save.
+            if (line.startsWith(QStringLiteral("#EXTINF:"))) {
+                const int comma = line.indexOf(QLatin1Char(','));
+                pendingTitle = comma >= 0 ? line.mid(comma + 1).trimmed() : QString();
+            }
+            continue;
+        }
+        if (line.contains(QStringLiteral("://"))) {
+            addStream(line, pendingTitle);
+        } else {
+            paths.append(QDir::isAbsolutePath(line) ? line : base.absoluteFilePath(line));
+        }
+        pendingTitle.clear();
     }
     appendPaths(paths);
     return true;

@@ -2,6 +2,7 @@
 
 #include <QQuickFramebufferObject>
 #include <QMutex>
+#include <QTimer>
 #include <QStringList>
 #include <QSize>
 #include <QString>
@@ -42,6 +43,14 @@ class ProjectMItem : public QQuickFramebufferObject
     Q_PROPERTY(bool active READ active WRITE setActive NOTIFY activeChanged)
     Q_PROPERTY(bool adaptiveQuality READ adaptiveQuality WRITE setAdaptiveQuality NOTIFY adaptiveQualityChanged)
     Q_PROPERTY(qreal targetFps READ targetFps WRITE setTargetFps NOTIFY targetFpsChanged)
+    // Hard ceiling on how often we redraw. Without it the visualiser free-runs whenever a
+    // preset is cheap, burning cores to produce frames nobody asked for - and on a software
+    // renderer that starves the rest of the desktop. 0 means uncapped, for benchmarking.
+    Q_PROPERTY(int maxFps READ maxFps WRITE setMaxFps NOTIFY maxFpsChanged)
+    // Run the rendering threads as a batch workload so they stop out-competing the desktop
+    // for wakeups. Must be switchable: video has presentation deadlines and should not be
+    // scheduled this way. See the note in the brief.
+    Q_PROPERTY(bool yieldToDesktop READ yieldToDesktop WRITE setYieldToDesktop NOTIFY yieldToDesktopChanged)
 
     // Stats for the frame-time overlay. Observed smoothness over RustDesk tells you about
     // the video stream, not about us, so the app has to report its own numbers.
@@ -83,6 +92,10 @@ public:
     void setAdaptiveQuality(bool enabled);
     qreal targetFps() const { return m_targetFps; }
     void setTargetFps(qreal fps);
+    int maxFps() const { return m_maxFps; }
+    void setMaxFps(int fps);
+    bool yieldToDesktop() const { return m_yieldToDesktop; }
+    void setYieldToDesktop(bool yield);
 
     Q_INVOKABLE void nextPreset();
     Q_INVOKABLE void previousPreset();
@@ -123,6 +136,8 @@ signals:
     void activeChanged();
     void adaptiveQualityChanged();
     void targetFpsChanged();
+    void maxFpsChanged();
+    void yieldToDesktopChanged();
     void statsChanged();
 
 private:
@@ -144,6 +159,9 @@ private:
 
     bool m_active = true;
     bool m_adaptiveQuality = true;
+    int m_maxFps = 60;
+    bool m_yieldToDesktop = true;
+    QTimer m_frameTimer;
     qreal m_targetFps = 30.0;
 
     QMutex m_commandMutex;

@@ -18,6 +18,12 @@
 #include <QRandomGenerator>
 #include <cmath>
 
+#ifdef Q_OS_LINUX
+#include <sched.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
+
 #include "AudioEngine.h"
 
 
@@ -110,6 +116,8 @@ public:
         }
 
         m_active = pmItem->active();
+        m_selfDriven = pmItem->maxFps() <= 0;
+        m_yieldToDesktop = pmItem->yieldToDesktop();
         const QStringList wantedList = pmItem->presetList();
         if (wantedList != m_explicitPaths) {
             m_explicitPaths = wantedList;
@@ -129,6 +137,16 @@ public:
 
     void render() override
     {
+        // The visualiser is the least important thing on the machine. On a software renderer
+        // it will happily use a core and a half, and if it competes on equal terms with the
+        // window manager and the compositor the rest of the desktop stops repainting - panel
+        // items go undrawn until hovered, regions stay stale. Nice only this thread: audio
+        // runs on GStreamer's own threads and must keep its priority.
+#ifdef Q_OS_LINUX
+        if (m_batchApplied != m_yieldToDesktop)
+            applyScheduling(m_yieldToDesktop);
+#endif
+
         if (!m_pm) {
             update();
             return;
@@ -284,10 +302,56 @@ public:
         if (win)
             win->endExternalCommands();
 
-        update();
+        // With a frame cap the item's timer asks for the next frame; asking for it here too
+        // would defeat the cap.
+        if (m_selfDriven)
+            update();
     }
 
 private:
+#ifdef Q_OS_LINUX
+    // SCHED_BATCH rather than a nice value, deliberately. Renicing is one-way for an
+    // unprivileged process - RLIMIT_NICE is 0 on the target distros, so a thread lowered to
+    // nice 5 can never be raised back - and that would permanently penalise video rendering,
+    // which shares this very render thread through qml6glsink. SCHED_BATCH costs no CPU
+    // share, only the wakeup-latency bonus that lets a busy renderer out-compete the panel
+    // and the window manager, and it can be switched off again.
+    void applyScheduling(bool batch)
+    {
+        if (qEnvironmentVariableIsSet("PLAYER_NO_SCHED_BATCH")) {
+            m_batchApplied = batch;
+            return;
+        }
+
+        sched_param param{};
+        param.sched_priority = 0;
+        const int policy = batch ? SCHED_BATCH : SCHED_OTHER;
+
+        int changed = 0;
+        if (sched_setscheduler(static_cast<pid_t>(syscall(SYS_gettid)), policy, &param) == 0)
+            ++changed;
+
+        // The rasterisation happens on Mesa's worker threads, not on this one. They belong to
+        // this process, so they are ours to reschedule; missing them leaves the desktop
+        // competing with four busy workers.
+        QDir tasks(QStringLiteral("/proc/self/task"));
+        const QStringList entries = tasks.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const QString &entry : entries) {
+            QFile comm(QStringLiteral("/proc/self/task/%1/comm").arg(entry));
+            if (!comm.open(QIODevice::ReadOnly | QIODevice::Text))
+                continue;
+            if (!QString::fromUtf8(comm.readAll()).trimmed().startsWith(QStringLiteral("llvmpipe")))
+                continue;
+            if (sched_setscheduler(entry.toInt(), policy, &param) == 0)
+                ++changed;
+        }
+
+        qInfo("rendering threads set to %s (%d threads)",
+              batch ? "SCHED_BATCH" : "SCHED_OTHER", changed);
+        m_batchApplied = batch;
+    }
+#endif
+
     void loadLibrary()
     {
         if (!m_playlist || m_presetsPath.isEmpty())
@@ -504,6 +568,8 @@ private:
     QStringList m_explicitPaths;
     int m_pendingJumpIndex = -1;
     bool m_active = true;
+    bool m_selfDriven = false;
+    bool m_batchApplied = false;
     bool m_idleCleared = false;
     QList<int> m_commands;
     bool m_pendingLibrary = false;
@@ -511,6 +577,7 @@ private:
     bool m_wantLocked = false;
     bool m_wantShuffle = true;
     qreal m_wantDuration = 30.0;
+    bool m_yieldToDesktop = true;
     qreal m_appliedDuration = 30.0;
     uint32_t m_lastIndex = 0;
     uint32_t m_lastCount = 0;
@@ -537,6 +604,10 @@ private:
 ProjectMItem::ProjectMItem(QQuickItem *parent)
     : QQuickFramebufferObject(parent)
 {
+    m_frameTimer.setTimerType(Qt::PreciseTimer);
+    m_frameTimer.setInterval(m_maxFps > 0 ? qMax(1, 1000 / m_maxFps) : 16);
+    connect(&m_frameTimer, &QTimer::timeout, this, [this]() { update(); });
+
     // Render scale requires taking manual control of the texture size; with
     // textureFollowsItemSize the FBO would always match the item.
     setTextureFollowsItemSize(false);
@@ -658,7 +729,37 @@ void ProjectMItem::setActive(bool active)
     if (active == m_active)
         return;
     m_active = active;
+    if (m_active && m_maxFps > 0)
+        m_frameTimer.start();
+    else
+        m_frameTimer.stop();
     emit activeChanged();
+    update();
+}
+
+void ProjectMItem::setYieldToDesktop(bool yield)
+{
+    if (yield == m_yieldToDesktop)
+        return;
+    m_yieldToDesktop = yield;
+    emit yieldToDesktopChanged();
+    update();
+}
+
+void ProjectMItem::setMaxFps(int fps)
+{
+    fps = fps <= 0 ? 0 : qBound(10, fps, 240);
+    if (fps == m_maxFps)
+        return;
+    m_maxFps = fps;
+    if (m_maxFps > 0) {
+        m_frameTimer.setInterval(qMax(1, 1000 / m_maxFps));
+        if (m_active)
+            m_frameTimer.start();
+    } else {
+        m_frameTimer.stop();
+    }
+    emit maxFpsChanged();
     update();
 }
 

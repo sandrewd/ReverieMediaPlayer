@@ -85,7 +85,8 @@ Rectangle {
             }
 
             Label {
-                text: root.formatTime(AudioEngine.duration)
+                text: PlaylistModel.currentIsStream ? qsTr("live")
+                                                    : root.formatTime(AudioEngine.duration)
                 color: Theme.textDim
                 font.family: "monospace"
                 font.pixelSize: 11
@@ -129,7 +130,9 @@ Rectangle {
                 spacing: 0
                 Label {
                     Layout.fillWidth: true
-                    text: AudioEngine.streamTitle !== ""
+                    // A local file also emits a title tag from its ID3 data, but for those
+                    // TagLib is authoritative. Only a stream has nothing better to offer.
+                    text: PlaylistModel.currentIsStream && AudioEngine.streamTitle !== ""
                         ? AudioEngine.streamTitle
                         : (PlaylistModel.currentTitle !== "" ? PlaylistModel.currentTitle
                                                              : qsTr("Nothing playing"))
@@ -140,8 +143,13 @@ Rectangle {
                 }
                 Label {
                     Layout.fillWidth: true
-                    visible: !root.compact && PlaylistModel.currentArtist !== ""
-                    text: PlaylistModel.currentArtist
+                    visible: !root.compact && text !== ""
+                    text: AudioEngine.buffering
+                          ? qsTr("Buffering…")
+                          : PlaylistModel.currentIsStream
+                            ? (AudioEngine.streamStation !== "" ? AudioEngine.streamStation
+                                                                : PlaylistModel.currentTitle)
+                            : PlaylistModel.currentArtist
                     color: Theme.textDim
                     font.pixelSize: 11
                     elide: Text.ElideRight

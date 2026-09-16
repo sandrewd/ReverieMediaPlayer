@@ -159,9 +159,10 @@ ApplicationWindow {
                     id: visualizer
                     anchors.fill: parent
                     audioEngine: AudioEngine
-                    // Black unless audio is actually flowing. Pausing counts as not playing.
+                    // Black unless audio is actually flowing. Pausing counts as not playing;
+                    // buffering does not, since the stream is still playing while it tops up.
                     active: AudioEngine.state === AudioEngine.Playing
-                            || AudioEngine.state === AudioEngine.Buffering
+                    maxFps: initialMaxFps
                     renderScale: initialScale
                     presetPath: initialPreset
                     presetsPath: initialPresetsPath
@@ -241,6 +242,7 @@ ApplicationWindow {
                 }
                 onPlayRequested: function(index) { root.playIndex(index) }
                 onCollapseRequested: root.playlistVisible = false
+                onAddStreamRequested: streamDialog.open()
             }
         }
 
@@ -446,6 +448,11 @@ ApplicationWindow {
         }
         MenuSeparator {}
         MenuItem {
+            text: qsTr("Add a radio stream…")
+            onTriggered: streamDialog.open()
+        }
+        MenuSeparator {}
+        MenuItem {
             id: persistToggle
             text: qsTr("Remember playlist between launches")
             checkable: true
@@ -537,6 +544,69 @@ ApplicationWindow {
             MenuItem { text: qsTr("Change every 30 seconds"); onTriggered: visualizer.presetDuration = 30 }
             MenuItem { text: qsTr("Change every 2 minutes");  onTriggered: visualizer.presetDuration = 120 }
         }
+    }
+
+    // Streams come free from playbin3, so this is a dialog and a list rather than an engine.
+    Dialog {
+        id: streamDialog
+        title: qsTr("Add a radio stream")
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(460, root.width - 60)
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        closePolicy: Popup.CloseOnEscape
+
+        onOpened: { urlField.text = ""; nameField.text = ""; urlField.forceActiveFocus() }
+        onAccepted: {
+            PlaylistModel.addStream(urlField.text, nameField.text)
+            if (PlaylistModel.count > 0 && AudioEngine.source === "")
+                root.playIndex(PlaylistModel.count - 1)
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 10
+
+            Label {
+                text: qsTr("Stream address")
+                color: Theme.textDim
+                font.pixelSize: 11
+            }
+            TextField {
+                id: urlField
+                Layout.fillWidth: true
+                placeholderText: qsTr("http://example.com:8000/stream")
+                selectByMouse: true
+                onAccepted: if (streamDialog.acceptable) streamDialog.accept()
+            }
+            Label {
+                text: qsTr("Station name (optional)")
+                color: Theme.textDim
+                font.pixelSize: 11
+            }
+            TextField {
+                id: nameField
+                Layout.fillWidth: true
+                placeholderText: qsTr("Leave blank to use the address")
+                selectByMouse: true
+                onAccepted: if (streamDialog.acceptable) streamDialog.accept()
+            }
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                visible: urlField.text !== "" && !streamDialog.acceptable
+                text: qsTr("That needs to be a full address, including http:// or https://")
+                color: "#d08770"
+                font.pixelSize: 11
+            }
+        }
+
+        // Cheap sanity check only. Whether the station actually answers is playbin3's problem,
+        // and it reports back through the usual error path.
+        readonly property bool acceptable: /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^\s\/]+/.test(urlField.text.trim())
+        Component.onCompleted: standardButton(Dialog.Ok).enabled = Qt.binding(function() {
+            return streamDialog.acceptable
+        })
     }
 
     FileDialog {

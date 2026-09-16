@@ -9,6 +9,7 @@ Rectangle {
 
     signal playRequested(int index)
     signal collapseRequested()
+    signal addStreamRequested()
 
     color: Theme.surface
 
@@ -125,7 +126,25 @@ Rectangle {
                             elide: Text.ElideRight
                         }
                     }
+                    Rectangle {
+                        visible: model.isStream
+                        implicitWidth: streamTag.implicitWidth + 10
+                        implicitHeight: streamTag.implicitHeight + 4
+                        radius: 3
+                        color: "transparent"
+                        border.color: Theme.textDim
+                        border.width: 1
+                        Label {
+                            id: streamTag
+                            anchors.centerIn: parent
+                            text: qsTr("LIVE")
+                            color: Theme.textDim
+                            font.pixelSize: 8
+                            font.letterSpacing: 0.8
+                        }
+                    }
                     Label {
+                        visible: !model.isStream
                         text: model.durationText
                         color: Theme.textDim
                         font.pixelSize: 11
@@ -205,6 +224,11 @@ Rectangle {
             Button {
                 text: qsTr("Add folder")
                 onClicked: folderDialog.open()
+                flat: true
+            }
+            Button {
+                text: qsTr("Add stream")
+                onClicked: root.addStreamRequested()
                 flat: true
             }
             Item { Layout.fillWidth: true }

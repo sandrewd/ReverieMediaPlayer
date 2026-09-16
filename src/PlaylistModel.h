@@ -8,11 +8,12 @@
 
 struct Track
 {
-    QString path;
+    QString path;       // a local path, or a URL for a stream
     QString title;
     QString artist;
     QString album;
     int durationSec = 0;
+    bool isStream = false;
 };
 
 // One playlist. Not tabbed playlists, not multiple queues - that was decided and it keeps
@@ -30,6 +31,7 @@ class PlaylistModel : public QAbstractListModel
     Q_PROPERTY(QString currentTitle READ currentTitle NOTIFY currentIndexChanged)
     Q_PROPERTY(QString currentArtist READ currentArtist NOTIFY currentIndexChanged)
     Q_PROPERTY(QString currentPath READ currentPath NOTIFY currentIndexChanged)
+    Q_PROPERTY(bool currentIsStream READ isCurrentStream NOTIFY currentIndexChanged)
 
 public:
     enum Roles {
@@ -40,6 +42,7 @@ public:
         DurationRole,
         DurationTextRole,
         IsCurrentRole,
+        IsStreamRole,
     };
 
     explicit PlaylistModel(QObject *parent = nullptr);
@@ -60,6 +63,10 @@ public:
 
 public slots:
     void addFiles(const QList<QUrl> &urls);
+    // Streams carry no tags to read, so the name is whatever the user calls the station;
+    // anything the station itself announces arrives later as a GStreamer tag.
+    void addStream(const QString &url, const QString &name = QString());
+    bool isCurrentStream() const;
     void addFolder(const QUrl &folder);
     void removeRowsAt(const QList<int> &rows);
     void moveRow(int from, int to);

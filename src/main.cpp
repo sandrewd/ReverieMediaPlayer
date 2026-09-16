@@ -52,6 +52,8 @@ int main(int argc, char *argv[])
     parser.addOption(presetsOption);
     QCommandLineOption fullscreenOption("fullscreen", "Start with the visualiser fullscreen.");
     parser.addOption(fullscreenOption);
+    QCommandLineOption fpsCapOption("max-fps", "Visualiser frame cap; 0 is uncapped.", "n", "60");
+    parser.addOption(fpsCapOption);
     parser.addPositionalArgument("files", "Audio files or folders to add to the playlist.",
                                  "[files...]");
     parser.process(app);
@@ -77,6 +79,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("initialScale", parser.value(scaleOption).toDouble());
     engine.rootContext()->setContextProperty("initialPresetsPath", presetsDir);
     engine.rootContext()->setContextProperty("initialCuratedList", curatedList);
+    engine.rootContext()->setContextProperty("initialMaxFps", parser.value(fpsCapOption).toInt());
 
     // Qt 6.4 puts QML module resources under qrc:/<URI>/; the qrc:/qt/qml/<URI>/ layout
     // only arrives in 6.5. Noble ships 6.4.2, so this path is version-sensitive.
@@ -116,6 +119,11 @@ int main(int argc, char *argv[])
         {
             QList<QUrl> files;
             for (const QString &argument : positional) {
+                // A URL on the command line is a stream, not a file to stat.
+                if (argument.contains(QStringLiteral("://"))) {
+                    playlist->addStream(argument);
+                    continue;
+                }
                 const QFileInfo info(argument);
                 if (info.isDir())
                     playlist->addFolder(QUrl::fromLocalFile(info.absoluteFilePath()));

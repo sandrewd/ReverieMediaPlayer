@@ -152,6 +152,14 @@ void AudioEngine::setSource(const QString &uriOrPath)
     m_position = 0;
     m_duration = 0;
     m_streamTitle.clear();
+    m_streamStation.clear();
+    m_bufferPercent = 100;
+    m_sinceProgress.invalidate();
+    if (m_buffering) {
+        m_buffering = false;
+        emit bufferingChanged();
+    }
+    emit streamStationChanged();
     emit sourceChanged();
     emit positionChanged();
     emit durationChanged();
@@ -165,6 +173,7 @@ void AudioEngine::play()
         return;
     gst_element_set_state(m_pipeline, GST_STATE_PLAYING);
     m_positionTimer.start();
+    m_sinceProgress.restart();
     setState(Playing);
 }
 
@@ -260,6 +269,19 @@ void AudioEngine::updateDuration()
     gst_query_unref(query);
 }
 
+void AudioEngine::updateBuffering()
+{
+    // "Buffering" should mean playback has stalled, not merely that a queue is below full.
+    // A live stream delivered at exactly playback rate sits under 100% forever while playing
+    // perfectly well, and reporting that as buffering is just wrong.
+    const bool stalled = m_bufferPercent < 100 && m_state == Playing
+        && m_sinceProgress.isValid() && m_sinceProgress.elapsed() > 1000;
+    if (stalled != m_buffering) {
+        m_buffering = stalled;
+        emit bufferingChanged();
+    }
+}
+
 void AudioEngine::pollPosition()
 {
     if (!m_pipeline)
@@ -269,9 +291,11 @@ void AudioEngine::pollPosition()
         const qint64 ms = position / GST_MSECOND;
         if (ms != m_position) {
             m_position = ms;
+            m_sinceProgress.restart();
             emit positionChanged();
         }
     }
+    updateBuffering();
     if (m_duration <= 0)
         updateDuration();
 }
@@ -322,6 +346,17 @@ void AudioEngine::pollBus()
                     }
                     g_free(title);
                 }
+                // Icecast sends the station name as the organization tag.
+                gchar *organization = nullptr;
+                if (gst_tag_list_get_string(tags, GST_TAG_ORGANIZATION, &organization)
+                    && organization) {
+                    const QString value = QString::fromUtf8(organization);
+                    if (value != m_streamStation) {
+                        m_streamStation = value;
+                        emit streamStationChanged();
+                    }
+                    g_free(organization);
+                }
                 gst_tag_list_unref(tags);
             }
             break;
@@ -329,10 +364,8 @@ void AudioEngine::pollBus()
         case GST_MESSAGE_BUFFERING: {
             gint percent = 0;
             gst_message_parse_buffering(msg, &percent);
-            if (percent < 100 && m_state == Playing)
-                setState(Buffering);
-            else if (percent >= 100 && m_state == Buffering)
-                setState(Playing);
+            m_bufferPercent = percent;
+            updateBuffering();
             break;
         }
         default:
