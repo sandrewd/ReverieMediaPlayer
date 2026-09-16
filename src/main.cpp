@@ -2,6 +2,7 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQuickWindow>
 #include <QSurfaceFormat>
 #include <QTimer>
 
@@ -28,9 +29,11 @@ int main(int argc, char *argv[])
     QCommandLineOption presetOption({"p", "preset"}, "Preset file to load.", "file");
     QCommandLineOption scaleOption({"s", "scale"}, "Initial render scale (0.1-1.0).", "scale", "0.5");
     QCommandLineOption secondsOption("seconds", "Exit after N seconds (for benchmarking).", "n", "0");
+    QCommandLineOption captureOption("capture", "Grab the window to a PNG and exit.", "file");
     parser.addOption(presetOption);
     parser.addOption(scaleOption);
     parser.addOption(secondsOption);
+    parser.addOption(captureOption);
     parser.process(app);
 
     QQmlApplicationEngine engine;
@@ -45,6 +48,27 @@ int main(int argc, char *argv[])
 
     // The visualizer is judged by its own numbers, never by watching it over a remote
     // desktop stream, so the spike can run unattended and report on exit.
+    // Grab what is actually composited. The frame timings say projectM is doing work;
+    // they say nothing about whether a single pixel reaches the window.
+    const QString capturePath = parser.value(captureOption);
+    if (!capturePath.isEmpty()) {
+        auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+        QTimer::singleShot(4000, &app, [window, capturePath, &app]() {
+            if (!window) {
+                qWarning("capture: root object is not a QQuickWindow");
+                app.exit(2);
+                return;
+            }
+            const QImage shot = window->grabWindow();
+            if (shot.isNull() || !shot.save(capturePath))
+                qWarning("capture: failed to grab or save");
+            else
+                qInfo("capture: wrote %s (%dx%d)", qPrintable(capturePath),
+                      shot.width(), shot.height());
+            app.quit();
+        });
+    }
+
     const int seconds = parser.value(secondsOption).toInt();
     if (seconds > 0)
         QTimer::singleShot(seconds * 1000, &app, &QGuiApplication::quit);

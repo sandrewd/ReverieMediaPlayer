@@ -10,8 +10,27 @@ qt_standard_project_setup(REQUIRES 6.4)
 
 # projectM is vendored and built into build/projectm-install (see README).
 find_package(projectM4 REQUIRED CONFIG
-    PATHS "${CMAKE_SOURCE_DIR}/build/projectm-install/lib/cmake/projectM4"
+    PATHS "${CMAKE_SOURCE_DIR}/build/projectm-master-install/lib/cmake/projectM4"
+          "${CMAKE_SOURCE_DIR}/build/projectm-install/lib/cmake/projectM4"
     NO_DEFAULT_PATH)
+
+# projectM only gained an explicit render target in 4.2.0; without it the visualizer
+# renders to the default framebuffer and the QML item stays black.
+include(CheckCXXSourceCompiles)
+get_target_property(_pm_includes libprojectM::projectM INTERFACE_INCLUDE_DIRECTORIES)
+find_file(PROJECTM_RENDER_OPENGL_H "projectM-4/render_opengl.h" PATHS ${_pm_includes} NO_DEFAULT_PATH)
+if(PROJECTM_RENDER_OPENGL_H)
+    file(READ "${PROJECTM_RENDER_OPENGL_H}" _pm_render_hdr)
+    string(FIND "${_pm_render_hdr}" "projectm_opengl_render_frame_fbo" _pm_has_fbo)
+    if(NOT _pm_has_fbo EQUAL -1)
+        set(PROJECTM_HAS_RENDER_FRAME_FBO ON)
+    endif()
+endif()
+if(PROJECTM_HAS_RENDER_FRAME_FBO)
+    message(STATUS "projectM: using projectm_opengl_render_frame_fbo")
+else()
+    message(WARNING "projectM lacks projectm_opengl_render_frame_fbo; the visualizer will render black")
+endif()
 
 qt_add_executable(player
     src/main.cpp
@@ -26,6 +45,10 @@ qt_add_qml_module(player
 )
 
 target_include_directories(player PRIVATE src)
+
+if(PROJECTM_HAS_RENDER_FRAME_FBO)
+    target_compile_definitions(player PRIVATE PROJECTM_HAS_RENDER_FRAME_FBO)
+endif()
 
 target_link_libraries(player PRIVATE
     Qt6::Quick

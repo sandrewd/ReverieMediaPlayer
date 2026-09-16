@@ -44,6 +44,8 @@ public:
             m_pendingPreset = true;
         }
 
+        qInfo("createFramebufferObject: requested %dx%d -> fbo %dx%d (scale %.2f)",
+              size.width(), size.height(), m_fboSize.width(), m_fboSize.height(), m_renderScale);
         projectm_set_window_size(m_pm, m_fboSize.width(), m_fboSize.height());
 
         QOpenGLFramebufferObjectFormat format;
@@ -63,6 +65,9 @@ public:
         const qreal wantedScale = pmItem->renderScale();
         const QSize itemSize(qRound(pmItem->width()), qRound(pmItem->height()));
         if (!qFuzzyCompare(wantedScale, m_renderScale) || scaledSize(itemSize) != m_fboSize) {
+            qInfo("invalidating fbo: scale %.2f -> %.2f, item %dx%d, current fbo %dx%d",
+                  m_renderScale, wantedScale, itemSize.width(), itemSize.height(),
+                  m_fboSize.width(), m_fboSize.height());
             m_renderScale = wantedScale;
             invalidateFramebufferObject();
         }
@@ -73,14 +78,6 @@ public:
             m_pendingPreset = true;
         }
 
-        if (m_statsDirty) {
-            QMetaObject::invokeMethod(pmItem, "applyStats", Qt::QueuedConnection,
-                                      Q_ARG(qreal, m_lastFrameMs),
-                                      Q_ARG(qreal, m_fps),
-                                      Q_ARG(int, m_fboSize.width()),
-                                      Q_ARG(int, m_fboSize.height()));
-            m_statsDirty = false;
-        }
     }
 
     void render() override
@@ -109,7 +106,18 @@ public:
         if (win)
             win->beginExternalCommands();
 
+        // projectM <= 4.1.7 hardcodes glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0) for its final
+        // composite, so its output lands on the window's default framebuffer and the scene
+        // graph then clears over it - the item renders black while still costing full frame
+        // time. 4.2.0 adds an explicit target, which is the only correct fix.
+#if defined(PROJECTM_HAS_RENDER_FRAME_FBO)
+        if (QOpenGLFramebufferObject *target = framebufferObject())
+            projectm_opengl_render_frame_fbo(m_pm, target->handle());
+        else
+            projectm_opengl_render_frame(m_pm);
+#else
         projectm_opengl_render_frame(m_pm);
+#endif
 
         // llvmpipe defers work aggressively, so without a flush the measured time is the
         // time to queue commands, not the time to draw. But the flush also costs throughput:
@@ -138,7 +146,44 @@ public:
         }
         m_intervalTimer.restart();
 
-        m_statsDirty = true;
+        // Push stats straight to the GUI thread a few times a second. A queued invocation is
+        // safe across threads; doing it every frame would just flood the event loop.
+        if (!m_statsPosted.isValid() || m_statsPosted.elapsed() >= 200) {
+            m_statsPosted.restart();
+            if (m_item) {
+                QMetaObject::invokeMethod(m_item, "applyStats", Qt::QueuedConnection,
+                                          Q_ARG(qreal, m_lastFrameMs),
+                                          Q_ARG(qreal, m_fps),
+                                          Q_ARG(int, m_fboSize.width()),
+                                          Q_ARG(int, m_fboSize.height()));
+            }
+        }
+
+        static const bool probe = qEnvironmentVariableIsSet("PLAYER_PROBE");
+        if (probe && m_frameCount % 30 == 0) {
+            if (QOpenGLFramebufferObject *fbo = framebufferObject()) {
+                const QImage img = fbo->toImage();
+                quint64 sum = 0;
+                int nonBlack = 0;
+                const int step = qMax(1, img.width() / 64);
+                int samples = 0;
+                for (int y = 0; y < img.height(); y += step) {
+                    for (int x = 0; x < img.width(); x += step) {
+                        const QRgb px = img.pixel(x, y);
+                        const int lum = qGray(px);
+                        sum += lum;
+                        if (lum > 8)
+                            ++nonBlack;
+                        ++samples;
+                    }
+                }
+                qInfo("  probe: fbo %dx%d mean-luma %.1f non-black %d/%d (%.0f%%)",
+                      img.width(), img.height(), samples ? double(sum) / samples : 0.0,
+                      nonBlack, samples, samples ? 100.0 * nonBlack / samples : 0.0);
+            } else {
+                qWarning("  probe: framebufferObject() is null");
+            }
+        }
 
         if (++m_frameCount % 30 == 0) {
             qInfo("frame %5d | projectM %6.2f ms | %5.1f fps | fbo %dx%d",
@@ -183,7 +228,7 @@ private:
     QSize m_fboSize;
     QString m_presetPath;
     bool m_pendingPreset = false;
-    bool m_statsDirty = false;
+    QElapsedTimer m_statsPosted;
     double m_lastFrameMs = 0.0;
     double m_fps = 0.0;
     double m_phase = 0.0;
