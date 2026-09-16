@@ -4,3 +4,4 @@ compile_commands.json
 *.user
 assets/presets/
 assets/test-audio/
+_reference/extracted/
