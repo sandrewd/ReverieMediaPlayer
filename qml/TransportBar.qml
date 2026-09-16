@@ -12,6 +12,8 @@ Rectangle {
     property bool compact: false
     signal requestNext()
     signal requestPrevious()
+    signal requestPlayPause()
+    signal requestStop()
 
     color: Theme.surface
     implicitHeight: compact ? 62 : 88
@@ -99,7 +101,14 @@ Rectangle {
             IconButton {
                 glyph: AudioEngine.state === AudioEngine.Playing ? "pause" : "play"
                 primary: true
-                onClicked: AudioEngine.togglePlayPause()
+                onClicked: root.requestPlayPause()
+            }
+            IconButton {
+                glyph: "stop"
+                enabled: AudioEngine.state !== AudioEngine.Stopped
+                onClicked: root.requestStop()
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Stop")
             }
             IconButton {
                 glyph: "next"

@@ -16,6 +16,7 @@
 #include <projectM-4/playlist.h>
 
 #include <QRandomGenerator>
+#include <cmath>
 
 #include "AudioEngine.h"
 
@@ -422,9 +423,21 @@ private:
         // Real audio when the pipeline is delivering it; the synthetic sweep otherwise, so
         // the visualiser is never a still image while the user is browsing a playlist.
         if (m_ring && m_ring->readLatest(samples, kSamplesPerFrame)) {
+            m_audioIsLive = true;
+            if (qEnvironmentVariableIsSet("PLAYER_PROBE") && m_frameCount % 60 == 0) {
+                double sum = 0.0, peak = 0.0;
+                for (int i = 0; i < kSamplesPerFrame * 2; ++i) {
+                    sum += double(samples[i]) * samples[i];
+                    peak = qMax(peak, qAbs(double(samples[i])));
+                }
+                qInfo("  audio: LIVE  rms %.4f  peak %.4f", std::sqrt(sum / (kSamplesPerFrame * 2)), peak);
+            }
             projectm_pcm_add_float(m_pm, samples, kSamplesPerFrame, PROJECTM_STEREO);
             return;
         }
+        m_audioIsLive = false;
+        if (qEnvironmentVariableIsSet("PLAYER_PROBE") && m_frameCount % 60 == 0)
+            qInfo("  audio: synthetic fallback (no PCM arriving)");
 
         const double sweep = 220.0 + 160.0 * std::sin(m_sweepPhase);
         m_sweepPhase += 0.01;
@@ -446,6 +459,7 @@ private:
     projectm_playlist_handle m_playlist = nullptr;
     ProjectMItem *m_item = nullptr;
     AudioRingBuffer *m_ring = nullptr;
+    bool m_audioIsLive = false;
     QString m_presetsPath;
     QString m_curatedList;
     QList<int> m_commands;

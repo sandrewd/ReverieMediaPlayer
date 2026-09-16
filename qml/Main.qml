@@ -41,8 +41,11 @@ ApplicationWindow {
 
     onFullscreenChanged: {
         root.visibility = fullscreen ? Window.FullScreen : Window.Windowed
-        if (fullscreen)
+        if (fullscreen) {
+            controlsVisible = true
+            fullscreenHint.show()
             idleTimer.restart()
+        }
     }
 
     onMiniChanged: {
@@ -59,7 +62,11 @@ ApplicationWindow {
     // Always-on-top works through window flags on X11 and is simply not possible on Wayland:
     // there is no portable client-side protocol for it. Documented, not chased.
     onAlwaysOnTopChanged: {
-        root.flags = alwaysOnTop ? (Qt.Window | Qt.WindowStaysOnTopHint) : Qt.Window
+        // Add or clear the single hint rather than assigning a whole flag set: replacing the
+        // flags wholesale drops the title and system-menu hints with it, and the window loses
+        // its decoration on some window managers.
+        root.flags = alwaysOnTop ? (root.flags | Qt.WindowStaysOnTopHint)
+                                 : (root.flags & ~Qt.WindowStaysOnTopHint)
     }
 
     function playIndex(index) {
@@ -68,6 +75,17 @@ ApplicationWindow {
         PlaylistModel.currentIndex = index
         AudioEngine.setSource(PlaylistModel.currentPath)
         AudioEngine.play()
+    }
+
+    // Pressing Play with a loaded playlist but no track chosen should just play, rather than
+    // doing nothing and leaving "Nothing playing" on screen. That was a real dead end: adding
+    // a file and pressing Play looked broken until you knew to double-click the row.
+    function togglePlay() {
+        if (AudioEngine.source === "" && PlaylistModel.count > 0) {
+            playIndex(PlaylistModel.currentIndex >= 0 ? PlaylistModel.currentIndex : 0)
+            return
+        }
+        AudioEngine.togglePlayPause()
     }
 
     function playNext() { playIndex(PlaylistModel.nextIndex(true)) }
@@ -124,7 +142,14 @@ ApplicationWindow {
                 }
                 HoverHandler {
                     id: visualizerHover
-                    onPointChanged: if (root.fullscreen) { controlsVisible = true; idleTimer.restart() }
+                    onPointChanged: {
+                        if (!root.fullscreen)
+                            return
+                        if (!root.controlsVisible)
+                            fullscreenHint.show()
+                        root.controlsVisible = true
+                        idleTimer.restart()
+                    }
                 }
 
                 // Frame-time overlay, required from the first commit: over RustDesk observed
@@ -134,14 +159,14 @@ ApplicationWindow {
                     anchors { left: parent.left; top: parent.top; margins: 10 }
                     width: overlayText.implicitWidth + 18
                     height: overlayText.implicitHeight + 14
-                    color: "#c0000000"
+                    color: Theme.overlayBackground
                     radius: 4
                     Text {
                         id: overlayText
                         anchors.centerIn: parent
                         font.family: "monospace"
                         font.pixelSize: 11
-                        color: "#e8e8e8"
+                        color: Theme.overlayText
                         text: "projectM   %1 ms\nthroughput %2 fps\nrender     %3x%4 (%5%)"
                             .arg(visualizer.frameTimeMs.toFixed(2))
                             .arg(visualizer.fps.toFixed(1))
@@ -192,6 +217,8 @@ ApplicationWindow {
             compact: root.mini
             onRequestNext: root.playNext()
             onRequestPrevious: root.playPrevious()
+            onRequestPlayPause: root.togglePlay()
+            onRequestStop: AudioEngine.stop()
         }
     }
 
@@ -262,6 +289,27 @@ ApplicationWindow {
             checkable: true
             checked: PlaylistModel.persistAcrossLaunches
             onTriggered: PlaylistModel.persistAcrossLaunches = checked
+        }
+        Menu {
+            title: qsTr("Appearance")
+            MenuItem {
+                text: qsTr("Follow system theme")
+                checkable: true
+                checked: SystemTheme.preference === SystemTheme.FollowSystem
+                onTriggered: SystemTheme.preference = SystemTheme.FollowSystem
+            }
+            MenuItem {
+                text: qsTr("Always dark")
+                checkable: true
+                checked: SystemTheme.preference === SystemTheme.AlwaysDark
+                onTriggered: SystemTheme.preference = SystemTheme.AlwaysDark
+            }
+            MenuItem {
+                text: qsTr("Always light")
+                checkable: true
+                checked: SystemTheme.preference === SystemTheme.AlwaysLight
+                onTriggered: SystemTheme.preference = SystemTheme.AlwaysLight
+            }
         }
         MenuItem {
             text: qsTr("Keep window on top")
@@ -339,6 +387,29 @@ ApplicationWindow {
         onAccepted: PlaylistModel.loadM3U(selectedFile)
     }
 
+    // Fullscreen removes the title bar, so say how to get back. Shown on entry and again
+    // whenever the pointer moves after the chrome has hidden itself.
+    Rectangle {
+        id: fullscreenHint
+        function show() { opacity = 1.0; hintTimer.restart() }
+        visible: root.fullscreen && opacity > 0.01
+        opacity: 0
+        Behavior on opacity { NumberAnimation { duration: 220 } }
+        anchors { horizontalCenter: parent.horizontalCenter; top: parent.top; topMargin: 24 }
+        width: hintLabel.implicitWidth + 28
+        height: hintLabel.implicitHeight + 18
+        radius: Theme.radius
+        color: Theme.overlayBackground
+        Label {
+            id: hintLabel
+            anchors.centerIn: parent
+            text: qsTr("Press Esc or double-click to leave fullscreen")
+            color: Theme.overlayText
+            font.pixelSize: 12
+        }
+        Timer { id: hintTimer; interval: 3200; onTriggered: fullscreenHint.opacity = 0 }
+    }
+
     DropArea {
         anchors.fill: parent
         onDropped: function(drop) {
@@ -380,7 +451,7 @@ ApplicationWindow {
 
     // --- keyboard ----------------------------------------------------------------------
 
-    Shortcut { sequence: "Space";       onActivated: AudioEngine.togglePlayPause() }
+    Shortcut { sequence: "Space";       onActivated: root.togglePlay() }
     Shortcut { sequence: "Right";       onActivated: AudioEngine.seek(AudioEngine.position + 5000) }
     Shortcut { sequence: "Left";        onActivated: AudioEngine.seek(Math.max(0, AudioEngine.position - 5000)) }
     Shortcut { sequence: "Ctrl+Right";  onActivated: root.playNext() }

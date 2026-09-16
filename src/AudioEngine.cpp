@@ -75,7 +75,12 @@ void AudioEngine::buildPipeline()
     GstElement *convert = gst_element_factory_make("audioconvert", nullptr);
     GstElement *tee = gst_element_factory_make("tee", nullptr);
     GstElement *playQueue = gst_element_factory_make("queue", nullptr);
-    GstElement *sink = gst_element_factory_make("autoaudiosink", nullptr);
+    // Test seam: automated runs need the pipeline to decode normally without putting sound
+    // through the speakers. Overriding the sink element is honest about what it changes,
+    // unlike re-ranking plugins globally, which also perturbs decoder autoplugging.
+    const QByteArray sinkOverride = qgetenv("PLAYER_AUDIO_SINK");
+    GstElement *sink = gst_element_factory_make(
+        sinkOverride.isEmpty() ? "autoaudiosink" : sinkOverride.constData(), nullptr);
     GstElement *pcmQueue = gst_element_factory_make("queue", nullptr);
     GstElement *pcmConvert = gst_element_factory_make("audioconvert", nullptr);
     GstElement *pcmResample = gst_element_factory_make("audioresample", nullptr);

@@ -13,7 +13,7 @@ Rectangle {
     implicitHeight: 44
     implicitWidth: row.implicitWidth + 24
     radius: Theme.radius
-    color: "#b0000000"
+    color: Theme.overlayBackground
 
     RowLayout {
         id: row
@@ -59,11 +59,20 @@ Rectangle {
         ColumnLayout {
             spacing: 0
             Layout.maximumWidth: 260
+            // Labelled explicitly: without this the preset name reads as track information,
+            // which is exactly how it was misread the first time someone ran the app.
+            Label {
+                text: qsTr("VISUALISATION")
+                color: Theme.overlayTextDim
+                font.pixelSize: 8
+                font.letterSpacing: 1.2
+                font.weight: Font.DemiBold
+            }
             Label {
                 Layout.fillWidth: true
                 text: root.visualizer && root.visualizer.presetName !== ""
                       ? root.visualizer.presetName : qsTr("No preset library")
-                color: Theme.text
+                color: Theme.overlayText
                 font.pixelSize: 11
                 elide: Text.ElideRight
             }
@@ -78,7 +87,7 @@ Rectangle {
                                    + (root.visualizer.adaptiveQuality ? qsTr(" auto") : "")
                                  : "")
                       : ""
-                color: Theme.textDim
+                color: Theme.overlayTextDim
                 font.pixelSize: 10
                 elide: Text.ElideRight
             }

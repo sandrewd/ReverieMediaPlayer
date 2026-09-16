@@ -53,6 +53,8 @@ qt_add_executable(player
     src/PlaylistModel.h
     src/MprisAdaptor.cpp
     src/MprisAdaptor.h
+    src/SystemTheme.cpp
+    src/SystemTheme.h
 )
 
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)

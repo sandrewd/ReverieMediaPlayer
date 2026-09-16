@@ -41,6 +41,8 @@ AbstractButton {
                 case "pause":
                     ctx.fillRect(w * 0.12, 0, w * 0.28, h)
                     ctx.fillRect(w * 0.60, 0, w * 0.28, h); break
+                case "stop":
+                    ctx.fillRect(w * 0.08, h * 0.08, w * 0.84, h * 0.84); break
                 case "next":
                     ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(w * 0.7, h / 2)
                     ctx.lineTo(0, h); ctx.closePath(); ctx.fill()
