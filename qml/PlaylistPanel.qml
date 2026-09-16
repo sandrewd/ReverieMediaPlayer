@@ -208,6 +208,15 @@ Rectangle {
 
     Menu {
         id: contextMenu
+        onAboutToShow: {
+            let widest = 0
+            for (let i = 0; i < count; ++i) {
+                const item = itemAt(i)
+                if (item && item.implicitWidth > widest)
+                    widest = item.implicitWidth
+            }
+            width = Math.max(160, Math.min(360, widest + 44))
+        }
         MenuItem {
             text: qsTr("Play")
             enabled: root.selectedRows().length === 1

@@ -69,6 +69,17 @@ ApplicationWindow {
                                  : (root.flags & ~Qt.WindowStaysOnTopHint)
     }
 
+    function fitMenuWidth(menu, minimum, maximum) {
+        let widest = 0
+        for (let i = 0; i < menu.count; ++i) {
+            const item = menu.itemAt(i)
+            if (item && item.implicitWidth > widest)
+                widest = item.implicitWidth
+        }
+        // Leave room for the submenu arrow and the checkable indicator column.
+        menu.width = Math.max(minimum, Math.min(maximum, widest + 44))
+    }
+
     function playIndex(index) {
         if (index < 0 || index >= PlaylistModel.count)
             return
@@ -285,7 +296,7 @@ ApplicationWindow {
     // with, then by author where an author actually has several presets in that category.
     Menu {
         id: presetMenu
-        width: 420
+        onAboutToShow: root.fitMenuWidth(presetMenu, 200, 460)
 
         function useList(category) {
             visualizer.setPresetList(PresetLibrary.paths(category))
@@ -333,7 +344,6 @@ ApplicationWindow {
             id: catMenu
             required property string modelData
             title: modelData
-            width: 560
             property bool populated: false
 
             MenuItem {
@@ -373,6 +383,7 @@ ApplicationWindow {
                         presetIndex: loose[i].index
                     }))
                 }
+                root.fitMenuWidth(catMenu, 200, 620)
             }
         }
     }
@@ -383,7 +394,6 @@ ApplicationWindow {
             id: artist
             property string category: ""
             property var entries: []
-            width: 560
             property bool populated: false
             onAboutToShow: {
                 if (populated)
@@ -396,6 +406,7 @@ ApplicationWindow {
                         presetIndex: entries[i].index
                     }))
                 }
+                root.fitMenuWidth(artist, 180, 620)
             }
         }
     }
@@ -417,6 +428,7 @@ ApplicationWindow {
 
     Menu {
         id: optionsMenu
+        onAboutToShow: root.fitMenuWidth(optionsMenu, 220, 420)
         MenuItem {
             text: qsTr("Save playlist as M3U…")
             enabled: PlaylistModel.count > 0

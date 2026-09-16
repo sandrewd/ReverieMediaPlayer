@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QObject>
+#include <QProcess>
+#include <QTimer>
 #include <QtQml/qqmlregistration.h>
 
 // Qt 6.4 predates Qt::ColorScheme and QStyleHints::colorScheme, both of which arrive in 6.5,
@@ -20,6 +22,7 @@ public:
     Q_ENUM(Preference)
 
     explicit SystemTheme(QObject *parent = nullptr);
+    ~SystemTheme() override;
 
     bool dark() const;
     bool systemIsDark() const { return m_systemIsDark; }
@@ -36,8 +39,21 @@ protected:
 
 private:
     void redetect();
-    static bool detectSystemDark();
+    void startMonitor();
+    void applyMonitorLine(const QString &line);
+    bool detectSystemDark() const;
+    // -1 unknown, 0 light, 1 dark
+    static int paletteHint();
+    static int querySchemeHint();
 
     bool m_systemIsDark = true;
     Preference m_preference = FollowSystem;
+
+    // The desktop's own colour-scheme setting, when it expresses a preference at all.
+    int m_schemeHint = -1;
+    // Fallback read of the GTK theme name, for desktops that only change that.
+    int m_themeNameHint = -1;
+
+    QProcess m_monitor;
+    QTimer m_poll;
 };
