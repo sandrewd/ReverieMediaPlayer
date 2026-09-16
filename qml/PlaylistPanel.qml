@@ -39,14 +39,18 @@ Rectangle {
         anchors.fill: parent
         spacing: 0
 
-        RowLayout {
+        // Anchored rather than laid out. A RowLayout with Layout.margins came out 344 wide
+        // inside a 340 panel, which pushed the track count past the edge and clipped it.
+        // Anchoring the count to the right edge means it cannot overflow whatever the width.
+        Item {
             Layout.fillWidth: true
-            Layout.margins: 8
-            spacing: 6
+            implicitHeight: 40
 
-            // Collapse control lives on the panel it collapses, which is where people look
-            // for it, rather than in the window chrome.
             IconButton {
+                id: collapseButton
+                anchors.left: parent.left
+                anchors.leftMargin: 6
+                anchors.verticalCenter: parent.verticalCenter
                 glyph: "chevronRight"
                 size: 24
                 onClicked: root.collapseRequested()
@@ -55,16 +59,27 @@ Rectangle {
             }
 
             Label {
+                id: countLabel
+                anchors.right: parent.right
+                anchors.rightMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+                text: PlaylistModel.count + (PlaylistModel.count === 1 ? qsTr(" track")
+                                                                       : qsTr(" tracks"))
+                color: Theme.textDim
+                font.pixelSize: 11
+            }
+
+            Label {
+                anchors.left: collapseButton.right
+                anchors.leftMargin: 6
+                anchors.right: countLabel.left
+                anchors.rightMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
                 text: qsTr("Playlist")
                 color: Theme.text
                 font.pixelSize: 13
                 font.weight: Font.DemiBold
-                Layout.fillWidth: true
-            }
-            Label {
-                text: PlaylistModel.count + (PlaylistModel.count === 1 ? qsTr(" track") : qsTr(" tracks"))
-                color: Theme.textDim
-                font.pixelSize: 11
+                elide: Text.ElideRight
             }
         }
 
@@ -211,33 +226,50 @@ Rectangle {
 
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
 
-        RowLayout {
+        // One "Add" button rather than three. Three of them made this row demand ~344px, and
+        // a ColumnLayout will not lay out narrower than its widest child's minimum width, so
+        // every row in the panel - including the header - was being given 344px inside a
+        // 340px panel and clipped. It is also simply less to read.
+        Item {
             Layout.fillWidth: true
-            Layout.margins: 8
-            spacing: 6
+            implicitHeight: 42
 
             Button {
-                text: qsTr("Add files")
-                onClicked: fileDialog.open()
+                id: addButton
+                anchors.left: parent.left
+                anchors.leftMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+                text: qsTr("Add")
                 flat: true
+                onClicked: addMenu.popup()
             }
+
             Button {
-                text: qsTr("Add folder")
-                onClicked: folderDialog.open()
-                flat: true
-            }
-            Button {
-                text: qsTr("Add stream")
-                onClicked: root.addStreamRequested()
-                flat: true
-            }
-            Item { Layout.fillWidth: true }
-            Button {
+                anchors.right: parent.right
+                anchors.rightMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
                 text: qsTr("Clear")
-                enabled: PlaylistModel.count > 0
                 flat: true
+                enabled: PlaylistModel.count > 0
                 onClicked: { PlaylistModel.clear(); root.clearSelection() }
             }
+        }
+    }
+
+    Menu {
+        id: addMenu
+        MenuItem {
+            text: qsTr("Files…")
+            onTriggered: fileDialog.open()
+        }
+        MenuItem {
+            text: qsTr("Folder…")
+            onTriggered: folderDialog.open()
+        }
+        MenuSeparator {}
+        MenuItem {
+            text: qsTr("Radio stream…")
+            onTriggered: root.addStreamRequested()
         }
     }
 

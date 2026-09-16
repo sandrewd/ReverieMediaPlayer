@@ -40,6 +40,16 @@ ApplicationWindow {
     }
     onControlsVisibleChanged: if (controlsVisible && fullscreen) idleTimer.restart()
 
+    // Any sign of life brings the chrome back and resets the countdown.
+    function revealControls() {
+        if (!root.fullscreen)
+            return
+        if (!root.controlsVisible)
+            fullscreenHint.show()
+        root.controlsVisible = true
+        idleTimer.restart()
+    }
+
     // Collapse order as the window narrows: playlist panel first, then the volume slider
     // (inside TransportBar), then the artist line. The transport itself never collapses.
     readonly property bool roomForPlaylist: width >= 700
@@ -193,16 +203,17 @@ ApplicationWindow {
                     acceptedButtons: Qt.RightButton
                     onTapped: presetMenu.popup()
                 }
-                HoverHandler {
-                    id: visualizerHover
-                    onPointChanged: {
-                        if (!root.fullscreen)
-                            return
-                        if (!root.controlsVisible)
-                            fullscreenHint.show()
-                        root.controlsVisible = true
-                        idleTimer.restart()
-                    }
+                // A MouseArea reports genuine movement; HoverHandler's point also changes on
+                // scene updates, which kept restarting the idle timer every frame and meant
+                // the controls never actually hid. Buttons are not accepted, so clicks still
+                // reach the handlers underneath.
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.NoButton
+                    cursorShape: root.fullscreen && !root.controlsVisible ? Qt.BlankCursor
+                                                                          : Qt.ArrowCursor
+                    onPositionChanged: root.revealControls()
                 }
 
                 // Frame-time overlay, required from the first commit: over RustDesk observed
@@ -261,18 +272,28 @@ ApplicationWindow {
             }
         }
 
-        TransportBar {
-            id: transportBar
+        // In fullscreen the transport floats over the visualiser instead of taking a slice of
+        // the window, so the visualisation really does fill the screen. Windowed, this spacer
+        // reserves exactly the height the bar occupies below.
+        Item {
             Layout.fillWidth: true
-            visible: !root.fullscreen || root.controlsVisible
-            compact: root.mini
-            showRestore: root.mini
-            onRequestRestore: root.mini = false
-            onRequestNext: root.playNext()
-            onRequestPrevious: root.playPrevious()
-            onRequestPlayPause: root.togglePlay()
-            onRequestStop: AudioEngine.stop()
+            Layout.preferredHeight: root.fullscreen ? 0 : transportBar.implicitHeight
         }
+    }
+
+    TransportBar {
+        id: transportBar
+        anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+        compact: root.mini
+        showRestore: root.mini
+        opacity: root.fullscreen && !root.controlsVisible ? 0.0 : 1.0
+        visible: opacity > 0.01
+        Behavior on opacity { NumberAnimation { duration: 200 } }
+        onRequestRestore: root.mini = false
+        onRequestNext: root.playNext()
+        onRequestPrevious: root.playPrevious()
+        onRequestPlayPause: root.togglePlay()
+        onRequestStop: AudioEngine.stop()
     }
 
     // --- chrome ------------------------------------------------------------------------
@@ -912,9 +933,9 @@ ApplicationWindow {
 
     // --- keyboard ----------------------------------------------------------------------
 
-    Shortcut { sequence: "Space";       onActivated: root.togglePlay() }
-    Shortcut { sequence: "Right";       onActivated: AudioEngine.seek(AudioEngine.position + 5000) }
-    Shortcut { sequence: "Left";        onActivated: AudioEngine.seek(Math.max(0, AudioEngine.position - 5000)) }
+    Shortcut { sequence: "Space";       onActivated: { root.revealControls(); root.togglePlay() } }
+    Shortcut { sequence: "Right";       onActivated: { root.revealControls(); AudioEngine.seek(AudioEngine.position + 5000) } }
+    Shortcut { sequence: "Left";        onActivated: { root.revealControls(); AudioEngine.seek(Math.max(0, AudioEngine.position - 5000)) } }
     Shortcut { sequence: "Ctrl+Right";  onActivated: root.playNext() }
     Shortcut { sequence: "Ctrl+Left";   onActivated: root.playPrevious() }
     Shortcut { sequence: "Ctrl+M";      onActivated: root.mini = !root.mini }
@@ -926,10 +947,13 @@ ApplicationWindow {
     Shortcut { sequence: "P";           onActivated: visualizer.previousPreset() }
     Shortcut { sequence: "R";           onActivated: visualizer.randomPreset() }
     Shortcut {
-        sequence: "Escape"
+        sequences: ["Escape"]
+        context: Qt.ApplicationShortcut
         onActivated: {
-            if (root.fullscreen) root.fullscreen = false
-            else if (root.mini) root.mini = false
+            if (root.fullscreen)
+                root.fullscreen = false
+            else if (root.mini)
+                root.mini = false
         }
     }
 }
