@@ -8,6 +8,7 @@ Rectangle {
     id: root
 
     signal playRequested(int index)
+    signal collapseRequested()
 
     color: Theme.surface
 
@@ -41,6 +42,16 @@ Rectangle {
             Layout.fillWidth: true
             Layout.margins: 8
             spacing: 6
+
+            // Collapse control lives on the panel it collapses, which is where people look
+            // for it, rather than in the window chrome.
+            IconButton {
+                glyph: "chevronRight"
+                size: 24
+                onClicked: root.collapseRequested()
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Hide playlist")
+            }
 
             Label {
                 text: qsTr("Playlist")

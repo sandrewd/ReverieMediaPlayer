@@ -218,17 +218,23 @@ ApplicationWindow {
             }
 
             Rectangle {
-                visible: root.showPlaylist
+                visible: playlistPanel.Layout.preferredWidth > 0
                 Layout.preferredWidth: 1
                 Layout.fillHeight: true
                 color: Theme.border
             }
 
             PlaylistPanel {
-                visible: root.showPlaylist
-                Layout.preferredWidth: 340
+                id: playlistPanel
+                visible: Layout.preferredWidth > 0
+                clip: true
+                Layout.preferredWidth: root.showPlaylist ? 340 : 0
                 Layout.fillHeight: true
+                Behavior on Layout.preferredWidth {
+                    NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+                }
                 onPlayRequested: function(index) { root.playIndex(index) }
+                onCollapseRequested: root.playlistVisible = false
             }
         }
 
@@ -254,14 +260,6 @@ ApplicationWindow {
         Behavior on opacity { NumberAnimation { duration: 180 } }
         spacing: 4
 
-        IconButton {
-            glyph: "list"
-            enabled: root.roomForPlaylist
-            onClicked: root.playlistVisible = !root.playlistVisible
-            ToolTip.visible: hovered
-            ToolTip.text: root.roomForPlaylist ? qsTr("Show or hide the playlist")
-                                               : qsTr("Window too narrow for the playlist")
-        }
         IconButton {
             glyph: "expand"
             onClicked: root.fullscreen = !root.fullscreen
@@ -547,6 +545,35 @@ ApplicationWindow {
         title: qsTr("Load playlist")
         nameFilters: [qsTr("M3U playlists (*.m3u *.m3u8)"), qsTr("All files (*)")]
         onAccepted: PlaylistModel.loadM3U(selectedFile)
+    }
+
+    // With the panel collapsed its own control is gone, so leave a handle on the edge it
+    // retracted into. Hidden in mini and fullscreen, and when the window is too narrow to
+    // show the panel at all.
+    Rectangle {
+        id: playlistHandle
+        visible: !root.mini && !root.fullscreen && root.roomForPlaylist && !root.playlistVisible
+        anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+        width: 22
+        height: 64
+        radius: Theme.radius
+        color: handleHover.hovered ? Theme.surfaceHigh : Theme.surface
+        border.color: Theme.border
+        border.width: 1
+        Behavior on color { ColorAnimation { duration: 90 } }
+
+        HoverHandler { id: handleHover }
+        TapHandler { onTapped: root.playlistVisible = true }
+
+        IconButton {
+            anchors.centerIn: parent
+            glyph: "chevronLeft"
+            size: 20
+            enabled: false          // the whole tab is the target; this is just the glyph
+            opacity: 1.0
+        }
+        ToolTip.visible: handleHover.hovered
+        ToolTip.text: qsTr("Show playlist")
     }
 
     // Fullscreen removes the title bar, so say how to get back. Shown on entry and again

@@ -103,6 +103,24 @@ AbstractButton {
                     ctx.moveTo(w * 0.95, h * 0.65); ctx.lineTo(w * 0.95, h * 0.95); ctx.lineTo(w * 0.65, h * 0.95)
                     ctx.moveTo(w * 0.35, h * 0.95); ctx.lineTo(w * 0.05, h * 0.95); ctx.lineTo(w * 0.05, h * 0.65)
                     ctx.stroke(); break
+                case "chevronRight":
+                    ctx.strokeStyle = ctx.fillStyle
+                    ctx.lineWidth = Math.max(1.5, w * 0.16)
+                    ctx.lineCap = "round"; ctx.lineJoin = "round"
+                    ctx.beginPath()
+                    ctx.moveTo(w * 0.34, h * 0.12)
+                    ctx.lineTo(w * 0.72, h * 0.5)
+                    ctx.lineTo(w * 0.34, h * 0.88)
+                    ctx.stroke(); break
+                case "chevronLeft":
+                    ctx.strokeStyle = ctx.fillStyle
+                    ctx.lineWidth = Math.max(1.5, w * 0.16)
+                    ctx.lineCap = "round"; ctx.lineJoin = "round"
+                    ctx.beginPath()
+                    ctx.moveTo(w * 0.66, h * 0.12)
+                    ctx.lineTo(w * 0.28, h * 0.5)
+                    ctx.lineTo(w * 0.66, h * 0.88)
+                    ctx.stroke(); break
                 case "menu":
                     for (let j = 0; j < 3; ++j)
                         ctx.fillRect(0, h * (0.1 + j * 0.36), w, h * 0.16)
