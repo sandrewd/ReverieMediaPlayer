@@ -290,11 +290,25 @@ ApplicationWindow {
                 TapHandler {
                     onDoubleTapped: root.fullscreen = !root.fullscreen
                 }
+                // Mouse and touchpad only, and this is the important part: `acceptedButtons`
+                // filters *mouse buttons*, and a touch point carries no button at all, so the
+                // Qt.RightButton restriction does not apply to touch. On a touchscreen a plain
+                // tap therefore reached this handler - and because a tap on the chrome is also
+                // delivered to the button under the finger, tapping Options opened the options
+                // menu and this one at the same time, with the preset picker drawn on top.
                 TapHandler {
+                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                     acceptedButtons: Qt.RightButton
                     // Nothing in this menu applies to video: there is no preset on screen to
                     // change, lock or randomise.
                     onTapped: if (!AudioEngine.hasVideo) presetMenu.popup()
+                }
+                // Touch has no second button, so the picker gets the gesture touch actually uses
+                // for a context menu. Without this, restricting the handler above would simply
+                // remove the feature on a touchscreen.
+                TapHandler {
+                    acceptedDevices: PointerDevice.TouchScreen
+                    onLongPressed: if (!AudioEngine.hasVideo) presetMenu.popup()
                 }
                 // A MouseArea reports genuine movement; HoverHandler's point also changes on
                 // scene updates, which kept restarting the idle timer every frame and meant
