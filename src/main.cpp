@@ -18,6 +18,9 @@
 
 #include <QSurfaceFormat>
 #include <QTimer>
+#include <QDBusConnection>
+#include <QDBusConnectionInterface>
+#include <QDBusInterface>
 
 namespace {
 
@@ -117,6 +120,45 @@ int main(int argc, char *argv[])
                                  "[files...]");
     parser.process(app);
 
+    // Single instance. Opening a second file from a file manager used to start a second Reverie,
+    // which played over the first and lost the MPRIS name, so media keys kept controlling the
+    // window you were not looking at. If somebody already owns the name, hand them what we were
+    // given and get out of the way.
+    //
+    // Deliberately before anything expensive: no QML engine, no projectM, no preset scan. The
+    // second process should cost almost nothing and disappear.
+    {
+        QDBusConnection bus = QDBusConnection::sessionBus();
+        if (bus.isConnected() && bus.interface()
+            && bus.interface()->isServiceRegistered(QString::fromLatin1(MprisPlayer::serviceName()))) {
+            const QStringList handoff = parser.positionalArguments();
+            if (!handoff.isEmpty()) {
+                QStringList uris;
+                for (const QString &argument : handoff) {
+                    uris.append(argument.contains(QStringLiteral("://"))
+                                    ? argument
+                                    : QUrl::fromLocalFile(
+                                          QFileInfo(argument).absoluteFilePath()).toString());
+                }
+                QDBusInterface reverie(QString::fromLatin1(MprisPlayer::serviceName()),
+                                       QString::fromLatin1(MprisPlayer::objectPath()),
+                                       QString::fromLatin1(MprisPlayer::appInterface()), bus);
+                reverie.call(QStringLiteral("OpenFiles"), uris);
+            }
+            // Bring the existing window forward either way, so launching the application twice
+            // looks like focusing it rather than doing nothing. Note this is a request the
+            // compositor may refuse: on Wayland a client cannot raise itself without a valid
+            // activation token, so expect this to be a no-op there.
+            QDBusInterface root(QString::fromLatin1(MprisPlayer::serviceName()),
+                                QString::fromLatin1(MprisPlayer::objectPath()),
+                                QStringLiteral("org.mpris.MediaPlayer2"), bus);
+            root.call(QStringLiteral("Raise"));
+            qInfo("another instance owns %s; handed it %lld file(s) and exiting",
+                  MprisPlayer::serviceName(), static_cast<long long>(handoff.size()));
+            return 0;
+        }
+    }
+
     // Find the preset library. The order matters and is not arbitrary: an installed copy has to
     // win on a user's machine, and the source tree has to win during development, but neither may
     // be assumed to exist. `PLAYER_SOURCE_DIR` is a developer convenience compiled into the
@@ -210,38 +252,55 @@ int main(int argc, char *argv[])
     QObject::connect(mpris, &MprisPlayer::quitRequested, &app, &QGuiApplication::quit);
     mpris->registerService();
 
+    // Two callers need this: the command line at startup, and a second process handing us its
+    // arguments over D-Bus. Sharing one implementation is the point - they behaved differently
+    // before and that is how the wrong track came to play.
+    auto addAndPlay = [&](const QStringList &arguments, bool replaceExisting) {
+        if (arguments.isEmpty())
+            return;
+        if (replaceExisting)
+            playlist->clear();
+        // Where the newly-given tracks will land. With playlist persistence on, the list is
+        // already populated from the last session, so "play index 0" would start whatever was
+        // restored rather than the file the user just handed us.
+        const int firstNewRow = playlist->rowCount();
+        QList<QUrl> files;
+        for (const QString &argument : arguments) {
+            // A URL is a stream - except file://, which a second instance uses to forward local
+            // paths and which must not be mistaken for one.
+            const bool isFileUrl = argument.startsWith(QStringLiteral("file://"));
+            if (!isFileUrl && argument.contains(QStringLiteral("://"))) {
+                playlist->addStream(argument);
+                continue;
+            }
+            const QFileInfo info(isFileUrl ? QUrl(argument).toLocalFile() : argument);
+            if (info.isDir())
+                playlist->addFolder(QUrl::fromLocalFile(info.absoluteFilePath()));
+            else
+                files.append(QUrl::fromLocalFile(info.absoluteFilePath()));
+        }
+        if (!files.isEmpty())
+            playlist->addFiles(files);
+
+        // Being handed a file is a request to play it. This is what "Open with" does from a file
+        // manager, and a player that opens a file and then sits there waiting to be told to play
+        // it is simply broken - there is no other reason to have opened it.
+        if (playlist->rowCount() > firstNewRow) {
+            QMetaObject::invokeMethod(engine.rootObjects().first(), "playIndex",
+                                      Q_ARG(QVariant, firstNewRow));
+        }
+    };
+
+    // A second process handed us its files: replace the playlist and play, then come forward.
+    QObject::connect(mpris, &MprisPlayer::openFilesRequested, &app,
+                     [&addAndPlay, mpris](const QStringList &uris) {
+        addAndPlay(uris, true);
+        emit mpris->raiseRequested();
+    });
+
     const QStringList positional = parser.positionalArguments();
     if (!positional.isEmpty()) {
-        {
-            // Where the newly-given tracks will land. With playlist persistence on, the list is
-            // already populated from the last session, so "play index 0" would start whatever was
-            // restored rather than the file the user just handed us.
-            const int firstNewRow = playlist->rowCount();
-            QList<QUrl> files;
-            for (const QString &argument : positional) {
-                // A URL on the command line is a stream, not a file to stat.
-                if (argument.contains(QStringLiteral("://"))) {
-                    playlist->addStream(argument);
-                    continue;
-                }
-                const QFileInfo info(argument);
-                if (info.isDir())
-                    playlist->addFolder(QUrl::fromLocalFile(info.absoluteFilePath()));
-                else
-                    files.append(QUrl::fromLocalFile(info.absoluteFilePath()));
-            }
-            if (!files.isEmpty())
-                playlist->addFiles(files);
-
-            // Being handed a file is a request to play it. This is what "Open with" does from
-            // a file manager, and a player that opens a file and then sits there waiting to be
-            // told to play it is simply broken - there is no other reason to have opened it.
-            // --autoplay is not required for this and is kept only for the case below.
-            if (playlist->rowCount() > firstNewRow) {
-                QMetaObject::invokeMethod(engine.rootObjects().first(), "playIndex",
-                                          Q_ARG(QVariant, firstNewRow));
-            }
-        }
+        addAndPlay(positional, false);
     } else if (parser.isSet(autoplayOption) && playlist->rowCount() > 0) {
         // No files given, so this is a restored playlist. Starting it is opt-in: launching the
         // application from the desktop should not begin playing on its own.

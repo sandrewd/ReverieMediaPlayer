@@ -20,6 +20,7 @@ MprisPlayer::MprisPlayer(AudioEngine *engine, PlaylistModel *playlist, QObject *
 {
     new MprisRootAdaptor(this);
     new MprisPlayerAdaptor(this);
+    new ReverieAppAdaptor(this);
 
     if (m_engine) {
         connect(m_engine, &AudioEngine::stateChanged, this, &MprisPlayer::emitPlaybackStatusChanged);
@@ -28,6 +29,10 @@ MprisPlayer::MprisPlayer(AudioEngine *engine, PlaylistModel *playlist, QObject *
     if (m_playlist)
         connect(m_playlist, &PlaylistModel::currentIndexChanged, this, &MprisPlayer::emitMetadataChanged);
 }
+
+const char *MprisPlayer::serviceName() { return kServiceName; }
+const char *MprisPlayer::objectPath() { return kObjectPath; }
+const char *MprisPlayer::appInterface() { return "io.github.sandrewd.ReverieMediaPlayer"; }
 
 bool MprisPlayer::registerService()
 {
@@ -222,8 +227,20 @@ void MprisPlayerAdaptor::SetPosition(const QDBusObjectPath &, qint64 positionMic
 
 void MprisPlayerAdaptor::OpenUri(const QString &uri)
 {
-    if (m_owner->engine()) {
-        m_owner->engine()->setSource(uri);
-        m_owner->engine()->play();
-    }
+    // Goes through the playlist rather than straight to the engine. Setting the source directly
+    // left audio playing with no row current, which is the orphan case the playlist invariant
+    // exists to prevent: clearing the list or removing the track would not have stopped it.
+    emit m_owner->openFilesRequested(QStringList{uri});
+}
+
+ReverieAppAdaptor::ReverieAppAdaptor(MprisPlayer *parent)
+    : QDBusAbstractAdaptor(parent)
+    , m_owner(parent)
+{
+}
+
+void ReverieAppAdaptor::OpenFiles(const QStringList &uris)
+{
+    if (!uris.isEmpty())
+        emit m_owner->openFilesRequested(uris);
 }

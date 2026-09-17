@@ -21,6 +21,12 @@ public:
 
     bool registerService();
 
+    // Exposed so the single-instance check in main.cpp asks about the same name this registers,
+    // rather than keeping a second copy of the string that can drift.
+    static const char *serviceName();
+    static const char *objectPath();
+    static const char *appInterface();
+
     AudioEngine *engine() const { return m_engine; }
     PlaylistModel *playlist() const { return m_playlist; }
 
@@ -32,6 +38,9 @@ signals:
     void previousRequested();
     void raiseRequested();
     void quitRequested();
+    // Files handed to us by a second process, or by anything calling MPRIS OpenUri. The
+    // playlist is replaced and playback starts - see the handler in main.cpp.
+    void openFilesRequested(const QStringList &uris);
 
 private slots:
     void emitPlaybackStatusChanged();
@@ -70,6 +79,25 @@ public:
 public slots:
     void Raise();
     void Quit();
+
+private:
+    MprisPlayer *m_owner;
+};
+
+// Our own interface alongside the MPRIS ones, used for single-instance handling. MPRIS OpenUri
+// takes one URI and `reverie %U` may be handed several, so forwarding them one at a time would
+// mean each replacing the last. Kept off the MPRIS interfaces deliberately: those are a spec
+// other people's clients rely on, and adding methods to them invites confusion.
+class ReverieAppAdaptor : public QDBusAbstractAdaptor
+{
+    Q_OBJECT
+    Q_CLASSINFO("D-Bus Interface", "io.github.sandrewd.ReverieMediaPlayer")
+
+public:
+    explicit ReverieAppAdaptor(MprisPlayer *parent);
+
+public slots:
+    void OpenFiles(const QStringList &uris);
 
 private:
     MprisPlayer *m_owner;
