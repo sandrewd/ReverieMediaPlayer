@@ -83,8 +83,10 @@ int main(int argc, char *argv[])
     migrateLegacySettings();
 
     QCommandLineParser parser;
-    parser.setApplicationDescription("Phase 0 spike: projectM inside QML's scene graph.");
+    parser.setApplicationDescription(
+        "Reverie Media Player — a media player with the visualisations built in.");
     parser.addHelpOption();
+    parser.addVersionOption();
     QCommandLineOption presetOption({"p", "preset"}, "Preset file to load.", "file");
     // Default of 0 means "not specified": the stored preference wins unless overridden.
     QCommandLineOption scaleOption({"s", "scale"}, "Override the stored render scale (0.1-1.0).",
@@ -126,6 +128,17 @@ int main(int argc, char *argv[])
         curatedList.clear();
 
     QQmlApplicationEngine engine;
+
+    // The QML module is compiled into the binary. Qt 6.4's default resource prefix is "/", not
+    // the "qrc:/qt/qml" that later versions put on the import path automatically, so without
+    // this the embedded module is simply not found.
+    //
+    // This mattered more than it looks. Qt also puts the executable's own directory on the
+    // import path, and the build tree contains a generated Player/ module directory — so every
+    // run from build/ silently resolved the module from disk and the embedded copy was never
+    // exercised. Move the binary anywhere else and the application hung on startup. It only
+    // surfaced when it was installed and launched from the applications menu.
+    engine.addImportPath(QStringLiteral("qrc:/"));
     engine.rootContext()->setContextProperty("initialPreset", parser.value(presetOption));
     engine.rootContext()->setContextProperty("initialScale", parser.value(scaleOption).toDouble());
     engine.rootContext()->setContextProperty("initialPresetsPath", presetsDir);

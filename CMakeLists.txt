@@ -89,6 +89,22 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/share/icons
 install(FILES ${CMAKE_SOURCE_DIR}/assets/share/applications/reverie.desktop
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
 install(TARGETS player RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# projectM is vendored and built alongside us, so it is not on the system loader path. Install
+# its libraries into a private directory and point the executable at them relatively - an
+# absolute build-tree RPATH would work on this machine and nowhere else, which is exactly the
+# kind of thing that only shows up once someone installs it.
+get_target_property(_pm_lib libprojectM::projectM IMPORTED_LOCATION_RELEASE)
+if(NOT _pm_lib)
+    get_target_property(_pm_lib libprojectM::projectM IMPORTED_LOCATION)
+endif()
+get_filename_component(_pm_libdir "${_pm_lib}" DIRECTORY)
+file(GLOB PROJECTM_RUNTIME_LIBS "${_pm_libdir}/libprojectM-4*.so*")
+install(FILES ${PROJECTM_RUNTIME_LIBS}
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/reverie)
+set_target_properties(player PROPERTIES
+    INSTALL_RPATH "\$ORIGIN/../${CMAKE_INSTALL_LIBDIR}/reverie"
+    BUILD_WITH_INSTALL_RPATH FALSE)
 install(CODE "execute_process(COMMAND gtk-update-icon-cache -q -t -f
         \"$ENV{DESTDIR}${CMAKE_INSTALL_FULL_DATADIR}/icons/hicolor\" ERROR_QUIET)")
 
