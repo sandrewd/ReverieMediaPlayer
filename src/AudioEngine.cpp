@@ -172,6 +172,16 @@ void AudioEngine::buildPipeline()
             m_makeupGain = nullptr;
         }
     }
+    // Which concrete sink autoaudiosink picks is the first thing worth knowing when a machine
+    // is silent, and it is invisible otherwise.
+    if (sink) {
+        g_signal_connect(sink, "element-added",
+                         G_CALLBACK(+[](GstBin *, GstElement *element, gpointer) {
+                             qInfo("audio: output sink is %s",
+                                   gst_element_get_name(element));
+                         }), nullptr);
+    }
+
     if (!equaliserLinked) {
         if (!gst_element_link(convert, tee))
             qWarning("audio: could not link the output bin at all - there will be no sound");
@@ -505,6 +515,22 @@ void AudioEngine::pollBus()
             g_free(debug);
             m_positionTimer.stop();
             setState(Stopped);
+            break;
+        }
+        // Warnings were being dropped on the floor. A pipeline that fails to negotiate, or a
+        // sink that cannot open its device, often reports it this way rather than as an error -
+        // so the player went quiet with nothing said anywhere.
+        case GST_MESSAGE_WARNING: {
+            GError *warning = nullptr;
+            gchar *debug = nullptr;
+            gst_message_parse_warning(msg, &warning, &debug);
+            qWarning("gstreamer warning from %s: %s (%s)",
+                     GST_OBJECT_NAME(msg->src),
+                     warning ? warning->message : "unknown",
+                     debug ? debug : "no detail");
+            if (warning)
+                g_error_free(warning);
+            g_free(debug);
             break;
         }
         case GST_MESSAGE_STREAM_COLLECTION: {
