@@ -383,7 +383,9 @@ Rectangle {
         id: fileDialog
         title: qsTr("Add files")
         fileMode: FileDialog.OpenFiles
-        nameFilters: [qsTr("Audio files (*.mp3 *.flac *.ogg *.oga *.opus *.m4a *.aac *.wav *.wma *.aiff)"),
+        nameFilters: [qsTr("Media files (*.mp3 *.flac *.ogg *.oga *.opus *.m4a *.aac *.wav *.wma *.aiff *.mp4 *.m4v *.webm *.mkv *.avi *.mov *.ogv *.wmv *.flv *.mpg *.mpeg *.ts)"),
+                      qsTr("Audio only (*.mp3 *.flac *.ogg *.oga *.opus *.m4a *.aac *.wav *.wma *.aiff)"),
+                      qsTr("Video only (*.mp4 *.m4v *.webm *.mkv *.avi *.mov *.ogv *.wmv *.flv *.mpg *.mpeg *.ts)"),
                       qsTr("All files (*)")]
         onAccepted: PlaylistModel.addFiles(selectedFiles)
     }

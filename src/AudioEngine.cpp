@@ -7,6 +7,9 @@
 #include <gst/gst.h>
 #include <gst/app/gstappsink.h>
 #include <gst/audio/streamvolume.h>
+#include <gst/video/video.h>
+
+#include "VideoItem.h"
 
 namespace {
 
@@ -139,8 +142,96 @@ void AudioEngine::buildPipeline()
 
     g_object_set(m_pipeline, "audio-sink", bin, nullptr);
 
+    buildVideoSink();
+
     gst_stream_volume_set_volume(GST_STREAM_VOLUME(m_pipeline),
                                  GST_STREAM_VOLUME_FORMAT_CUBIC, m_volume);
+}
+
+namespace {
+
+// Called on a GStreamer streaming thread.
+GstFlowReturn onNewVideoSample(GstAppSink *sink, gpointer userData)
+{
+    auto *engine = static_cast<AudioEngine *>(userData);
+    GstSample *sample = gst_app_sink_pull_sample(sink);
+    if (!sample)
+        return GST_FLOW_OK;
+
+    GstCaps *caps = gst_sample_get_caps(sample);
+    GstBuffer *buffer = gst_sample_get_buffer(sample);
+    GstVideoInfo info;
+    GstMapInfo map;
+
+    if (caps && buffer && gst_video_info_from_caps(&info, caps)
+        && gst_buffer_map(buffer, &map, GST_MAP_READ)) {
+        const int width = GST_VIDEO_INFO_WIDTH(&info);
+        const int height = GST_VIDEO_INFO_HEIGHT(&info);
+        const int stride = GST_VIDEO_INFO_PLANE_STRIDE(&info, 0);
+
+        // copy() detaches from the mapped buffer, which is unmapped the moment we return.
+        const QImage frame = QImage(map.data, width, height, stride,
+                                    QImage::Format_RGBA8888).copy();
+        gst_buffer_unmap(buffer, &map);
+        engine->deliverVideoFrame(frame);
+    }
+
+    gst_sample_unref(sample);
+    return GST_FLOW_OK;
+}
+
+} // namespace
+
+void AudioEngine::buildVideoSink()
+{
+    // Frames come back as plain RGBA and are drawn by VideoItem. See VideoItem.h for why the
+    // GL sink is not used.
+    GstElement *bin = gst_bin_new("video-output");
+    GstElement *convert = gst_element_factory_make("videoconvert", nullptr);
+    m_videoSink = gst_element_factory_make("appsink", nullptr);
+    if (!bin || !convert || !m_videoSink) {
+        qWarning("could not build the video output bin");
+        return;
+    }
+
+    GstCaps *caps = gst_caps_new_simple("video/x-raw",
+                                        "format", G_TYPE_STRING, "RGBA",
+                                        nullptr);
+    gst_app_sink_set_caps(GST_APP_SINK(m_videoSink), caps);
+    gst_caps_unref(caps);
+
+    // sync=true so video is presented on the clock rather than as fast as it decodes; that is
+    // what keeps it with the audio. Dropping is allowed because a late frame is worth less
+    // than a stalled pipeline.
+    g_object_set(m_videoSink, "emit-signals", FALSE, "sync", TRUE, "max-buffers", 2,
+                 "drop", TRUE, nullptr);
+    GstAppSinkCallbacks callbacks = {};
+    callbacks.new_sample = onNewVideoSample;
+    gst_app_sink_set_callbacks(GST_APP_SINK(m_videoSink), &callbacks, this, nullptr);
+
+    gst_bin_add_many(GST_BIN(bin), convert, m_videoSink, nullptr);
+    gst_element_link(convert, m_videoSink);
+
+    GstPad *binSink = gst_element_get_static_pad(convert, "sink");
+    gst_element_add_pad(bin, gst_ghost_pad_new("sink", binSink));
+    gst_object_unref(binSink);
+
+    g_object_set(m_pipeline, "video-sink", bin, nullptr);
+}
+
+void AudioEngine::setVideoItem(QQuickItem *item)
+{
+    m_videoItem = qobject_cast<VideoItem *>(item);
+    if (!m_videoItem && item)
+        qWarning("video surface is not a VideoItem; video will not be shown");
+}
+
+void AudioEngine::deliverVideoFrame(const QImage &frame)
+{
+    if (!m_videoItem)
+        return;
+    QMetaObject::invokeMethod(m_videoItem, "presentFrame", Qt::QueuedConnection,
+                              Q_ARG(QImage, frame));
 }
 
 void AudioEngine::setSource(const QString &uriOrPath)
@@ -163,6 +254,12 @@ void AudioEngine::setSource(const QString &uriOrPath)
     m_streamStation.clear();
     m_bufferPercent = 100;
     m_sinceProgress.invalidate();
+    if (m_hasVideo) {
+        m_hasVideo = false;
+        emit hasVideoChanged();
+    }
+    if (m_videoItem)
+        QMetaObject::invokeMethod(m_videoItem, "clear", Qt::QueuedConnection);
     if (m_buffering) {
         m_buffering = false;
         emit bufferingChanged();
@@ -317,6 +414,10 @@ void AudioEngine::pollBus()
         return;
 
     while (GstMessage *msg = gst_bus_pop(bus)) {
+        if (qEnvironmentVariableIsSet("PLAYER_BUS_TRACE")) {
+            qInfo("bus: %s from %s", GST_MESSAGE_TYPE_NAME(msg),
+                  GST_MESSAGE_SRC_NAME(msg) ? GST_MESSAGE_SRC_NAME(msg) : "?");
+        }
         switch (GST_MESSAGE_TYPE(msg)) {
         case GST_MESSAGE_EOS:
             m_positionTimer.stop();
@@ -333,6 +434,26 @@ void AudioEngine::pollBus()
             g_free(debug);
             m_positionTimer.stop();
             setState(Stopped);
+            break;
+        }
+        case GST_MESSAGE_STREAM_COLLECTION: {
+            // playbin3 reports what it found this way rather than through an n-video property.
+            GstStreamCollection *collection = nullptr;
+            gst_message_parse_stream_collection(msg, &collection);
+            if (collection) {
+                bool video = false;
+                const guint count = gst_stream_collection_get_size(collection);
+                for (guint i = 0; i < count && !video; ++i) {
+                    GstStream *stream = gst_stream_collection_get_stream(collection, i);
+                    if (stream && (gst_stream_get_stream_type(stream) & GST_STREAM_TYPE_VIDEO))
+                        video = true;
+                }
+                gst_object_unref(collection);
+                if (video != m_hasVideo) {
+                    m_hasVideo = video;
+                    emit hasVideoChanged();
+                }
+            }
             break;
         }
         case GST_MESSAGE_DURATION_CHANGED:

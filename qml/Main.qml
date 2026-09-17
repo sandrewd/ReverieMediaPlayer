@@ -231,13 +231,26 @@ ApplicationWindow {
                     color: "black"
                 }
 
+                // Video takes the stage when the media has any; the visualiser is what an
+                // audio-only track gets. Both live in the same slot, so fullscreen, the
+                // collapsing playlist and the floating transport all work unchanged.
+                VideoSurface {
+                    id: videoSurface
+                    anchors.fill: parent
+                    visible: AudioEngine.hasVideo
+                }
+
                 ProjectMItem {
                     id: visualizer
                     anchors.fill: parent
+                    visible: !AudioEngine.hasVideo
                     audioEngine: AudioEngine
                     // Black unless audio is actually flowing. Pausing counts as not playing;
                     // buffering does not, since the stream is still playing while it tops up.
-                    active: AudioEngine.state === AudioEngine.Playing
+                    // Idle whenever video is on screen: rendering presets behind an opaque
+                    // video surface is pure waste, and on a software renderer it is waste the
+                    // video decode needs.
+                    active: AudioEngine.state === AudioEngine.Playing && !AudioEngine.hasVideo
                     maxFps: initialMaxFps
                     // No binding here: the item loads the user's stored quality in its
                     // constructor, and a binding would overwrite it on every startup.

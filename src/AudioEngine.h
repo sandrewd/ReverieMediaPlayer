@@ -1,6 +1,10 @@
 #pragma once
 
 #include <QObject>
+// Included rather than forward-declared: a Q_INVOKABLE taking QQuickItem* needs its metatype,
+// and a forward declaration collides with the one QtQuick declares later.
+#include <QImage>
+#include <QQuickItem>
 #include <QString>
 #include <QElapsedTimer>
 #include <QTimer>
@@ -37,6 +41,9 @@ class AudioEngine : public QObject
     // Buffering is not a playback state: the stream is still playing while it tops up, and
     // folding it into `state` made the transport show a play button during playback.
     Q_PROPERTY(bool buffering READ buffering NOTIFY bufferingChanged)
+    // Whether the current media actually carries a video stream. playbin3 has no n-video
+    // property; this comes from the stream collection it publishes on the bus.
+    Q_PROPERTY(bool hasVideo READ hasVideo NOTIFY hasVideoChanged)
 
 public:
     enum State { Stopped, Playing, Paused, Buffering };
@@ -55,6 +62,13 @@ public:
     QString streamTitle() const { return m_streamTitle; }
     QString streamStation() const { return m_streamStation; }
     bool buffering() const { return m_buffering; }
+    bool hasVideo() const { return m_hasVideo; }
+
+    // Hands the QML video surface to the sink. Must be a Qt6GLVideoItem from the qml6 plugin;
+    // the sink stores it as a plain QQuickItem pointer and will not accept anything else.
+    Q_INVOKABLE void setVideoItem(QQuickItem *item);
+    // Called from the streaming thread; forwards to the item on the GUI thread.
+    void deliverVideoFrame(const QImage &frame);
 
     void setVolume(qreal volume);
     void setMuted(bool muted);
@@ -81,11 +95,13 @@ signals:
     void streamTitleChanged();
     void streamStationChanged();
     void bufferingChanged();
+    void hasVideoChanged();
     void endOfStream();
     void errorOccurred(const QString &message);
 
 private:
     void buildPipeline();
+    void buildVideoSink();
     void pollBus();
     void pollPosition();
     void setState(State state);
@@ -94,6 +110,9 @@ private:
 
     GstElement *m_pipeline = nullptr;
     GstElement *m_appsink = nullptr;
+    GstElement *m_videoSink = nullptr;
+    class VideoItem *m_videoItem = nullptr;
+    bool m_hasVideo = false;
     std::unique_ptr<AudioRingBuffer> m_ring;
     QTimer m_busTimer;
     QTimer m_positionTimer;

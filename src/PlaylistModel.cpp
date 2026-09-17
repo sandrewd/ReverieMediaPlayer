@@ -15,10 +15,18 @@
 namespace {
 
 const QStringList kSupportedSuffixes = {
+    // Audio
     QStringLiteral("mp3"),  QStringLiteral("flac"), QStringLiteral("ogg"),
     QStringLiteral("oga"),  QStringLiteral("opus"), QStringLiteral("m4a"),
     QStringLiteral("aac"),  QStringLiteral("wav"),  QStringLiteral("wma"),
     QStringLiteral("aiff"), QStringLiteral("ape"),  QStringLiteral("mpc"),
+    // Video. A media player that silently refuses to add a video file is worse than one that
+    // adds it and cannot decode it: playbin3 will say so, whereas this said nothing at all.
+    QStringLiteral("mp4"),  QStringLiteral("m4v"),  QStringLiteral("webm"),
+    QStringLiteral("mkv"),  QStringLiteral("avi"),  QStringLiteral("mov"),
+    QStringLiteral("ogv"),  QStringLiteral("wmv"),  QStringLiteral("flv"),
+    QStringLiteral("mpg"),  QStringLiteral("mpeg"), QStringLiteral("ts"),
+    QStringLiteral("m2ts"), QStringLiteral("3gp"),
 };
 
 QString formatDuration(int seconds)

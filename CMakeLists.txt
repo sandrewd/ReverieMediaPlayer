@@ -26,7 +26,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Quick OpenGL DBus Svg)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GST REQUIRED IMPORTED_TARGET
-    gstreamer-1.0 gstreamer-app-1.0 gstreamer-audio-1.0 gstreamer-tag-1.0)
+    gstreamer-1.0 gstreamer-app-1.0 gstreamer-audio-1.0 gstreamer-tag-1.0 gstreamer-video-1.0)
 pkg_check_modules(TAGLIB REQUIRED IMPORTED_TARGET taglib)
 qt_standard_project_setup(REQUIRES 6.4)
 
@@ -77,6 +77,8 @@ qt_add_executable(player
     src/PresetLibrary.h
     src/AppInfo.cpp
     src/AppInfo.h
+    src/VideoItem.cpp
+    src/VideoItem.h
 )
 
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -134,6 +136,7 @@ qt_add_qml_module(player
         qml/PlaylistPanel.qml
         qml/ColourRow.qml
         qml/ReverieMark.qml
+        qml/VideoSurface.qml
 )
 
 set_target_properties(player PROPERTIES OUTPUT_NAME reverie)

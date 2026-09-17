@@ -1,6 +1,8 @@
 #include <QCommandLineParser>
 #include <QGuiApplication>
 #include <QIcon>
+
+#include <gst/gst.h>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
@@ -57,6 +59,9 @@ int main(int argc, char *argv[])
     format.setDepthBufferSize(24);
     format.setStencilBufferSize(8);
     QSurfaceFormat::setDefaultFormat(format);
+
+    // GStreamer up before the QML engine, so element creation during QML load is safe.
+    gst_init(&argc, &argv);
 
     QGuiApplication app(argc, argv);
     // QSettings and QStandardPaths key off these. applicationName stays lowercase and
