@@ -331,11 +331,23 @@ void AudioEngine::setSource(const QString &uriOrPath)
     setState(Stopped);
 }
 
+void AudioEngine::applyOutputLevels()
+{
+    if (!m_pipeline)
+        return;
+    gst_stream_volume_set_volume(GST_STREAM_VOLUME(m_pipeline),
+                                 GST_STREAM_VOLUME_FORMAT_CUBIC, m_volume);
+    gst_stream_volume_set_mute(GST_STREAM_VOLUME(m_pipeline), m_muted);
+}
+
 void AudioEngine::play()
 {
     if (!m_pipeline || m_source.isEmpty())
         return;
     gst_element_set_state(m_pipeline, GST_STATE_PLAYING);
+    // After the state change, so the sink exists and the value reaches the stream rather than
+    // being overwritten by whatever the audio server restored for this application.
+    applyOutputLevels();
     m_positionTimer.start();
     m_sinceProgress.restart();
     setState(Playing);
@@ -520,6 +532,11 @@ void AudioEngine::pollBus()
             break;
         case GST_MESSAGE_ASYNC_DONE:
             updateDuration();
+            // Only now does the sink exist, so only now can our mute and volume reach the
+            // stream. Setting them right after set_state(PLAYING) is too early - the state
+            // change is asynchronous, and the audio server applies its remembered
+            // per-application values when the stream is actually created.
+            applyOutputLevels();
             break;
         case GST_MESSAGE_TAG: {
             GstTagList *tags = nullptr;

@@ -157,6 +157,12 @@ private:
     void updateDuration();
     void updateBuffering();
 
+    // Pushes our volume and mute onto the pipeline unconditionally. The setters only act on a
+    // change, so at startup - m_muted already false - nothing was ever sent, and PulseAudio and
+    // PipeWire restore a *per-application* mute and volume onto every new stream. One accidental
+    // mute is then remembered for ever: the server silences the stream while our slider sits at
+    // 70% and the mute button looks off. Asserting our state makes the app authoritative again.
+    void applyOutputLevels();
     void applyEqualiserToPipeline();
     void saveEqualiser();
 
