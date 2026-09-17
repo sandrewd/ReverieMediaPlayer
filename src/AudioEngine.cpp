@@ -153,12 +153,30 @@ void AudioEngine::buildPipeline()
 
     gst_bin_add_many(GST_BIN(bin), convert, tee, playQueue, sink, pcmQueue, pcmConvert,
                      pcmResample, m_appsink, nullptr);
+    // The link is checked. If the equaliser cannot sit in the chain on this machine, falling
+    // back to a direct connection keeps the player playing: silence with no explanation is a far
+    // worse failure than having no tone controls.
+    bool equaliserLinked = false;
     if (haveEqualiser) {
         gst_bin_add_many(GST_BIN(bin), m_equaliser, m_makeupGain, nullptr);
-        gst_element_link_many(convert, m_equaliser, m_makeupGain, tee, nullptr);
-        applyEqualiserToPipeline();
-    } else {
-        gst_element_link(convert, tee);
+        equaliserLinked = gst_element_link_many(convert, m_equaliser, m_makeupGain, tee, nullptr);
+        if (equaliserLinked) {
+            applyEqualiserToPipeline();
+            qInfo("audio: equaliser in the chain");
+        } else {
+            qWarning("audio: could not link the equaliser; continuing without tone controls");
+            gst_element_unlink_many(convert, m_equaliser, m_makeupGain, tee, nullptr);
+            gst_bin_remove(GST_BIN(bin), m_equaliser);
+            gst_bin_remove(GST_BIN(bin), m_makeupGain);
+            m_equaliser = nullptr;
+            m_makeupGain = nullptr;
+        }
+    }
+    if (!equaliserLinked) {
+        if (!gst_element_link(convert, tee))
+            qWarning("audio: could not link the output bin at all - there will be no sound");
+        else
+            qInfo("audio: equaliser bypassed");
     }
     gst_element_link_many(playQueue, sink, nullptr);
     gst_element_link_many(pcmQueue, pcmConvert, pcmResample, m_appsink, nullptr);
