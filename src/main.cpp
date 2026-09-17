@@ -102,7 +102,8 @@ int main(int argc, char *argv[])
     parser.addOption(scaleOption);
     parser.addOption(secondsOption);
     parser.addOption(captureOption);
-    QCommandLineOption autoplayOption("autoplay", "Start playing the first track immediately.");
+    QCommandLineOption autoplayOption("autoplay",
+        "Start playing a restored playlist. Files given as arguments already play.");
     parser.addOption(autoplayOption);
     QCommandLineOption miniOption("mini", "Start in mini-player mode.");
     parser.addOption(miniOption);
@@ -212,6 +213,10 @@ int main(int argc, char *argv[])
     const QStringList positional = parser.positionalArguments();
     if (!positional.isEmpty()) {
         {
+            // Where the newly-given tracks will land. With playlist persistence on, the list is
+            // already populated from the last session, so "play index 0" would start whatever was
+            // restored rather than the file the user just handed us.
+            const int firstNewRow = playlist->rowCount();
             QList<QUrl> files;
             for (const QString &argument : positional) {
                 // A URL on the command line is a stream, not a file to stat.
@@ -228,10 +233,21 @@ int main(int argc, char *argv[])
             if (!files.isEmpty())
                 playlist->addFiles(files);
 
-            if (parser.isSet(autoplayOption) && playlist->rowCount() > 0) {
+            // Being handed a file is a request to play it. This is what "Open with" does from
+            // a file manager, and a player that opens a file and then sits there waiting to be
+            // told to play it is simply broken - there is no other reason to have opened it.
+            // --autoplay is not required for this and is kept only for the case below.
+            if (playlist->rowCount() > firstNewRow) {
                 QMetaObject::invokeMethod(engine.rootObjects().first(), "playIndex",
-                                          Q_ARG(QVariant, 0));
+                                          Q_ARG(QVariant, firstNewRow));
             }
+        }
+    } else if (parser.isSet(autoplayOption) && playlist->rowCount() > 0) {
+        // No files given, so this is a restored playlist. Starting it is opt-in: launching the
+        // application from the desktop should not begin playing on its own.
+        {
+            QMetaObject::invokeMethod(engine.rootObjects().first(), "playIndex",
+                                      Q_ARG(QVariant, 0));
         }
     }
 
