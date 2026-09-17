@@ -29,6 +29,12 @@ QtObject {
 
     // Text drawn over the visualiser is always light: the video behind it is dark-ish in every
     // theme, so following the shell here would make it unreadable.
+    // The transport's top edge is a special case: whatever is above it is always the stage -
+    // video or a preset - and therefore always dark. A border derived from the panel colour
+    // disappears there in a dark theme, which makes a windowed transport look as though it is
+    // covering the picture. This one contrasts with the bar, so the boundary reads in both.
+    readonly property color stageEdge: dark ? Qt.rgba(1, 1, 1, 0.26) : border
+
     readonly property color overlayText: "#f0f2f4"
     readonly property color overlayTextDim: "#a8b0b8"
     readonly property color overlayBackground: "#b0000000"

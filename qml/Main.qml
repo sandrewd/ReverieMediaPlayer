@@ -367,6 +367,8 @@ ApplicationWindow {
         anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
         compact: root.mini
         showRestore: root.mini
+        // Fullscreen is the only state where the bar is over the picture rather than below it.
+        overVideo: root.fullscreen
         opacity: root.fullscreen && !root.controlsVisible ? 0.0 : 1.0
         visible: opacity > 0.01
         Behavior on opacity { NumberAnimation { duration: 200 } }
