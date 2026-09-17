@@ -1052,13 +1052,19 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 spacing: 10
                 Label {
-                    text: qsTr("Tint")
+                    // "Tint" alone did not say what it tinted, sitting in a list of colour roles.
+                    text: qsTr("Visualiser tint")
                     color: Theme.text
                     Layout.preferredWidth: 96
+                    wrapMode: Text.WordWrap
                 }
                 Slider {
                     id: tintSlider
                     Layout.fillWidth: true
+                    // Same trap as the transport sliders and the equaliser faders: a custom
+                    // background gives the Control no implicit size, so it draws correctly and
+                    // catches nothing.
+                    implicitHeight: 20
                     from: 0; to: 100; stepSize: 5
                     value: SystemTheme.stageTint
                     onMoved: SystemTheme.stageTint = Math.round(value)
@@ -1092,9 +1098,9 @@ ApplicationWindow {
             Label {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
-                text: qsTr("How much of that colour washes over the visualiser while it plays. "
-                           + "At 0% the visualisation is untouched and the colour is only what "
-                           + "you see when nothing is playing.")
+                text: qsTr("How much of the Visualiser colour washes over the visualisation while "
+                           + "it plays. At 0% the visualisation is untouched, and that colour is "
+                           + "only what you see when nothing is playing.")
                 color: Theme.textDim
                 font.pixelSize: 11
             }

@@ -85,6 +85,11 @@ Rectangle {
             Slider {
                 id: seekSlider
                 Layout.fillWidth: true
+                // Without this the slider has no height and cannot be clicked at all. A Control
+                // takes its implicit size from its background, and a plain Rectangle's is zero -
+                // so the track and handle painted normally while the slider itself was a strip
+                // of nothing. Seeking by mouse never worked.
+                implicitHeight: Math.max(18, 20 * root.uiScale)
                 enabled: AudioEngine.seekable && AudioEngine.duration > 0
                 from: 0
                 to: Math.max(1, AudioEngine.duration)
@@ -246,6 +251,9 @@ Rectangle {
             }
             Slider {
                 id: volumeSlider
+                // See seekSlider: a Control with a plain Rectangle background has no implicit
+                // height, and therefore no hit area.
+                implicitHeight: Math.max(18, 20 * root.uiScale)
                 // First thing to go when the window gets narrow: the mute button still works.
                 visible: !root.compact
                 Layout.preferredWidth: 90 * root.uiScale
