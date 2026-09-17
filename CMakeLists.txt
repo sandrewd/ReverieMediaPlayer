@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(player VERSION 0.3.0 LANGUAGES CXX)
+project(player VERSION 0.3.1 LANGUAGES CXX)
 
 # Shown in About. Real since 2026-09-16; it was deliberately an obvious placeholder until the
 # project had a remote, because a plausible-looking URL that goes nowhere is worse than one that
@@ -236,16 +236,42 @@ set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 # and pointing dpkg-shlibdeps at a directory that does not exist fails the whole run.
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS_PRIVATE_DIRS "${_pm_libdir}")
 
-# Runtime dependencies shlibdeps cannot see. QML modules are loaded by name at runtime rather
-# than linked, and GStreamer decoders are plugins autoplugged by playbin3 - nothing in the ELF
-# headers mentions either, so both have to be declared by hand. Without the decoders the
-# application starts perfectly and then refuses to play anything, which is the worst failure to
-# debug on someone else's machine.
+# Runtime dependencies shlibdeps cannot see, because nothing in the ELF headers mentions them.
+#
+# QML modules are resolved by name at runtime and never linked. Listing them by hand shipped a
+# package missing QtQuick.Templates and QtQuick.Shapes: qml6-module-qtquick-controls depends on
+# the templates *library* but not its QML module, and a developer machine has both anyway through
+# the Qt dev packages, so the gap only appears on a clean install - as "plugin not found" at QML
+# load, with the application dying before it draws anything. They are derived now: see
+# tools/qml-package-deps.py. The static list survives only as a fallback for build hosts without
+# qmlimportscanner or dpkg.
+execute_process(
+    COMMAND ${CMAKE_COMMAND} -E env python3
+            "${CMAKE_SOURCE_DIR}/tools/qml-package-deps.py" "${CMAKE_SOURCE_DIR}/qml"
+    OUTPUT_VARIABLE PLAYER_QML_PACKAGES
+    ERROR_VARIABLE PLAYER_QML_PACKAGES_ERR
+    RESULT_VARIABLE PLAYER_QML_PACKAGES_RC
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+if(PLAYER_QML_PACKAGES_RC EQUAL 0 AND PLAYER_QML_PACKAGES)
+    string(REPLACE "\n" ";" PLAYER_QML_PACKAGES "${PLAYER_QML_PACKAGES}")
+    list(JOIN PLAYER_QML_PACKAGES ", " PLAYER_QML_DEPENDS)
+    message(STATUS "Reverie: QML runtime packages resolved: ${PLAYER_QML_DEPENDS}")
+else()
+    set(PLAYER_QML_DEPENDS
+        "qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, \
+qml6-module-qtquick-dialogs, qml6-module-qtquick-window, qml6-module-qtquick-templates, \
+qml6-module-qtquick-shapes")
+    message(WARNING "Reverie: could not resolve QML packages (${PLAYER_QML_PACKAGES_ERR}); "
+                    "falling back to the static list")
+endif()
+
+# GStreamer decoders are plugins autoplugged by playbin3, and libqt6svg6 provides the qsvg
+# image-format plugin the mark is drawn with - the binary does not link Qt6Svg at all. Without
+# the decoders the application starts perfectly and then refuses to play anything, which is the
+# worst failure to debug on someone else's machine.
 set(CPACK_DEBIAN_PACKAGE_DEPENDS
-    "qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, \
-qml6-module-qtquick-dialogs, qml6-module-qtquick-window, qml6-module-qtqml-workerscript, \
-gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, gstreamer1.0-plugins-bad, \
-gstreamer1.0-libav, libqt6svg6")
+    "${PLAYER_QML_DEPENDS}, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, \
+gstreamer1.0-plugins-bad, gstreamer1.0-libav, libqt6svg6")
 # Not a hard dependency: the visualiser works on llvmpipe, it is just slower. See section 4.
 set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "gstreamer1.0-pulseaudio | gstreamer1.0-alsa")
 
