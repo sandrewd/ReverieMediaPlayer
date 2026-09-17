@@ -1,4 +1,6 @@
 #include "AudioEngine.h"
+#include <cmath>
+#include <QSettings>
 
 #include <QDebug>
 #include <QFileInfo>
@@ -44,6 +46,20 @@ AudioEngine::AudioEngine(QObject *parent)
     if (!gst_is_initialized())
         gst_init(nullptr, nullptr);
 
+    // Load the stored curve before the pipeline is built, so the equaliser starts configured
+    // rather than flat-then-corrected - the latter is audible on the first second of a track.
+    {
+        QSettings settings;
+        m_equaliserGains.clear();
+        const QStringList stored =
+            settings.value(QStringLiteral("audio/equaliserBands")).toString().split(
+                QLatin1Char(','), Qt::SkipEmptyParts);
+        for (int band = 0; band < kEqualiserBands; ++band)
+            m_equaliserGains.append(band < stored.size() ? stored.at(band).toDouble() : 0.0);
+        m_equaliserPreset = settings.value(QStringLiteral("audio/equaliserPreset")).toString();
+        m_equaliserEnabled = settings.value(QStringLiteral("audio/equaliserEnabled"), false).toBool();
+    }
+
     buildPipeline();
 
     // Polling the bus avoids assuming a GLib main loop is driving Qt's event loop.
@@ -76,6 +92,11 @@ void AudioEngine::buildPipeline()
     // the brief settled on, and it is why no second media engine is needed.
     GstElement *bin = gst_bin_new("audio-output");
     GstElement *convert = gst_element_factory_make("audioconvert", nullptr);
+    // Ahead of the tee on purpose, so the visualiser is driven by the signal the listener hears
+    // rather than the one before the equaliser touched it. equalizer-10bands is in
+    // gstreamer1.0-plugins-good, which is already a dependency, and costs about 0.2% of a core.
+    m_equaliser = gst_element_factory_make("equalizer-10bands", nullptr);
+    m_makeupGain = gst_element_factory_make("volume", nullptr);
     GstElement *tee = gst_element_factory_make("tee", nullptr);
     GstElement *playQueue = gst_element_factory_make("queue", nullptr);
     // Test seam: automated runs need the pipeline to decode normally without putting sound
@@ -96,6 +117,15 @@ void AudioEngine::buildPipeline()
     GstElement *pcmConvert = gst_element_factory_make("audioconvert", nullptr);
     GstElement *pcmResample = gst_element_factory_make("audioresample", nullptr);
     m_appsink = gst_element_factory_make("appsink", nullptr);
+
+    // The equaliser is optional: if the plugin is missing the player still plays, it just has no
+    // tone controls. Failing the whole output bin over it would be the wrong trade.
+    const bool haveEqualiser = m_equaliser && m_makeupGain;
+    if (!haveEqualiser) {
+        qWarning("equalizer-10bands unavailable; tone controls disabled");
+        if (m_equaliser) { gst_object_unref(m_equaliser); m_equaliser = nullptr; }
+        if (m_makeupGain) { gst_object_unref(m_makeupGain); m_makeupGain = nullptr; }
+    }
 
     if (!bin || !convert || !tee || !playQueue || !sink || !pcmQueue || !pcmConvert
         || !pcmResample || !m_appsink) {
@@ -123,7 +153,13 @@ void AudioEngine::buildPipeline()
 
     gst_bin_add_many(GST_BIN(bin), convert, tee, playQueue, sink, pcmQueue, pcmConvert,
                      pcmResample, m_appsink, nullptr);
-    gst_element_link(convert, tee);
+    if (haveEqualiser) {
+        gst_bin_add_many(GST_BIN(bin), m_equaliser, m_makeupGain, nullptr);
+        gst_element_link_many(convert, m_equaliser, m_makeupGain, tee, nullptr);
+        applyEqualiserToPipeline();
+    } else {
+        gst_element_link(convert, tee);
+    }
     gst_element_link_many(playQueue, sink, nullptr);
     gst_element_link_many(pcmQueue, pcmConvert, pcmResample, m_appsink, nullptr);
 
@@ -503,4 +539,140 @@ void AudioEngine::pollBus()
         gst_message_unref(msg);
     }
     gst_object_unref(bus);
+}
+
+// --- equaliser -------------------------------------------------------------------------------
+//
+// Ten fixed bands, the centres equalizer-10bands defines. The curves are our own renditions of
+// what these names usually mean, not reproductions of anybody's published settings - the same
+// honesty the colour palettes carry.
+//
+// Boosts are kept modest on purpose. Every positive decibel here is one the makeup stage has to
+// take back out to avoid clipping, so a curve full of +12s would simply be a quieter track.
+namespace {
+
+struct EqPreset { const char *name; double gains[AudioEngine::kEqualiserBands]; };
+
+const EqPreset kEqPresets[] = {
+    { "Flat",        {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0 } },
+    { "Acoustic",    {  4,  4,  3,  1,  2,  2,  3,  3,  2,  1 } },
+    { "Bass boost",  {  6,  5,  4,  2,  0,  0,  0,  0,  0,  0 } },
+    { "Classical",   {  4,  3,  2,  0, -1, -1,  0,  2,  3,  3 } },
+    { "Country",     {  3,  4,  2,  0, -1,  0,  2,  3,  3,  2 } },
+    { "Electronic",  {  5,  4,  1, -1, -2,  1,  2,  3,  4,  4 } },
+    { "Hip-hop",     {  6,  5,  3,  1, -1, -1,  1,  2,  3,  2 } },
+    { "Jazz",        {  4,  3,  1,  1, -1, -1,  0,  2,  3,  3 } },
+    { "Pop",         { -1,  0,  2,  3,  4,  3,  1,  0, -1, -1 } },
+    { "Rock",        {  5,  4,  2, -1, -2, -1,  2,  3,  4,  4 } },
+    { "Treble boost",{  0,  0,  0,  0,  0,  1,  2,  4,  5,  6 } },
+    { "Vocal",       { -3, -2,  0,  2,  4,  4,  3,  1,  0, -1 } },
+};
+
+const char *kBandLabels[AudioEngine::kEqualiserBands] = {
+    "29", "59", "119", "237", "474", "947", "1.9k", "3.8k", "7.5k", "15k"
+};
+
+} // namespace
+
+QStringList AudioEngine::equaliserPresetNames() const
+{
+    QStringList names;
+    for (const EqPreset &preset : kEqPresets)
+        names.append(QString::fromLatin1(preset.name));
+    return names;
+}
+
+QStringList AudioEngine::equaliserBandLabels() const
+{
+    QStringList labels;
+    for (const char *label : kBandLabels)
+        labels.append(QString::fromLatin1(label));
+    return labels;
+}
+
+QVariantList AudioEngine::equaliserBands() const
+{
+    QVariantList bands;
+    for (qreal gain : m_equaliserGains)
+        bands.append(gain);
+    return bands;
+}
+
+void AudioEngine::applyEqualiserPreset(const QString &name)
+{
+    for (const EqPreset &preset : kEqPresets) {
+        if (name.compare(QString::fromLatin1(preset.name), Qt::CaseInsensitive) != 0)
+            continue;
+        m_equaliserGains.clear();
+        for (double gain : preset.gains)
+            m_equaliserGains.append(gain);
+        m_equaliserPreset = QString::fromLatin1(preset.name);
+        // Choosing a curve is choosing to hear it; leaving the equaliser off after picking one
+        // looks exactly like the picking not having worked.
+        m_equaliserEnabled = true;
+        applyEqualiserToPipeline();
+        saveEqualiser();
+        emit equaliserChanged();
+        return;
+    }
+}
+
+void AudioEngine::setEqualiserBand(int band, qreal gainDb)
+{
+    if (band < 0 || band >= kEqualiserBands)
+        return;
+    gainDb = qBound(-24.0, static_cast<double>(gainDb), 12.0);
+    if (qFuzzyCompare(m_equaliserGains.at(band), gainDb))
+        return;
+    m_equaliserGains[band] = gainDb;
+    // Editing a band means this is no longer whichever preset it started from. Saying so is what
+    // stops the menu claiming "Rock" while the curve is something else.
+    m_equaliserPreset.clear();
+    m_equaliserEnabled = true;
+    applyEqualiserToPipeline();
+    saveEqualiser();
+    emit equaliserChanged();
+}
+
+void AudioEngine::setEqualiserEnabled(bool enabled)
+{
+    if (enabled == m_equaliserEnabled)
+        return;
+    m_equaliserEnabled = enabled;
+    applyEqualiserToPipeline();
+    saveEqualiser();
+    emit equaliserChanged();
+}
+
+void AudioEngine::resetEqualiser()
+{
+    applyEqualiserPreset(QStringLiteral("Flat"));
+    setEqualiserEnabled(false);
+}
+
+void AudioEngine::applyEqualiserToPipeline()
+{
+    if (!m_equaliser || !m_makeupGain)
+        return;
+    double highestBoost = 0.0;
+    for (int band = 0; band < kEqualiserBands; ++band) {
+        const double gain = m_equaliserEnabled ? m_equaliserGains.value(band, 0.0) : 0.0;
+        highestBoost = qMax(highestBoost, gain);
+        g_object_set(m_equaliser, QByteArray("band" + QByteArray::number(band)).constData(),
+                     gain, nullptr);
+    }
+    // Take back exactly what the loudest band added. Without this a boosted curve on material
+    // already near full scale clips, which sounds like distortion rather than like tone control.
+    g_object_set(m_makeupGain, "volume", std::pow(10.0, -highestBoost / 20.0), nullptr);
+}
+
+void AudioEngine::saveEqualiser()
+{
+    QSettings settings;
+    settings.setValue(QStringLiteral("audio/equaliserEnabled"), m_equaliserEnabled);
+    settings.setValue(QStringLiteral("audio/equaliserPreset"), m_equaliserPreset);
+    QStringList gains;
+    for (qreal gain : m_equaliserGains)
+        gains.append(QString::number(gain, 'f', 1));
+    settings.setValue(QStringLiteral("audio/equaliserBands"), gains.join(QLatin1Char(',')));
 }

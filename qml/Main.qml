@@ -617,9 +617,13 @@ ApplicationWindow {
             onTriggered: qualityDialog.open()
         }
         Menu {
-            title: qsTr("Presets")
+            // Was "Presets", which said nothing about what it governed and collided
+            // head-on with the equaliser's presets once those existed.
+            id: visualisationMenu
+            title: qsTr("Visualisation")
+            onAboutToShow: root.fitMenuWidth(visualisationMenu, 220, 420)
             MenuItem {
-                text: qsTr("Curated set")
+                text: qsTr("Use the curated selection")
                 // A package that ships only the curated presets installs no list, and then this
                 // switches between a set and itself. Hide it rather than have it do nothing.
                 visible: initialCuratedList !== ""
@@ -635,15 +639,47 @@ ApplicationWindow {
                 }
             }
             MenuItem {
-                text: qsTr("Shuffle presets")
+                text: qsTr("Shuffle the order")
                 checkable: true
                 checked: visualizer.shuffle
                 onTriggered: visualizer.shuffle = checked
             }
             MenuSeparator {}
-            MenuItem { text: qsTr("Change every 15 seconds"); onTriggered: visualizer.presetDuration = 15 }
-            MenuItem { text: qsTr("Change every 30 seconds"); onTriggered: visualizer.presetDuration = 30 }
-            MenuItem { text: qsTr("Change every 2 minutes");  onTriggered: visualizer.presetDuration = 120 }
+
+            // These were four plain items with no checked state, so nothing showed which one was
+            // in force, and there was no way to stop the rotation at all - the only way to hold a
+            // visualisation was to right-click it and pick one. Exclusive now, with holding as a
+            // first-class choice.
+            ButtonGroup { id: visualisationIntervalGroup }
+
+            MenuItem {
+                text: qsTr("Stay on one visualisation")
+                checkable: true
+                ButtonGroup.group: visualisationIntervalGroup
+                checked: visualizer.presetLocked
+                onTriggered: visualizer.presetLocked = true
+            }
+            MenuItem {
+                text: qsTr("Change every 15 seconds")
+                checkable: true
+                ButtonGroup.group: visualisationIntervalGroup
+                checked: !visualizer.presetLocked && visualizer.presetDuration === 15
+                onTriggered: { visualizer.presetLocked = false; visualizer.presetDuration = 15 }
+            }
+            MenuItem {
+                text: qsTr("Change every 30 seconds")
+                checkable: true
+                ButtonGroup.group: visualisationIntervalGroup
+                checked: !visualizer.presetLocked && visualizer.presetDuration === 30
+                onTriggered: { visualizer.presetLocked = false; visualizer.presetDuration = 30 }
+            }
+            MenuItem {
+                text: qsTr("Change every 2 minutes")
+                checkable: true
+                ButtonGroup.group: visualisationIntervalGroup
+                checked: !visualizer.presetLocked && visualizer.presetDuration === 120
+                onTriggered: { visualizer.presetLocked = false; visualizer.presetDuration = 120 }
+            }
         }
 
         Menu {
@@ -731,6 +767,52 @@ ApplicationWindow {
                     text: qsTr("Edit and save colours…")
                     onTriggered: themeDialog.open()
                 }
+            }
+        }
+
+        Menu {
+            id: soundMenu
+            title: qsTr("Sound")
+            onAboutToShow: root.fitMenuWidth(soundMenu, 220, 420)
+
+            // Exclusive for the same reason the appearance options are: four independent
+            // checkboxes can be left with nothing selected, because clicking the active one
+            // assigns checked = false and detaches the binding.
+            ButtonGroup { id: equaliserGroup }
+
+            MenuItem {
+                text: qsTr("No equaliser")
+                checkable: true
+                ButtonGroup.group: equaliserGroup
+                checked: !AudioEngine.equaliserEnabled
+                onTriggered: AudioEngine.equaliserEnabled = false
+            }
+            MenuSeparator {}
+            // Instantiator, not Repeater: a Menu builds its items through insertItem, and a
+            // Repeater tries to assign them as visual children, which a Menu has no property for.
+            Instantiator {
+                model: AudioEngine.equaliserPresetNames
+                delegate: MenuItem {
+                    text: modelData
+                    checkable: true
+                    ButtonGroup.group: equaliserGroup
+                    checked: AudioEngine.equaliserEnabled
+                             && AudioEngine.equaliserPreset === modelData
+                    onTriggered: AudioEngine.applyEqualiserPreset(modelData)
+                }
+                // After "No equaliser" and its separator.
+                onObjectAdded: function(index, object) { soundMenu.insertItem(2 + index, object) }
+                onObjectRemoved: function(index, object) { soundMenu.removeItem(object) }
+            }
+            MenuSeparator {}
+            MenuItem {
+                // Shown as selected when the bands have been edited by hand, which is what an
+                // empty preset name means.
+                text: qsTr("Custom…")
+                checkable: true
+                ButtonGroup.group: equaliserGroup
+                checked: AudioEngine.equaliserEnabled && AudioEngine.equaliserPreset === ""
+                onTriggered: equaliserDialog.open()
             }
         }
 
@@ -934,6 +1016,106 @@ ApplicationWindow {
         MenuItem { text: qsTr("Use as panels");     onTriggered: root.applyCustomColour("surface", recentMenu.pending) }
         MenuItem { text: qsTr("Use as highlight");  onTriggered: root.applyCustomColour("accent", recentMenu.pending) }
         MenuItem { text: qsTr("Use as text");       onTriggered: root.applyCustomColour("text", recentMenu.pending) }
+    }
+
+    // Ten vertical faders, one per band. This is the part §1 warns about - the target user is
+    // explicitly not a sound engineer - so it sits one step in, behind "Custom…" at the bottom of
+    // the preset list, exactly as the colour editor sits behind the ready-made palettes.
+    Dialog {
+        id: equaliserDialog
+        title: qsTr("Custom equaliser")
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(460, root.width - 60)
+        standardButtons: Dialog.Close
+        closePolicy: Popup.CloseOnEscape
+
+        ColumnLayout {
+            id: equaliserColumn
+            anchors.fill: parent
+            spacing: 10
+
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("Drag a band to change it. Boosts are quietly compensated for, so a "
+                           + "loud curve will not distort - it will just be a little quieter.")
+                color: Theme.textDim
+                font.pixelSize: 11
+            }
+
+            RowLayout {
+                id: faderRow
+                Layout.fillWidth: true
+                Layout.preferredHeight: 190
+                spacing: 2
+
+                Repeater {
+                    model: AudioEngine.equaliserBandLabels()
+                    delegate: ColumnLayout {
+                        // Width computed rather than filled: a vertical Slider has a small fixed
+                        // implicit width and Layout.fillWidth would not spread the columns past
+                        // it, so the ten faders bunched against the left edge.
+                        //
+                        // Measured from the dialog's column, not from the row. Dividing the row's
+                        // own width is circular - the row is as wide as its children, which were
+                        // being sized from it - and the faders stayed exactly as narrow as before.
+                        Layout.preferredWidth: (equaliserColumn.width - faderRow.spacing * 9) / 10
+                        Layout.fillHeight: true
+                        spacing: 4
+
+                        Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: (AudioEngine.equaliserBands[index] > 0 ? "+" : "")
+                                  + Number(AudioEngine.equaliserBands[index]).toFixed(0)
+                            color: Theme.textDim
+                            font.pixelSize: 10
+                            font.family: "monospace"
+                        }
+                        Slider {
+                            id: bandSlider
+                            Layout.alignment: Qt.AlignHCenter
+                            Layout.fillHeight: true
+                            orientation: Qt.Vertical
+                            from: -24; to: 12
+                            value: AudioEngine.equaliserBands[index]
+                            onMoved: AudioEngine.setEqualiserBand(index, value)
+
+                            background: Rectangle {
+                                x: bandSlider.leftPadding + bandSlider.availableWidth / 2 - width / 2
+                                y: bandSlider.topPadding
+                                width: 4
+                                height: bandSlider.availableHeight
+                                radius: 2
+                                color: Theme.surfaceHigh
+                            }
+                            handle: Rectangle {
+                                x: bandSlider.leftPadding + bandSlider.availableWidth / 2 - width / 2
+                                y: bandSlider.topPadding
+                                   + bandSlider.visualPosition * (bandSlider.availableHeight - height)
+                                width: 16; height: 16; radius: 8
+                                color: Theme.accent
+                            }
+                        }
+                        Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: modelData
+                            color: Theme.textDim
+                            font.pixelSize: 9
+                        }
+                    }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Item { Layout.fillWidth: true }
+                Button {
+                    text: qsTr("Flatten")
+                    onClicked: AudioEngine.applyEqualiserPreset("Flat")
+                }
+            }
+        }
     }
 
     Dialog {

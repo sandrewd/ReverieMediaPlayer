@@ -1,6 +1,9 @@
 #pragma once
 
 #include <QObject>
+#include <QVariantList>
+#include <QStringList>
+#include <QList>
 // Included rather than forward-declared: a Q_INVOKABLE taking QQuickItem* needs its metatype,
 // and a forward declaration collides with the one QtQuick declares later.
 #include <QImage>
@@ -45,6 +48,15 @@ class AudioEngine : public QObject
     // property; this comes from the stream collection it publishes on the bus.
     Q_PROPERTY(bool hasVideo READ hasVideo NOTIFY hasVideoChanged)
 
+    // Equaliser. Ten bands from 29 Hz to 15 kHz, which is what equalizer-10bands offers, sitting
+    // between the decode and the tee so the visualiser reacts to what you actually hear.
+    Q_PROPERTY(bool equaliserEnabled READ equaliserEnabled WRITE setEqualiserEnabled
+                   NOTIFY equaliserChanged)
+    // The preset in use, or an empty string when the bands have been edited by hand.
+    Q_PROPERTY(QString equaliserPreset READ equaliserPreset NOTIFY equaliserChanged)
+    Q_PROPERTY(QVariantList equaliserBands READ equaliserBands NOTIFY equaliserChanged)
+    Q_PROPERTY(QStringList equaliserPresetNames READ equaliserPresetNames CONSTANT)
+
 public:
     enum State { Stopped, Playing, Paused, Buffering };
     Q_ENUM(State)
@@ -67,6 +79,20 @@ public:
     // Hands the QML video surface to the sink. Must be a Qt6GLVideoItem from the qml6 plugin;
     // the sink stores it as a plain QQuickItem pointer and will not accept anything else.
     Q_INVOKABLE void setVideoItem(QQuickItem *item);
+
+    // Fixed by equalizer-10bands; not a preference.
+    static constexpr int kEqualiserBands = 10;
+
+    bool equaliserEnabled() const { return m_equaliserEnabled; }
+    void setEqualiserEnabled(bool enabled);
+    QString equaliserPreset() const { return m_equaliserPreset; }
+    QVariantList equaliserBands() const;
+    QStringList equaliserPresetNames() const;
+    // Band centre frequencies, for labelling the custom mixer. Fixed by the element.
+    Q_INVOKABLE QStringList equaliserBandLabels() const;
+    Q_INVOKABLE void applyEqualiserPreset(const QString &name);
+    Q_INVOKABLE void setEqualiserBand(int band, qreal gainDb);
+    Q_INVOKABLE void resetEqualiser();
     // Called from the streaming thread; forwards to the item on the GUI thread.
     void deliverVideoFrame(const QImage &frame);
 
@@ -96,6 +122,7 @@ signals:
     void streamStationChanged();
     void bufferingChanged();
     void hasVideoChanged();
+    void equaliserChanged();
     void endOfStream();
     void errorOccurred(const QString &message);
 
@@ -107,6 +134,18 @@ private:
     void setState(State state);
     void updateDuration();
     void updateBuffering();
+
+    void applyEqualiserToPipeline();
+    void saveEqualiser();
+
+    GstElement *m_equaliser = nullptr;
+    // Attenuates by the largest positive band gain. A +12 dB boost on material already near full
+    // scale would clip, and the fix every player uses is a pre-amp - but §1 says remove knobs
+    // rather than add them, so this one is derived from the curve instead of exposed.
+    GstElement *m_makeupGain = nullptr;
+    bool m_equaliserEnabled = false;
+    QString m_equaliserPreset;
+    QList<qreal> m_equaliserGains;
 
     GstElement *m_pipeline = nullptr;
     GstElement *m_appsink = nullptr;
