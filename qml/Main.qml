@@ -251,6 +251,10 @@ ApplicationWindow {
                     // video surface is pure waste, and on a software renderer it is waste the
                     // video decode needs.
                     active: AudioEngine.state === AudioEngine.Playing && !AudioEngine.hasVideo
+                    // Video shares this render thread and has presentation deadlines and A/V
+                    // sync to hold, so it must not be scheduled as a batch workload. The
+                    // visualiser has neither and should keep yielding. See the brief, 9c.
+                    yieldToDesktop: !AudioEngine.hasVideo
                     maxFps: initialMaxFps
                     // No binding here: the item loads the user's stored quality in its
                     // constructor, and a binding would overwrite it on every startup.
@@ -267,7 +271,9 @@ ApplicationWindow {
                 }
                 TapHandler {
                     acceptedButtons: Qt.RightButton
-                    onTapped: presetMenu.popup()
+                    // Nothing in this menu applies to video: there is no preset on screen to
+                    // change, lock or randomise.
+                    onTapped: if (!AudioEngine.hasVideo) presetMenu.popup()
                 }
                 // A MouseArea reports genuine movement; HoverHandler's point also changes on
                 // scene updates, which kept restarting the idle timer every frame and meant
@@ -397,7 +403,7 @@ ApplicationWindow {
             overVideo: true
             onClicked: root.fullscreen = !root.fullscreen
             ToolTip.visible: hovered
-            ToolTip.text: qsTr("Fullscreen visualiser")
+            ToolTip.text: AudioEngine.hasVideo ? qsTr("Fullscreen video") : qsTr("Fullscreen visualiser")
         }
         IconButton {
             glyph: "mini"
@@ -1338,9 +1344,9 @@ ApplicationWindow {
     Shortcut { sequence: "Up";          onActivated: AudioEngine.volume = Math.min(1, AudioEngine.volume + 0.05) }
     Shortcut { sequence: "Down";        onActivated: AudioEngine.volume = Math.max(0, AudioEngine.volume - 0.05) }
     Shortcut { sequence: "F";           onActivated: root.fullscreen = !root.fullscreen }
-    Shortcut { sequence: "N";           onActivated: visualizer.nextPreset() }
-    Shortcut { sequence: "P";           onActivated: visualizer.previousPreset() }
-    Shortcut { sequence: "R";           onActivated: visualizer.randomPreset() }
+    Shortcut { sequence: "N";           onActivated: if (!AudioEngine.hasVideo) visualizer.nextPreset() }
+    Shortcut { sequence: "P";           onActivated: if (!AudioEngine.hasVideo) visualizer.previousPreset() }
+    Shortcut { sequence: "R";           onActivated: if (!AudioEngine.hasVideo) visualizer.randomPreset() }
     Shortcut {
         sequences: ["Escape"]
         context: Qt.ApplicationShortcut

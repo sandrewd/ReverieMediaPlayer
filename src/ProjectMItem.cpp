@@ -87,6 +87,11 @@ public:
         // Runs with the GUI thread blocked: the only safe place to exchange state.
         auto *pmItem = static_cast<ProjectMItem *>(item);
         m_item = pmItem;
+#ifdef Q_OS_LINUX
+        // This is the render thread, and the GUI thread is blocked, so it is the one moment
+        // where handing the tid over needs no care.
+        pmItem->publishRenderThread(static_cast<int>(syscall(SYS_gettid)));
+#endif
 
         // A scale or size change means the offscreen buffer is the wrong size. There is no
         // API to resize it, so drop it and let Qt ask for a new one on the next frame.
@@ -144,8 +149,8 @@ public:
         // items go undrawn until hovered, regions stay stale. Nice only this thread: audio
         // runs on GStreamer's own threads and must keep its priority.
 #ifdef Q_OS_LINUX
-        if (m_batchApplied != m_yieldToDesktop)
-            applyScheduling(m_yieldToDesktop);
+        if (m_item)
+            m_item->syncScheduling();
 #endif
 
         if (!m_pm) {
@@ -310,48 +315,6 @@ public:
     }
 
 private:
-#ifdef Q_OS_LINUX
-    // SCHED_BATCH rather than a nice value, deliberately. Renicing is one-way for an
-    // unprivileged process - RLIMIT_NICE is 0 on the target distros, so a thread lowered to
-    // nice 5 can never be raised back - and that would permanently penalise video rendering,
-    // which shares this very render thread through qml6glsink. SCHED_BATCH costs no CPU
-    // share, only the wakeup-latency bonus that lets a busy renderer out-compete the panel
-    // and the window manager, and it can be switched off again.
-    void applyScheduling(bool batch)
-    {
-        if (qEnvironmentVariableIsSet("PLAYER_NO_SCHED_BATCH")) {
-            m_batchApplied = batch;
-            return;
-        }
-
-        sched_param param{};
-        param.sched_priority = 0;
-        const int policy = batch ? SCHED_BATCH : SCHED_OTHER;
-
-        int changed = 0;
-        if (sched_setscheduler(static_cast<pid_t>(syscall(SYS_gettid)), policy, &param) == 0)
-            ++changed;
-
-        // The rasterisation happens on Mesa's worker threads, not on this one. They belong to
-        // this process, so they are ours to reschedule; missing them leaves the desktop
-        // competing with four busy workers.
-        QDir tasks(QStringLiteral("/proc/self/task"));
-        const QStringList entries = tasks.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-        for (const QString &entry : entries) {
-            QFile comm(QStringLiteral("/proc/self/task/%1/comm").arg(entry));
-            if (!comm.open(QIODevice::ReadOnly | QIODevice::Text))
-                continue;
-            if (!QString::fromUtf8(comm.readAll()).trimmed().startsWith(QStringLiteral("llvmpipe")))
-                continue;
-            if (sched_setscheduler(entry.toInt(), policy, &param) == 0)
-                ++changed;
-        }
-
-        qInfo("rendering threads set to %s (%d threads)",
-              batch ? "SCHED_BATCH" : "SCHED_OTHER", changed);
-        m_batchApplied = batch;
-    }
-#endif
 
     void loadLibrary()
     {
@@ -570,7 +533,6 @@ private:
     int m_pendingJumpIndex = -1;
     bool m_active = true;
     bool m_selfDriven = false;
-    bool m_batchApplied = false;
     bool m_idleCleared = false;
     QList<int> m_commands;
     bool m_pendingLibrary = false;
@@ -755,7 +717,66 @@ void ProjectMItem::setYieldToDesktop(bool yield)
         return;
     m_yieldToDesktop = yield;
     emit yieldToDesktopChanged();
+    // Apply it here rather than waiting for the next render(): when video is playing this item
+    // is invisible and render() will never come.
+    syncScheduling();
     update();
+}
+
+void ProjectMItem::publishRenderThread(int tid)
+{
+    QMutexLocker lock(&m_schedMutex);
+    m_renderTid = tid;
+}
+
+// SCHED_BATCH rather than a nice value, deliberately. Renicing is one-way for an unprivileged
+// process - RLIMIT_NICE is 0 on the target distros, so a thread lowered to nice 5 can never be
+// raised back - and that would permanently penalise video rendering, which shares this very
+// render thread. SCHED_BATCH costs no CPU share, only the wakeup-latency bonus that lets a busy
+// renderer out-compete the panel and the window manager, and it can be switched off again.
+void ProjectMItem::syncScheduling()
+{
+#ifdef Q_OS_LINUX
+    QMutexLocker lock(&m_schedMutex);
+    const int wanted = m_yieldToDesktop ? 1 : 0;
+    if (wanted == m_batchState)
+        return;
+    // Nothing to reschedule until the render thread has announced itself.
+    if (m_renderTid == 0)
+        return;
+
+    if (qEnvironmentVariableIsSet("PLAYER_NO_SCHED_BATCH")) {
+        m_batchState = wanted;
+        return;
+    }
+
+    sched_param param{};
+    param.sched_priority = 0;
+    const int policy = wanted ? SCHED_BATCH : SCHED_OTHER;
+
+    int changed = 0;
+    if (sched_setscheduler(static_cast<pid_t>(m_renderTid), policy, &param) == 0)
+        ++changed;
+
+    // The rasterisation happens on Mesa's worker threads, not on the render thread. They belong
+    // to this process, so they are ours to reschedule; missing them leaves the desktop competing
+    // with four busy workers.
+    QDir tasks(QStringLiteral("/proc/self/task"));
+    const QStringList entries = tasks.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString &entry : entries) {
+        QFile comm(QStringLiteral("/proc/self/task/%1/comm").arg(entry));
+        if (!comm.open(QIODevice::ReadOnly | QIODevice::Text))
+            continue;
+        if (!QString::fromUtf8(comm.readAll()).trimmed().startsWith(QStringLiteral("llvmpipe")))
+            continue;
+        if (sched_setscheduler(entry.toInt(), policy, &param) == 0)
+            ++changed;
+    }
+
+    qInfo("rendering threads set to %s (%d threads)",
+          wanted ? "SCHED_BATCH" : "SCHED_OTHER", changed);
+    m_batchState = wanted;
+#endif
 }
 
 void ProjectMItem::setMaxFps(int fps)

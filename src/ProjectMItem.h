@@ -97,6 +97,15 @@ public:
     bool yieldToDesktop() const { return m_yieldToDesktop; }
     void setYieldToDesktop(bool yield);
 
+    // Scheduling lives on the item, not the renderer, because it has to be reachable when the
+    // renderer is not running. While video is on screen this item is invisible, so the scene
+    // graph never calls render() - and a render thread left on SCHED_BATCH from the previous
+    // audio track would go on penalising video, which is exactly what the property exists to
+    // prevent. Safe from either thread: it locks, and both policies are unprivileged.
+    void syncScheduling();
+    // Called from synchronize(), which runs on the render thread with the GUI thread blocked.
+    void publishRenderThread(int tid);
+
     Q_INVOKABLE void nextPreset();
     Q_INVOKABLE void previousPreset();
     Q_INVOKABLE void randomPreset();
@@ -161,6 +170,9 @@ private:
     bool m_adaptiveQuality = true;
     int m_maxFps = 60;
     bool m_yieldToDesktop = true;
+    QMutex m_schedMutex;
+    int m_renderTid = 0;
+    int m_batchState = -1; // -1 unknown, 0 SCHED_OTHER, 1 SCHED_BATCH
     QTimer m_frameTimer;
     qreal m_targetFps = 30.0;
 
