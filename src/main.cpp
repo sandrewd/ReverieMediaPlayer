@@ -21,6 +21,7 @@
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
 #include <QDBusInterface>
+#include <QDBusMessage>
 #include <QWindow>
 
 namespace {
@@ -132,6 +133,21 @@ int main(int argc, char *argv[])
         QDBusConnection bus = QDBusConnection::sessionBus();
         if (bus.isConnected() && bus.interface()
             && bus.interface()->isServiceRegistered(QString::fromLatin1(MprisPlayer::serviceName()))) {
+            // An older Reverie owns the name but has none of this interface, so the hand-off
+            // silently fails - and exiting anyway means the upgrade appears not to have taken:
+            // the user keeps interacting with the old window and every relaunch quits on sight.
+            // Check first, and if nobody answers, carry on and open our own window.
+            QDBusInterface probe(QString::fromLatin1(MprisPlayer::serviceName()),
+                                 QString::fromLatin1(MprisPlayer::objectPath()),
+                                 QString::fromLatin1(MprisPlayer::appInterface()), bus);
+            const QDBusMessage reply =
+                probe.call(QDBus::BlockWithGui, QStringLiteral("Activate"), QString());
+            if (reply.type() == QDBusMessage::ErrorMessage) {
+                qInfo("%s is owned by something that does not speak our interface (%s); "
+                      "starting a window of our own",
+                      MprisPlayer::serviceName(), qPrintable(reply.errorName()));
+            } else {
+
             const QStringList handoff = parser.positionalArguments();
             if (!handoff.isEmpty()) {
                 QStringList uris;
@@ -154,13 +170,11 @@ int main(int argc, char *argv[])
             QString token = qEnvironmentVariable("XDG_ACTIVATION_TOKEN");
             if (token.isEmpty())
                 token = qEnvironmentVariable("DESKTOP_STARTUP_ID");
-            QDBusInterface reverieApp(QString::fromLatin1(MprisPlayer::serviceName()),
-                                      QString::fromLatin1(MprisPlayer::objectPath()),
-                                      QString::fromLatin1(MprisPlayer::appInterface()), bus);
-            reverieApp.call(QStringLiteral("Activate"), token);
+            probe.call(QStringLiteral("Activate"), token);
             qInfo("another instance owns %s; handed it %lld file(s) and exiting",
                   MprisPlayer::serviceName(), static_cast<long long>(handoff.size()));
             return 0;
+            }
         }
     }
 
