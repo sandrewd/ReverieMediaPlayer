@@ -37,6 +37,11 @@ class SystemTheme : public QObject
     // Panel sizes live here because this is the singleton that already owns QSettings, and a
     // second one for two integers would be worse. They are clamped in the setters rather than in
     // QML, so a stored value from a bigger screen cannot leave a panel unusable on a smaller one.
+    // How strongly the stage colour tints the visualiser while it is running, 0-100. Zero is
+    // the default and means the artwork is untouched, which is what it looked like before the
+    // colour existed. Idle always shows the colour solid, whatever this says - that is the case
+    // the role was added for.
+    Q_PROPERTY(int stageTint READ stageTint WRITE setStageTint NOTIFY customChanged)
     Q_PROPERTY(int playlistWidth READ playlistWidth WRITE setPlaylistWidth NOTIFY layoutChanged)
     Q_PROPERTY(int transportHeight READ transportHeight WRITE setTransportHeight NOTIFY layoutChanged)
     Q_PROPERTY(QStringList recentColours READ recentColours NOTIFY recentColoursChanged)
@@ -61,6 +66,8 @@ public:
     QColor customAccent() const { return m_customAccent; }
     QColor customText() const { return m_customText; }
     QColor customStage() const { return m_customStage; }
+    int stageTint() const { return m_stageTint; }
+    void setStageTint(int percent);
     int playlistWidth() const { return m_playlistWidth; }
     void setPlaylistWidth(int width);
     int transportHeight() const { return m_transportHeight; }
@@ -141,6 +148,7 @@ private:
     QColor m_customAccent;
     QColor m_customText;
     QColor m_customStage;
+    int m_stageTint = 0;
     int m_playlistWidth = 340;
     int m_transportHeight = 88;
     static constexpr int kRecentLimit = 5;

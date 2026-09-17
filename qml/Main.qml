@@ -277,9 +277,7 @@ ApplicationWindow {
                 // where there is no texture yet, in either theme.
                 Rectangle {
                     anchors.fill: parent
-                    // Black behind video, because letterbox bars should not be tinted; the
-                    // themed stage colour otherwise, so the window has an edge on a dark desktop.
-                    color: AudioEngine.hasVideo ? "black" : Theme.stage
+                    color: "black"
                 }
 
                 // Video takes the stage when the media has any; the visualiser is what an
@@ -313,6 +311,29 @@ ApplicationWindow {
                     presetPath: initialPreset
                     presetsPath: initialPresetsPath
                     curatedList: initialCuratedList
+                }
+
+                // The themed stage colour, painted *over* the visualiser rather than behind it,
+                // and only while nothing is playing.
+                //
+                // Behind it did not work twice over. projectM's texture does not cover the item
+                // exactly, so a coloured backdrop framed the artwork in a colour it never had -
+                // invisible against the old black, obvious against anything else. And an idle
+                // ProjectMItem still composites its cleared black buffer on top, so the colour
+                // never showed when it was supposed to: the stage stayed black.
+                //
+                // Above and idle-only gets both right, without hiding the FBO item - which would
+                // tear down its scene node and make projectM re-initialise on every pause.
+                Rectangle {
+                    anchors.fill: parent
+                    color: Theme.stage
+                    // Solid when nothing is playing - that is the case the colour was asked for,
+                    // a window with no visible edge on a black desktop. While the visualiser runs
+                    // it becomes a tint at whatever strength the user chose, defaulting to none.
+                    // Video is never tinted: letterbox bars and picture both want to be left
+                    // alone.
+                    opacity: visualizer.active ? Theme.stageTint : 1.0
+                    visible: !AudioEngine.hasVideo && opacity > 0.004
                 }
 
                 // Double-click the visualiser for fullscreen, the same gesture every video
@@ -1026,6 +1047,56 @@ ApplicationWindow {
                 label: qsTr("Visualiser")
                 colour: SystemTheme.customStage
                 onColourPicked: function(picked) { root.applyCustomColour("stage", picked) }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
+                Label {
+                    text: qsTr("Tint")
+                    color: Theme.text
+                    Layout.preferredWidth: 96
+                }
+                Slider {
+                    id: tintSlider
+                    Layout.fillWidth: true
+                    from: 0; to: 100; stepSize: 5
+                    value: SystemTheme.stageTint
+                    onMoved: SystemTheme.stageTint = Math.round(value)
+                    background: Rectangle {
+                        x: tintSlider.leftPadding
+                        y: tintSlider.topPadding + tintSlider.availableHeight / 2 - height / 2
+                        width: tintSlider.availableWidth; height: 4; radius: 2
+                        color: Theme.surfaceHigh
+                        Rectangle {
+                            width: tintSlider.visualPosition * parent.width
+                            height: parent.height; radius: 2
+                            color: Theme.accent
+                        }
+                    }
+                    handle: Rectangle {
+                        x: tintSlider.leftPadding
+                           + tintSlider.visualPosition * (tintSlider.availableWidth - width)
+                        y: tintSlider.topPadding + tintSlider.availableHeight / 2 - height / 2
+                        width: 14; height: 14; radius: 7
+                        color: Theme.accent
+                    }
+                }
+                Label {
+                    text: SystemTheme.stageTint + "%"
+                    color: Theme.textDim
+                    font.family: "monospace"
+                    Layout.preferredWidth: 46
+                    horizontalAlignment: Text.AlignRight
+                }
+            }
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("How much of that colour washes over the visualiser while it plays. "
+                           + "At 0% the visualisation is untouched and the colour is only what "
+                           + "you see when nothing is playing.")
+                color: Theme.textDim
+                font.pixelSize: 11
             }
 
             RowLayout {

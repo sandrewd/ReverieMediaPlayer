@@ -24,6 +24,9 @@ QtObject {
     // on a black desktop leaves the window with no visible edge.
     readonly property color stage:      custom ? SystemTheme.customStage
                                                : (dark ? "#08090c" : "#1b1e23")
+    // 0 means the visualiser is untouched while it runs; the stage colour is then only what you
+    // see when nothing is playing.
+    readonly property real stageTint:   SystemTheme.stageTint / 100.0
 
     // Derived. Nudging towards or away from the surface keeps hover states and borders
     // visible whichever direction the user's theme leans.

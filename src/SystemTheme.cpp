@@ -38,6 +38,7 @@ SystemTheme::SystemTheme(QObject *parent)
         m_platformPaletteIsDark = paletteHint();
     }
 
+    m_stageTint = qBound(0, settings.value(QStringLiteral("appearance/stageTint"), 0).toInt(), 100);
     m_playlistWidth = qBound(kMinPlaylistWidth,
                              settings.value(QStringLiteral("layout/playlistWidth"), 340).toInt(),
                              2000);
@@ -195,6 +196,16 @@ void SystemTheme::setCustomText(const QColor &colour)
     m_customText = colour;
     QSettings().setValue(QStringLiteral("appearance/text"), colour.name());
     applyPalette();
+    emit customChanged();
+}
+
+void SystemTheme::setStageTint(int percent)
+{
+    percent = qBound(0, percent, 100);
+    if (percent == m_stageTint)
+        return;
+    m_stageTint = percent;
+    QSettings().setValue(QStringLiteral("appearance/stageTint"), percent);
     emit customChanged();
 }
 
