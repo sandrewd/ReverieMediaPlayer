@@ -6,6 +6,7 @@
 #include <QFileInfo>
 #include <QSettings>
 #include <QStandardPaths>
+#include <QRandomGenerator>
 #include <QTextStream>
 
 #include <taglib/fileref.h>
@@ -49,6 +50,9 @@ PlaylistModel::PlaylistModel(QObject *parent)
 {
     QSettings settings;
     m_persist = settings.value(QStringLiteral("playlist/persist"), false).toBool();
+    m_repeatMode = static_cast<RepeatMode>(
+        qBound(0, settings.value(QStringLiteral("playlist/repeatMode"), 0).toInt(), 2));
+    m_shuffle = settings.value(QStringLiteral("playlist/shuffle"), false).toBool();
     if (m_persist)
         restoreSession();
 }
@@ -80,6 +84,8 @@ QVariant PlaylistModel::data(const QModelIndex &index, int role) const
                                                  : formatDuration(track.durationSec);
     case IsCurrentRole:    return index.row() == m_currentIndex;
     case IsStreamRole:     return track.isStream;
+    case FileNameRole:     return track.isStream ? track.path
+                                                 : QFileInfo(track.path).fileName();
     default:               return {};
     }
 }
@@ -95,6 +101,7 @@ QHash<int, QByteArray> PlaylistModel::roleNames() const
         {DurationTextRole, "durationText"},
         {IsCurrentRole, "isCurrent"},
         {IsStreamRole, "isStream"},
+        {FileNameRole, "fileName"},
     };
 }
 
@@ -147,6 +154,14 @@ QString PlaylistModel::currentArtist() const
         ? m_tracks.at(m_currentIndex).artist : QString();
 }
 
+QString PlaylistModel::currentFileName() const
+{
+    if (m_currentIndex < 0 || m_currentIndex >= m_tracks.size())
+        return QString();
+    const Track &track = m_tracks.at(m_currentIndex);
+    return track.isStream ? track.path : QFileInfo(track.path).fileName();
+}
+
 bool PlaylistModel::isCurrentStream() const
 {
     return (m_currentIndex >= 0 && m_currentIndex < m_tracks.size())
@@ -181,9 +196,39 @@ Track PlaylistModel::readMetadata(const QString &path)
     }
 
     // An untagged file is still a track. Fall back to the filename rather than a blank row.
-    if (track.title.isEmpty())
+    if (track.title.isEmpty()) {
         track.title = QFileInfo(path).completeBaseName();
+        track.titleFromFilename = true;
+    }
     return track;
+}
+
+void PlaylistModel::supplyMetadata(int row, const QString &title, const QString &artist)
+{
+    if (row < 0 || row >= m_tracks.size())
+        return;
+    Track &track = m_tracks[row];
+    QList<int> roles;
+
+    // Only a title that was really the filename may be replaced. A file that carried a tag keeps
+    // it, which is what "TagLib is authoritative" has meant since streams were added.
+    if (track.titleFromFilename && !title.isEmpty() && title != track.title) {
+        track.title = title;
+        track.titleFromFilename = false;
+        roles.append(TitleRole);
+    }
+    if (track.artist.isEmpty() && !artist.isEmpty()) {
+        track.artist = artist;
+        roles.append(ArtistRole);
+    }
+    if (roles.isEmpty())
+        return;
+
+    const QModelIndex idx = index(row, 0);
+    emit dataChanged(idx, idx, roles);
+    // currentTitle/currentArtist notify on this signal, so the transport picks the new values up.
+    if (row == m_currentIndex)
+        emit currentIndexChanged();
 }
 
 void PlaylistModel::appendPaths(const QStringList &paths)
@@ -382,6 +427,63 @@ bool PlaylistModel::loadM3U(const QUrl &source)
     }
     appendPaths(paths);
     return true;
+}
+
+void PlaylistModel::setRepeatMode(RepeatMode mode)
+{
+    if (mode == m_repeatMode)
+        return;
+    m_repeatMode = mode;
+    QSettings().setValue(QStringLiteral("playlist/repeatMode"), static_cast<int>(mode));
+    emit repeatModeChanged();
+}
+
+void PlaylistModel::cycleRepeat()
+{
+    switch (m_repeatMode) {
+    case RepeatNone: setRepeatMode(RepeatAll); break;
+    case RepeatAll:  setRepeatMode(RepeatOne); break;
+    case RepeatOne:  setRepeatMode(RepeatNone); break;
+    }
+}
+
+void PlaylistModel::setShuffle(bool shuffle)
+{
+    if (shuffle == m_shuffle)
+        return;
+    m_shuffle = shuffle;
+    QSettings().setValue(QStringLiteral("playlist/shuffle"), shuffle);
+    emit shuffleChanged();
+}
+
+int PlaylistModel::nextForPlayback(bool automatic) const
+{
+    if (m_tracks.isEmpty())
+        return -1;
+
+    // Repeating one track is about the track ending, not about the Next button.
+    if (automatic && m_repeatMode == RepeatOne)
+        return m_currentIndex >= 0 ? m_currentIndex : 0;
+
+    if (m_shuffle) {
+        if (m_tracks.size() == 1)
+            return 0;
+        // Anything but the track just played. Picking uniformly and retrying once is enough:
+        // a true shuffle order would need history the target user has not asked for.
+        int candidate = QRandomGenerator::global()->bounded(m_tracks.size());
+        if (candidate == m_currentIndex)
+            candidate = (candidate + 1) % m_tracks.size();
+        return candidate;
+    }
+
+    if (m_currentIndex + 1 < m_tracks.size())
+        return m_currentIndex + 1;
+
+    // Past the end. Wrapping is what "repeat the playlist" means; pressing Next by hand wraps
+    // too, because a dead button at the end of a list reads as broken.
+    if (m_repeatMode == RepeatAll || !automatic)
+        return 0;
+    return -1;
 }
 
 int PlaylistModel::nextIndex(bool wrap) const

@@ -14,6 +14,9 @@ struct Track
     QString album;
     int durationSec = 0;
     bool isStream = false;
+    // True when `title` is really the filename, because the file carried no tag TagLib could
+    // read. Only such a title may be replaced by what the decoder reports later.
+    bool titleFromFilename = false;
 };
 
 // One playlist. Not tabbed playlists, not multiple queues - that was decided and it keeps
@@ -30,10 +33,37 @@ class PlaylistModel : public QAbstractListModel
                    WRITE setPersistAcrossLaunches NOTIFY persistAcrossLaunchesChanged)
     Q_PROPERTY(QString currentTitle READ currentTitle NOTIFY currentIndexChanged)
     Q_PROPERTY(QString currentArtist READ currentArtist NOTIFY currentIndexChanged)
+    // What the transport shows on hover: the thing the tags were derived from.
+    Q_PROPERTY(QString currentFileName READ currentFileName NOTIFY currentIndexChanged)
+    Q_PROPERTY(RepeatMode repeatMode READ repeatMode WRITE setRepeatMode NOTIFY repeatModeChanged)
+    Q_PROPERTY(bool shuffle READ shuffle WRITE setShuffle NOTIFY shuffleChanged)
     Q_PROPERTY(QString currentPath READ currentPath NOTIFY currentIndexChanged)
     Q_PROPERTY(bool currentIsStream READ isCurrentStream NOTIFY currentIndexChanged)
 
 public:
+    enum RepeatMode {
+        RepeatNone = 0,   // stop at the end of the list
+        RepeatAll,        // wrap around
+        RepeatOne         // replay the current track
+    };
+    Q_ENUM(RepeatMode)
+
+    RepeatMode repeatMode() const { return m_repeatMode; }
+    void setRepeatMode(RepeatMode mode);
+    Q_INVOKABLE void cycleRepeat();
+    bool shuffle() const { return m_shuffle; }
+    void setShuffle(bool shuffle);
+
+    // What to play when the current track ends, or when Next is pressed. `automatic` separates
+    // the two: repeating one track means the *end of the track* replays it, while pressing Next
+    // still moves on - anything else makes the button look broken.
+    Q_INVOKABLE int nextForPlayback(bool automatic) const;
+
+    // Tags the decoder found while playing, offered to a row that has none. Deliberately a
+    // *fill*, never an override: TagLib stays authoritative for a file that actually carries
+    // tags, and only a title that was really the filename may be replaced.
+    Q_INVOKABLE void supplyMetadata(int row, const QString &title, const QString &artist);
+
     enum Roles {
         PathRole = Qt::UserRole + 1,
         TitleRole,
@@ -43,6 +73,7 @@ public:
         DurationTextRole,
         IsCurrentRole,
         IsStreamRole,
+        FileNameRole,
     };
 
     explicit PlaylistModel(QObject *parent = nullptr);
@@ -59,6 +90,7 @@ public:
 
     QString currentTitle() const;
     QString currentArtist() const;
+    QString currentFileName() const;
     QString currentPath() const;
 
 public slots:
@@ -82,11 +114,16 @@ signals:
     void currentIndexChanged();
     void countChanged();
     void persistAcrossLaunchesChanged();
+    void repeatModeChanged();
+    void shuffleChanged();
 
 private:
     void appendPaths(const QStringList &paths);
     static Track readMetadata(const QString &path);
     static QString sessionFilePath();
+
+    RepeatMode m_repeatMode = RepeatNone;
+    bool m_shuffle = false;
     static bool isSupported(const QString &path);
 
     QList<Track> m_tracks;

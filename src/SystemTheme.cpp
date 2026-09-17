@@ -38,6 +38,12 @@ SystemTheme::SystemTheme(QObject *parent)
         m_platformPaletteIsDark = paletteHint();
     }
 
+    m_playlistWidth = qBound(kMinPlaylistWidth,
+                             settings.value(QStringLiteral("layout/playlistWidth"), 340).toInt(),
+                             2000);
+    m_transportHeight = qBound(kMinTransportHeight,
+                               settings.value(QStringLiteral("layout/transportHeight"), 88).toInt(),
+                               kMaxTransportHeight);
     m_recentColours = settings.value(QStringLiteral("appearance/recentColours")).toStringList();
     while (m_recentColours.size() > kRecentLimit)
         m_recentColours.removeLast();
@@ -190,6 +196,26 @@ void SystemTheme::setCustomText(const QColor &colour)
     QSettings().setValue(QStringLiteral("appearance/text"), colour.name());
     applyPalette();
     emit customChanged();
+}
+
+void SystemTheme::setPlaylistWidth(int width)
+{
+    width = qBound(kMinPlaylistWidth, width, 2000);
+    if (width == m_playlistWidth)
+        return;
+    m_playlistWidth = width;
+    QSettings().setValue(QStringLiteral("layout/playlistWidth"), width);
+    emit layoutChanged();
+}
+
+void SystemTheme::setTransportHeight(int height)
+{
+    height = qBound(kMinTransportHeight, height, kMaxTransportHeight);
+    if (height == m_transportHeight)
+        return;
+    m_transportHeight = height;
+    QSettings().setValue(QStringLiteral("layout/transportHeight"), height);
+    emit layoutChanged();
 }
 
 void SystemTheme::setCustomStage(const QColor &colour)

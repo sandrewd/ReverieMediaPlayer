@@ -33,6 +33,12 @@ class SystemTheme : public QObject
     // playing, which on a black desktop leaves the window with no visible edge at all. It is a
     // real surface, so it belongs in the palette rather than in a settings panel of its own.
     Q_PROPERTY(QColor customStage READ customStage WRITE setCustomStage NOTIFY customChanged)
+
+    // Panel sizes live here because this is the singleton that already owns QSettings, and a
+    // second one for two integers would be worse. They are clamped in the setters rather than in
+    // QML, so a stored value from a bigger screen cannot leave a panel unusable on a smaller one.
+    Q_PROPERTY(int playlistWidth READ playlistWidth WRITE setPlaylistWidth NOTIFY layoutChanged)
+    Q_PROPERTY(int transportHeight READ transportHeight WRITE setTransportHeight NOTIFY layoutChanged)
     Q_PROPERTY(QStringList recentColours READ recentColours NOTIFY recentColoursChanged)
     Q_PROPERTY(int recentColoursLimit READ recentColoursLimit CONSTANT)
     Q_PROPERTY(QVariantList savedPalettes READ savedPalettes NOTIFY savedPalettesChanged)
@@ -55,6 +61,16 @@ public:
     QColor customAccent() const { return m_customAccent; }
     QColor customText() const { return m_customText; }
     QColor customStage() const { return m_customStage; }
+    int playlistWidth() const { return m_playlistWidth; }
+    void setPlaylistWidth(int width);
+    int transportHeight() const { return m_transportHeight; }
+    void setTransportHeight(int height);
+
+    // Neither panel may be squashed away: below these a control is a target nobody can hit.
+    static constexpr int kMinPlaylistWidth = 200;
+    static constexpr int kMinStageWidth = 360;
+    static constexpr int kMinTransportHeight = 64;
+    static constexpr int kMaxTransportHeight = 190;
     QStringList recentColours() const { return m_recentColours; }
     int recentColoursLimit() const { return kRecentLimit; }
     QVariantList savedPalettes() const;
@@ -90,6 +106,7 @@ signals:
     void systemIsDarkChanged();
     void preferenceChanged();
     void customChanged();
+    void layoutChanged();
     void recentColoursChanged();
     void savedPalettesChanged();
 
@@ -124,6 +141,8 @@ private:
     QColor m_customAccent;
     QColor m_customText;
     QColor m_customStage;
+    int m_playlistWidth = 340;
+    int m_transportHeight = 88;
     static constexpr int kRecentLimit = 5;
     static constexpr int kPaletteNameLimit = 24;
     QStringList m_recentColours;

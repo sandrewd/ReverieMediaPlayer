@@ -33,8 +33,14 @@ Rectangle {
     readonly property color barTextDim: overVideo ? Theme.overlayTextDim : Theme.textDim
     readonly property color barTrack:   overVideo ? Qt.rgba(1, 1, 1, 0.30) : Theme.surfaceHigh
 
+    // The height the bar wants at its natural size. The window may give it more or less, and
+    // everything inside scales with the ratio - a taller bar is a bigger bar, not the same
+    // controls floating in space.
+    readonly property int baseHeight: compact ? 62 : 88
+    property real uiScale: Math.max(0.75, Math.min(2.2, height / baseHeight))
+
     color: overVideo ? "transparent" : Theme.surface
-    implicitHeight: compact ? 62 : 88
+    implicitHeight: baseHeight
 
     // Taller than the bar and anchored to its bottom, so the fade starts above the controls and
     // over the picture. Nothing clips it: the gradient is the whole point.
@@ -58,9 +64,9 @@ Rectangle {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: Theme.spacing
-        anchors.topMargin: compact ? 6 : Theme.spacing
-        spacing: compact ? 2 : 6
+        anchors.margins: Theme.spacing * root.uiScale
+        anchors.topMargin: (compact ? 6 : Theme.spacing) * root.uiScale
+        spacing: (compact ? 2 : 6) * root.uiScale
 
         // Seek row. In compact mode the times move under the controls to save a line.
         RowLayout {
@@ -68,11 +74,11 @@ Rectangle {
             spacing: 10
 
             Label {
-                text: root.formatTime(AudioEngine.position)
+                text: root.haveMedia ? root.formatTime(AudioEngine.position) : "-:--"
                 color: root.barTextDim
                 font.family: "monospace"
-                font.pixelSize: 11
-                Layout.preferredWidth: 42
+                font.pixelSize: 11 * root.uiScale
+                Layout.preferredWidth: 42 * root.uiScale
                 horizontalAlignment: Text.AlignRight
             }
 
@@ -90,8 +96,8 @@ Rectangle {
                     x: seekSlider.leftPadding
                     y: seekSlider.topPadding + seekSlider.availableHeight / 2 - height / 2
                     width: seekSlider.availableWidth
-                    height: 4
-                    radius: 2
+                    height: 4 * root.uiScale
+                    radius: 2 * root.uiScale
                     color: root.barTrack
                     Rectangle {
                         width: seekSlider.visualPosition * parent.width
@@ -103,7 +109,8 @@ Rectangle {
                 handle: Rectangle {
                     x: seekSlider.leftPadding + seekSlider.visualPosition * (seekSlider.availableWidth - width)
                     y: seekSlider.topPadding + seekSlider.availableHeight / 2 - height / 2
-                    width: 14; height: 14; radius: 7
+                    width: 14 * root.uiScale; height: 14 * root.uiScale
+                    radius: width / 2
                     color: Theme.accent
                     visible: seekSlider.enabled
                     scale: seekSlider.pressed ? 1.25 : (seekSlider.hovered ? 1.1 : 1.0)
@@ -113,11 +120,13 @@ Rectangle {
 
             Label {
                 text: PlaylistModel.currentIsStream ? qsTr("live")
-                                                    : root.formatTime(AudioEngine.duration)
+                                                    : (root.haveMedia
+                                                       ? root.formatTime(AudioEngine.duration)
+                                                       : "-:--")
                 color: root.barTextDim
                 font.family: "monospace"
-                font.pixelSize: 11
-                Layout.preferredWidth: 42
+                font.pixelSize: 11 * root.uiScale
+                Layout.preferredWidth: 42 * root.uiScale
             }
         }
 
@@ -127,6 +136,7 @@ Rectangle {
 
             IconButton {
                 overVideo: root.overVideo
+                size: Theme.controlSizeSmall * root.uiScale
                 glyph: "prev"
                 onClicked: root.requestPrevious()
                 ToolTip.visible: hovered
@@ -136,11 +146,13 @@ Rectangle {
                 overVideo: root.overVideo
                 glyph: AudioEngine.state === AudioEngine.Playing ? "pause" : "play"
                 primary: true
+                size: Theme.controlSize * root.uiScale
                 onClicked: root.requestPlayPause()
             }
             IconButton {
                 overVideo: root.overVideo
                 glyph: "stop"
+                size: Theme.controlSizeSmall * root.uiScale
                 enabled: AudioEngine.state !== AudioEngine.Stopped
                 onClicked: root.requestStop()
                 ToolTip.visible: hovered
@@ -148,7 +160,33 @@ Rectangle {
             }
             IconButton {
                 overVideo: root.overVideo
+                glyph: "shuffle"
+                size: Theme.controlSizeSmall * root.uiScale
+                // First thing to go when the bar gets narrow, alongside the volume slider.
+                visible: !root.compact
+                active: PlaylistModel.shuffle
+                onClicked: PlaylistModel.shuffle = !PlaylistModel.shuffle
+                ToolTip.visible: hovered
+                ToolTip.text: PlaylistModel.shuffle ? qsTr("Shuffle is on") : qsTr("Shuffle")
+            }
+            IconButton {
+                overVideo: root.overVideo
+                glyph: PlaylistModel.repeatMode === PlaylistModel.RepeatOne ? "repeatOne" : "repeat"
+                size: Theme.controlSizeSmall * root.uiScale
+                visible: !root.compact
+                active: PlaylistModel.repeatMode !== PlaylistModel.RepeatNone
+                onClicked: PlaylistModel.cycleRepeat()
+                ToolTip.visible: hovered
+                ToolTip.text: PlaylistModel.repeatMode === PlaylistModel.RepeatOne
+                              ? qsTr("Repeating this track")
+                              : PlaylistModel.repeatMode === PlaylistModel.RepeatAll
+                                ? qsTr("Repeating the playlist")
+                                : qsTr("Repeat")
+            }
+            IconButton {
+                overVideo: root.overVideo
                 glyph: "next"
+                size: Theme.controlSizeSmall * root.uiScale
                 onClicked: root.requestNext()
                 ToolTip.visible: hovered
                 ToolTip.text: qsTr("Next")
@@ -159,21 +197,25 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.leftMargin: 8
                 spacing: 0
-                Label {
+                Ticker {
                     Layout.fillWidth: true
-                    // A local file also emits a title tag from its ID3 data, but for those
-                    // TagLib is authoritative. Only a stream has nothing better to offer.
+                    Layout.preferredHeight: implicitHeight
+                    // A stream announces its current track through the title tag; a file's title
+                    // comes from TagLib, topped up by whatever the decoder found - see
+                    // supplyMetadata, which fills gaps without overriding a real tag.
                     text: PlaylistModel.currentIsStream && AudioEngine.streamTitle !== ""
                         ? AudioEngine.streamTitle
                         : (PlaylistModel.currentTitle !== "" ? PlaylistModel.currentTitle
                                                              : qsTr("Nothing playing"))
                     color: root.barText
-                    font.pixelSize: root.compact ? 12 : 13
+                    font.pixelSize: root.compact ? 12 * root.uiScale : 13 * root.uiScale
                     font.weight: Font.DemiBold
-                    elide: Text.ElideRight
+                    // Once tags replace the filename there is no other way back to it.
+                    hoverText: PlaylistModel.currentFileName
                 }
-                Label {
+                Ticker {
                     Layout.fillWidth: true
+                    Layout.preferredHeight: implicitHeight
                     visible: !root.compact && text !== ""
                     text: AudioEngine.buffering
                           ? qsTr("Buffering…")
@@ -182,14 +224,15 @@ Rectangle {
                                                                 : PlaylistModel.currentTitle)
                             : PlaylistModel.currentArtist
                     color: root.barTextDim
-                    font.pixelSize: 11
-                    elide: Text.ElideRight
+                    font.pixelSize: 11 * root.uiScale
+                    hoverText: PlaylistModel.currentFileName
                 }
             }
 
             IconButton {
                 overVideo: root.overVideo
                 glyph: AudioEngine.muted ? "muted" : "volume"
+                size: Theme.controlSizeSmall * root.uiScale
                 onClicked: AudioEngine.muted = !AudioEngine.muted
             }
             IconButton {
@@ -205,7 +248,7 @@ Rectangle {
                 id: volumeSlider
                 // First thing to go when the window gets narrow: the mute button still works.
                 visible: !root.compact
-                Layout.preferredWidth: 90
+                Layout.preferredWidth: 90 * root.uiScale
                 from: 0; to: 1
                 value: AudioEngine.volume
                 onMoved: { AudioEngine.volume = value; AudioEngine.muted = false }
@@ -213,7 +256,8 @@ Rectangle {
                 background: Rectangle {
                     x: volumeSlider.leftPadding
                     y: volumeSlider.topPadding + volumeSlider.availableHeight / 2 - height / 2
-                    width: volumeSlider.availableWidth; height: 4; radius: 2
+                    width: volumeSlider.availableWidth
+                    height: 4 * root.uiScale; radius: 2 * root.uiScale
                     color: root.barTrack
                     Rectangle {
                         width: volumeSlider.visualPosition * parent.width
@@ -224,19 +268,29 @@ Rectangle {
                 handle: Rectangle {
                     x: volumeSlider.leftPadding + volumeSlider.visualPosition * (volumeSlider.availableWidth - width)
                     y: volumeSlider.topPadding + volumeSlider.availableHeight / 2 - height / 2
-                    width: 12; height: 12; radius: 6
+                    width: 12 * root.uiScale; height: 12 * root.uiScale
+                    radius: width / 2
                     color: Theme.accent
                 }
             }
         }
     }
 
+    // Hours are handled: the old version divided only by 60, so a 70-minute recording read
+    // "70:00". Matches formatDuration in PlaylistModel, which had it right all along.
     function formatTime(ms) {
-        if (!ms || ms <= 0)
-            return "0:00"
+        if (ms === undefined || ms === null || ms < 0)
+            return "-:--"
         const total = Math.floor(ms / 1000)
-        const m = Math.floor(total / 60)
+        const h = Math.floor(total / 3600)
+        const m = Math.floor((total % 3600) / 60)
         const s = total % 60
-        return m + ":" + (s < 10 ? "0" : "") + s
+        const two = function(n) { return n < 10 ? "0" + n : "" + n }
+        return h > 0 ? h + ":" + two(m) + ":" + two(s)
+                     : m + ":" + two(s)
     }
+
+    // Nothing loaded is not the same as being at the start of something. Showing 0:00 at both
+    // ends of an empty seek bar implies a track of zero length.
+    readonly property bool haveMedia: AudioEngine.duration > 0
 }

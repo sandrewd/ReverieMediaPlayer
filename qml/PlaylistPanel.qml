@@ -108,6 +108,12 @@ Rectangle {
 
                 HoverHandler { id: hover }
 
+                // Titles elide, and a title derived from tags no longer resembles the filename at
+                // all, so hovering is the only way back to what is actually on disk.
+                ToolTip.visible: hover.hovered && model.fileName !== ""
+                ToolTip.text: model.fileName
+                ToolTip.delay: 600
+
                 // The background tint alone reads as "selected" and depends on whatever the
                 // user's highlight colour happens to be. A hard edge marks the playing track
                 // unambiguously in every palette.

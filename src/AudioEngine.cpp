@@ -287,6 +287,11 @@ void AudioEngine::setSource(const QString &uriOrPath)
     m_position = 0;
     m_duration = 0;
     m_streamTitle.clear();
+    if (!m_tagTitle.isEmpty() || !m_tagArtist.isEmpty()) {
+        m_tagTitle.clear();
+        m_tagArtist.clear();
+        emit tagsChanged();
+    }
     m_streamStation.clear();
     m_bufferPercent = 100;
     m_sinceProgress.invalidate();
@@ -509,7 +514,20 @@ void AudioEngine::pollBus()
                         m_streamTitle = value;
                         emit streamTitleChanged();
                     }
+                    if (value != m_tagTitle) {
+                        m_tagTitle = value;
+                        emit tagsChanged();
+                    }
                     g_free(title);
+                }
+                gchar *artist = nullptr;
+                if (gst_tag_list_get_string(tags, GST_TAG_ARTIST, &artist) && artist) {
+                    const QString value = QString::fromUtf8(artist);
+                    if (value != m_tagArtist) {
+                        m_tagArtist = value;
+                        emit tagsChanged();
+                    }
+                    g_free(artist);
                 }
                 // Icecast sends the station name as the organization tag.
                 gchar *organization = nullptr;

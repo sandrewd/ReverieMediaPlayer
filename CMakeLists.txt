@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(player VERSION 0.5.0 LANGUAGES CXX)
+project(player VERSION 0.6.0 LANGUAGES CXX)
 
 # Shown in About. Real since 2026-09-16; it was deliberately an obvious placeholder until the
 # project had a remote, because a plausible-looking URL that goes nowhere is worse than one that
@@ -181,6 +181,7 @@ qt_add_qml_module(player
         qml/ColourRow.qml
         qml/ReverieMark.qml
         qml/VideoSurface.qml
+        qml/Ticker.qml
 )
 
 set_target_properties(player PROPERTIES OUTPUT_NAME reverie)

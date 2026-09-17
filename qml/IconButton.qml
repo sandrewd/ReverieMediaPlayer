@@ -11,6 +11,9 @@ AbstractButton {
     // Buttons sitting over the visualiser cannot borrow the shell's text colour: whatever the
     // theme, the thing behind them is arbitrary video and may be any brightness.
     property bool overVideo: false
+    // A latched control - shuffle on, repeat set. Tinted rather than filled, so it reads as
+    // "this mode is on" without competing with the play button.
+    property bool active: false
     property int size: primary ? Theme.controlSize : Theme.controlSizeSmall
 
     implicitWidth: size
@@ -41,7 +44,8 @@ AbstractButton {
             // the glyph has to be picked against it rather than assumed dark.
             property color glyphColor: control.primary
                 ? (Theme.accent.hslLightness > 0.55 ? "#0f1115" : "#f2f4f6")
-                : control.overVideo ? Theme.overlayText : Theme.text
+                : control.active ? Theme.accent
+            : control.overVideo ? Theme.overlayText : Theme.text
             onGlyphColorChanged: canvas.requestPaint()
 
             onPaint: {
@@ -102,6 +106,47 @@ AbstractButton {
                     ctx.fillRect(w * 0.12, h * 0.45, w * 0.76, h * 0.55)
                     ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = Math.max(1, w * 0.12)
                     ctx.beginPath(); ctx.arc(w * 0.74, h * 0.42, w * 0.24, Math.PI, 0); ctx.stroke()
+                    break
+                case "shuffle":
+                    ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = Math.max(1, w * 0.10)
+                    ctx.beginPath()
+                    ctx.moveTo(w * 0.08, h * 0.28); ctx.lineTo(w * 0.34, h * 0.28)
+                    ctx.lineTo(w * 0.66, h * 0.72); ctx.lineTo(w * 0.88, h * 0.72)
+                    ctx.moveTo(w * 0.08, h * 0.72); ctx.lineTo(w * 0.34, h * 0.72)
+                    ctx.lineTo(w * 0.66, h * 0.28); ctx.lineTo(w * 0.88, h * 0.28)
+                    ctx.stroke()
+                    // Arrow heads, so it reads as crossing paths rather than a letter.
+                    ctx.beginPath()
+                    ctx.moveTo(w * 0.92, h * 0.28); ctx.lineTo(w * 0.74, h * 0.18)
+                    ctx.lineTo(w * 0.74, h * 0.38); ctx.closePath(); ctx.fill()
+                    ctx.beginPath()
+                    ctx.moveTo(w * 0.92, h * 0.72); ctx.lineTo(w * 0.74, h * 0.62)
+                    ctx.lineTo(w * 0.74, h * 0.82); ctx.closePath(); ctx.fill()
+                    break
+                case "repeat":
+                case "repeatOne":
+                    ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = Math.max(1, w * 0.10)
+                    ctx.beginPath()
+                    ctx.moveTo(w * 0.24, h * 0.22); ctx.lineTo(w * 0.72, h * 0.22)
+                    ctx.arcTo(w * 0.92, h * 0.22, w * 0.92, h * 0.50, w * 0.20)
+                    ctx.moveTo(w * 0.76, h * 0.78); ctx.lineTo(w * 0.28, h * 0.78)
+                    ctx.arcTo(w * 0.08, h * 0.78, w * 0.08, h * 0.50, w * 0.20)
+                    ctx.stroke()
+                    ctx.beginPath()
+                    ctx.moveTo(w * 0.20, h * 0.10); ctx.lineTo(w * 0.20, h * 0.34)
+                    ctx.lineTo(w * 0.04, h * 0.22); ctx.closePath(); ctx.fill()
+                    ctx.beginPath()
+                    ctx.moveTo(w * 0.80, h * 0.90); ctx.lineTo(w * 0.80, h * 0.66)
+                    ctx.lineTo(w * 0.96, h * 0.78); ctx.closePath(); ctx.fill()
+                    if (control.glyph === "repeatOne") {
+                        // A "1" in the middle: the only difference between the two modes, so it
+                        // has to be legible at 34px.
+                        ctx.lineWidth = Math.max(1, w * 0.09)
+                        ctx.beginPath()
+                        ctx.moveTo(w * 0.42, h * 0.44); ctx.lineTo(w * 0.52, h * 0.38)
+                        ctx.lineTo(w * 0.52, h * 0.64)
+                        ctx.stroke()
+                    }
                     break
                 case "random":
                     ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = Math.max(1, w * 0.09)

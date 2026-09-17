@@ -48,6 +48,12 @@ class AudioEngine : public QObject
     // property; this comes from the stream collection it publishes on the bus.
     Q_PROPERTY(bool hasVideo READ hasVideo NOTIFY hasVideoChanged)
 
+    // Tags as the decoder reports them, for any medium. TagLib stays authoritative for files -
+    // see the playlist - but it reads nothing from a file that carries no tags it understands,
+    // and the decoder often does. These fill that gap rather than override anything.
+    Q_PROPERTY(QString tagTitle READ tagTitle NOTIFY tagsChanged)
+    Q_PROPERTY(QString tagArtist READ tagArtist NOTIFY tagsChanged)
+
     // Equaliser. Ten bands from 29 Hz to 15 kHz, which is what equalizer-10bands offers, sitting
     // between the decode and the tee so the visualiser reacts to what you actually hear.
     Q_PROPERTY(bool equaliserEnabled READ equaliserEnabled WRITE setEqualiserEnabled
@@ -82,6 +88,9 @@ public:
 
     // Fixed by equalizer-10bands; not a preference.
     static constexpr int kEqualiserBands = 10;
+
+    QString tagTitle() const { return m_tagTitle; }
+    QString tagArtist() const { return m_tagArtist; }
 
     bool equaliserEnabled() const { return m_equaliserEnabled; }
     void setEqualiserEnabled(bool enabled);
@@ -135,6 +144,7 @@ signals:
     void bufferingChanged();
     void hasVideoChanged();
     void equaliserChanged();
+    void tagsChanged();
     void endOfStream();
     void errorOccurred(const QString &message);
 
@@ -155,6 +165,8 @@ private:
     // scale would clip, and the fix every player uses is a pre-amp - but §1 says remove knobs
     // rather than add them, so this one is derived from the curve instead of exposed.
     GstElement *m_makeupGain = nullptr;
+    QString m_tagTitle;
+    QString m_tagArtist;
     bool m_equaliserEnabled = false;
     QString m_equaliserPreset;
     QList<qreal> m_equaliserGains;

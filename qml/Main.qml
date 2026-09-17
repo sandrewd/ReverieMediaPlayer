@@ -155,6 +155,14 @@ ApplicationWindow {
 
     // Editing a colour while some other theme is active looked like nothing happening, so
     // choosing one switches to the custom theme rather than quietly storing it for later.
+    // Clamped against the live window width as well as the stored bounds, so a width saved on a
+    // wide screen cannot leave the stage unusable on a narrow one.
+    function clampPlaylistWidth(w) {
+        const limit = Math.max(SystemTheme.kMinPlaylistWidth !== undefined ? 200 : 200,
+                               root.width - 360 - 6)
+        return Math.round(Math.max(200, Math.min(Math.max(200, limit), w)))
+    }
+
     function applyCustomColour(role, picked) {
         switch (role) {
         case "background": SystemTheme.customBackground = picked; break
@@ -192,7 +200,8 @@ ApplicationWindow {
         AudioEngine.togglePlayPause()
     }
 
-    function playNext() { playIndex(PlaylistModel.nextIndex(true)) }
+    // false = the user pressed Next. Repeat-one replays only when a track *ends*.
+    function playNext() { playIndex(PlaylistModel.nextForPlayback(false)) }
     function playPrevious() {
         // Restart the current track if the user is more than a few seconds in. Standard
         // behaviour everywhere, and it stops a mis-press losing your place in a long track.
@@ -218,9 +227,27 @@ ApplicationWindow {
         }
     }
 
+    // Tags arriving from the decoder are offered to the playing row. PlaylistModel only fills
+    // gaps with them - a file that carries real tags keeps them.
     Connections {
         target: AudioEngine
-        function onEndOfStream() { root.playNext() }
+        function onTagsChanged() {
+            if (!PlaylistModel.currentIsStream && PlaylistModel.currentIndex >= 0) {
+                PlaylistModel.supplyMetadata(PlaylistModel.currentIndex,
+                                             AudioEngine.tagTitle, AudioEngine.tagArtist)
+            }
+        }
+    }
+
+    Connections {
+        target: AudioEngine
+        function onEndOfStream() {
+            const next = PlaylistModel.nextForPlayback(true)
+            if (next < 0)
+                AudioEngine.stop()          // end of the list with repeat off
+            else
+                root.playIndex(next)
+        }
         function onErrorOccurred(message) {
             errorBanner.text = message
             errorBanner.visible = true
@@ -389,13 +416,59 @@ ApplicationWindow {
                 color: Theme.border
             }
 
+            // Drag to rebalance the stage against the playlist. Neither may be squashed away:
+            // SystemTheme clamps the stored width, and the maximum here keeps the stage at least
+            // kMinStageWidth wide however narrow the window gets.
+            Item {
+                id: playlistSplitter
+                visible: root.showPlaylist
+                Layout.preferredWidth: visible ? 6 : 0
+                Layout.fillHeight: true
+
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 2
+                    height: 34
+                    radius: 1
+                    color: splitterArea.containsMouse || splitterArea.pressed
+                           ? Theme.accent : Theme.border
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                }
+
+                MouseArea {
+                    id: splitterArea
+                    anchors.fill: parent
+                    anchors.leftMargin: -3
+                    anchors.rightMargin: -3
+                    hoverEnabled: true
+                    cursorShape: Qt.SplitHCursor
+                    property real grabX: 0
+                    property int grabWidth: 0
+                    onPressed: function(mouse) {
+                        grabX = mapToItem(null, mouse.x, 0).x
+                        grabWidth = SystemTheme.playlistWidth
+                    }
+                    onPositionChanged: function(mouse) {
+                        if (!pressed)
+                            return
+                        // The playlist is on the right, so dragging right narrows it.
+                        const dx = mapToItem(null, mouse.x, 0).x - grabX
+                        SystemTheme.playlistWidth = root.clampPlaylistWidth(grabWidth - dx)
+                    }
+                }
+            }
+
             PlaylistPanel {
                 id: playlistPanel
                 visible: Layout.preferredWidth > 0
                 clip: true
-                Layout.preferredWidth: root.showPlaylist ? 340 : 0
+                Layout.preferredWidth: root.showPlaylist
+                                       ? root.clampPlaylistWidth(SystemTheme.playlistWidth) : 0
                 Layout.fillHeight: true
+                // Animate the collapse, but not a drag - easing a width the pointer is already
+                // holding makes the panel lag behind the splitter.
                 Behavior on Layout.preferredWidth {
+                    enabled: !splitterArea.pressed
                     NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
                 }
                 onPlayRequested: function(index) { root.playIndex(index) }
@@ -409,7 +482,7 @@ ApplicationWindow {
         // reserves exactly the height the bar occupies below.
         Item {
             Layout.fillWidth: true
-            Layout.preferredHeight: root.fullscreen ? 0 : transportBar.implicitHeight
+            Layout.preferredHeight: root.fullscreen ? 0 : transportBar.height
         }
     }
 
@@ -418,6 +491,9 @@ ApplicationWindow {
         anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
         compact: root.mini
         showRestore: root.mini
+        // The mini player keeps its own compact height; only the full window honours the size the
+        // user dragged, because mini is pinned to the bar and would fight the drag.
+        height: root.mini ? implicitHeight : SystemTheme.transportHeight
         // Fullscreen is the only state where the bar is over the picture rather than below it.
         overVideo: root.fullscreen
         opacity: root.fullscreen && !root.controlsVisible ? 0.0 : 1.0
@@ -430,14 +506,52 @@ ApplicationWindow {
         onRequestStop: AudioEngine.stop()
     }
 
+    // Drag the top edge of the transport to make it taller or shorter. Everything inside scales
+    // with it - see TransportBar.uiScale - and SystemTheme clamps the result, because a control
+    // scaled down to a few pixels is a target nobody can hit.
+    MouseArea {
+        id: transportGrip
+        visible: !root.mini && !root.fullscreen
+        anchors { left: parent.left; right: parent.right; bottom: transportBar.top }
+        height: 6
+        hoverEnabled: true
+        cursorShape: Qt.SplitVCursor
+        property real grabY: 0
+        property int grabHeight: 0
+        onPressed: function(mouse) {
+            grabY = mapToItem(null, 0, mouse.y).y
+            grabHeight = SystemTheme.transportHeight
+        }
+        onPositionChanged: function(mouse) {
+            if (!pressed)
+                return
+            // The bar is at the bottom, so dragging up makes it taller.
+            const dy = mapToItem(null, 0, mouse.y).y - grabY
+            SystemTheme.transportHeight = grabHeight - dy
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 34
+            height: 2
+            radius: 1
+            color: transportGrip.containsMouse || transportGrip.pressed
+                   ? Theme.accent : Theme.border
+            Behavior on color { ColorAnimation { duration: 120 } }
+        }
+    }
+
     // --- chrome ------------------------------------------------------------------------
 
     Rectangle {
         // Keep clear of the playlist panel: this chrome belongs to the visualiser area. It
         // carries its own backdrop because the preset behind it can be any colour.
         anchors { right: parent.right; top: parent.top; margins: 10 }
+        // Follows the panel's real width, not a constant. It was hardcoded to 350, which put the
+        // chrome on top of the playlist the moment the panel could be dragged wider.
         // The edge handle is vertically centred, so it never reaches this corner.
-        anchors.rightMargin: root.showPlaylist ? 350 : 10
+        anchors.rightMargin: root.showPlaylist ? playlistPanel.width + playlistSplitter.width + 10
+                                               : 10
         visible: !root.mini && (!root.fullscreen || root.controlsVisible)
         opacity: root.controlsVisible ? 1.0 : 0.0
         Behavior on opacity { NumberAnimation { duration: 180 } }
@@ -487,9 +601,13 @@ ApplicationWindow {
         }
 
         MenuItem {
-            text: visualizer.presetName !== "" ? visualizer.presetName : qsTr("No visualisation")
+            // A preset is loaded whether or not anything is playing, but naming it above a black
+            // stage reads as "this is what you are watching", which is the same misreading that
+            // removed the idle animation in the first place. Nothing playing, nothing named.
+            readonly property bool showing: visualizer.active && visualizer.presetName !== ""
+            text: showing ? visualizer.presetName : "—"
             enabled: false
-            ToolTip.visible: hovered && visualizer.presetName !== ""
+            ToolTip.visible: hovered && showing
             ToolTip.text: visualizer.presetName
         }
         MenuSeparator {}
