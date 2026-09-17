@@ -100,6 +100,11 @@ public:
     // emit unconditionally for that reason.
     Q_INVOKABLE void chooseNoEqualiser();
     Q_INVOKABLE void applyCustomEqualiser();
+    // Zeroes the bands without leaving the custom curve. Calling applyEqualiserPreset("Flat")
+    // from inside the custom editor silently moved the selection to the Flat *preset*, so
+    // flattening dropped you out of the mode you were editing in - reported as confusing, and it
+    // was: every other equaliser treats this as "reset my curve".
+    Q_INVOKABLE void flattenCustomEqualiser();
     // Called from the streaming thread; forwards to the item on the GUI thread.
     void deliverVideoFrame(const QImage &frame);
 

@@ -664,6 +664,17 @@ void AudioEngine::applyCustomEqualiser()
     emit equaliserChanged();
 }
 
+void AudioEngine::flattenCustomEqualiser()
+{
+    for (int band = 0; band < kEqualiserBands; ++band)
+        m_equaliserGains[band] = 0.0;
+    m_equaliserPreset.clear();
+    m_equaliserEnabled = true;
+    applyEqualiserToPipeline();
+    saveEqualiser();
+    emit equaliserChanged();
+}
+
 void AudioEngine::resetEqualiser()
 {
     applyEqualiserPreset(QStringLiteral("Flat"));

@@ -62,16 +62,16 @@ ApplicationWindow {
 
     // Our renditions in these four roles, not reproductions of anyone's published scheme.
     readonly property var curatedPalettes: [
-        { name: qsTr("Midnight"),      bg: "#0f1115", sf: "#171a21", ac: "#4da3ff", tx: "#e8eaed" },
-        { name: qsTr("Daylight"),      bg: "#f2f3f5", sf: "#ffffff", ac: "#1f6feb", tx: "#1b1e23" },
-        { name: qsTr("Pastel"),        bg: "#fbf1f6", sf: "#ffffff", ac: "#e39ec1", tx: "#4a3b46" },
-        { name: qsTr("Funky"),         bg: "#1b1035", sf: "#2a1a52", ac: "#ff5fa2", tx: "#ffe7f4" },
-        { name: qsTr("Techno"),        bg: "#05010a", sf: "#12032a", ac: "#00ffd5", tx: "#d7f9ff" },
-        { name: qsTr("High contrast"), bg: "#000000", sf: "#0b0b0b", ac: "#ffff00", tx: "#ffffff" },
-        { name: qsTr("Forest"),        bg: "#10201a", sf: "#17322a", ac: "#6ee7a8", tx: "#e2f5ea" },
-        { name: qsTr("Ember"),         bg: "#1d1210", sf: "#2e1d19", ac: "#ff7a45", tx: "#ffe9df" },
-        { name: qsTr("Slate"),         bg: "#2e3440", sf: "#3b4252", ac: "#88c0d0", tx: "#eceff4" },
-        { name: qsTr("Sepia"),         bg: "#f4ecd8", sf: "#fffaf0", ac: "#a2673f", tx: "#3b2f2a" }
+        { name: qsTr("Midnight"),      bg: "#0f1115", sf: "#171a21", ac: "#4da3ff", tx: "#e8eaed", st: "#05070a" },
+        { name: qsTr("Daylight"),      bg: "#f2f3f5", sf: "#ffffff", ac: "#1f6feb", tx: "#1b1e23", st: "#1b1e23" },
+        { name: qsTr("Pastel"),        bg: "#fbf1f6", sf: "#ffffff", ac: "#e39ec1", tx: "#4a3b46", st: "#3a2f36" },
+        { name: qsTr("Funky"),         bg: "#1b1035", sf: "#2a1a52", ac: "#ff5fa2", tx: "#ffe7f4", st: "#12082a" },
+        { name: qsTr("Techno"),        bg: "#05010a", sf: "#12032a", ac: "#00ffd5", tx: "#d7f9ff", st: "#02000a" },
+        { name: qsTr("High contrast"), bg: "#000000", sf: "#0b0b0b", ac: "#ffff00", tx: "#ffffff", st: "#000000" },
+        { name: qsTr("Forest"),        bg: "#10201a", sf: "#17322a", ac: "#6ee7a8", tx: "#e2f5ea", st: "#081410" },
+        { name: qsTr("Ember"),         bg: "#1d1210", sf: "#2e1d19", ac: "#ff7a45", tx: "#ffe9df", st: "#140b09" },
+        { name: qsTr("Slate"),         bg: "#2e3440", sf: "#3b4252", ac: "#88c0d0", tx: "#eceff4", st: "#232831" },
+        { name: qsTr("Sepia"),         bg: "#f4ecd8", sf: "#fffaf0", ac: "#a2673f", tx: "#3b2f2a", st: "#2a221c" }
     ]
     property bool controlsVisible: true
 
@@ -161,6 +161,7 @@ ApplicationWindow {
         case "surface":    SystemTheme.customSurface = picked; break
         case "accent":     SystemTheme.customAccent = picked; break
         case "text":       SystemTheme.customText = picked; break
+        case "stage":      SystemTheme.customStage = picked; break
         }
         SystemTheme.rememberColour(picked)
         if (SystemTheme.preference !== SystemTheme.Custom)
@@ -249,7 +250,9 @@ ApplicationWindow {
                 // where there is no texture yet, in either theme.
                 Rectangle {
                     anchors.fill: parent
-                    color: "black"
+                    // Black behind video, because letterbox bars should not be tinted; the
+                    // themed stage colour otherwise, so the window has an edge on a dark desktop.
+                    color: AudioEngine.hasVideo ? "black" : Theme.stage
                 }
 
                 // Video takes the stage when the media has any; the visualiser is what an
@@ -764,7 +767,8 @@ ApplicationWindow {
                         required property var modelData
                         text: modelData.name
                         onTriggered: SystemTheme.applyPalettePreset(modelData.bg, modelData.sf,
-                                                                    modelData.ac, modelData.tx)
+                                                                    modelData.ac, modelData.tx,
+                                                                    modelData.st)
                     }
                     onObjectAdded: function(index, object) { palettesMenu.insertItem(index, object) }
                     onObjectRemoved: function(index, object) { palettesMenu.removeItem(object) }
@@ -867,7 +871,7 @@ ApplicationWindow {
             Label {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
-                text: qsTr("Pick four colours and the rest is worked out from them, so nothing ends up unreadable.")
+                text: qsTr("Pick five colours and the rest is worked out from them, so nothing ends up unreadable. Visualiser is the area behind the artwork.")
                 color: Theme.textDim
                 font.pixelSize: 11
             }
@@ -898,6 +902,12 @@ ApplicationWindow {
                 label: qsTr("Text")
                 colour: SystemTheme.customText
                 onColourPicked: function(picked) { root.applyCustomColour("text", picked) }
+            }
+            ColourRow {
+                Layout.fillWidth: true
+                label: qsTr("Visualiser")
+                colour: SystemTheme.customStage
+                onColourPicked: function(picked) { root.applyCustomColour("stage", picked) }
             }
 
             RowLayout {
@@ -1051,7 +1061,9 @@ ApplicationWindow {
     Dialog {
         id: equaliserDialog
         title: qsTr("Custom equaliser")
-        modal: true
+        // Deliberately not modal: an equaliser is adjusted *while listening*, and a modal dialog
+        // blocks the transport, the playlist and the menus while you do it.
+        modal: false
         anchors.centerIn: parent
         width: Math.min(460, root.width - 60)
         standardButtons: Dialog.Close
@@ -1145,7 +1157,7 @@ ApplicationWindow {
                 Item { Layout.fillWidth: true }
                 Button {
                     text: qsTr("Flatten")
-                    onClicked: AudioEngine.applyEqualiserPreset("Flat")
+                    onClicked: AudioEngine.flattenCustomEqualiser()
                 }
             }
         }

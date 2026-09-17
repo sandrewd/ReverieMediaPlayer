@@ -28,6 +28,11 @@ class SystemTheme : public QObject
     Q_PROPERTY(QColor customSurface READ customSurface WRITE setCustomSurface NOTIFY customChanged)
     Q_PROPERTY(QColor customAccent READ customAccent WRITE setCustomAccent NOTIFY customChanged)
     Q_PROPERTY(QColor customText READ customText WRITE setCustomText NOTIFY customChanged)
+    // A fifth role, added 2026-09-17 at the user's request and against the earlier note that the
+    // four never grow. The visualiser stage is most of the window and is black when nothing is
+    // playing, which on a black desktop leaves the window with no visible edge at all. It is a
+    // real surface, so it belongs in the palette rather than in a settings panel of its own.
+    Q_PROPERTY(QColor customStage READ customStage WRITE setCustomStage NOTIFY customChanged)
     Q_PROPERTY(QStringList recentColours READ recentColours NOTIFY recentColoursChanged)
     Q_PROPERTY(int recentColoursLimit READ recentColoursLimit CONSTANT)
     Q_PROPERTY(QVariantList savedPalettes READ savedPalettes NOTIFY savedPalettesChanged)
@@ -49,6 +54,7 @@ public:
     QColor customSurface() const { return m_customSurface; }
     QColor customAccent() const { return m_customAccent; }
     QColor customText() const { return m_customText; }
+    QColor customStage() const { return m_customStage; }
     QStringList recentColours() const { return m_recentColours; }
     int recentColoursLimit() const { return kRecentLimit; }
     QVariantList savedPalettes() const;
@@ -56,6 +62,7 @@ public:
     void setCustomSurface(const QColor &colour);
     void setCustomAccent(const QColor &colour);
     void setCustomText(const QColor &colour);
+    void setCustomStage(const QColor &colour);
 
     // Seeds the custom colours from whichever theme is showing, so editing starts from
     // something that already works rather than from black.
@@ -63,7 +70,8 @@ public:
 
     // Applies four colours at once and switches to the custom theme.
     Q_INVOKABLE void applyPalettePreset(const QColor &background, const QColor &surface,
-                                        const QColor &accent, const QColor &text);
+                                        const QColor &accent, const QColor &text,
+                                        const QColor &stage);
 
     // A deliberately short history of colours the user has chosen, newest first. Capped, so
     // it cannot grow without bound; picking a colour already in the list moves it to the
@@ -115,6 +123,7 @@ private:
     QColor m_customSurface;
     QColor m_customAccent;
     QColor m_customText;
+    QColor m_customStage;
     static constexpr int kRecentLimit = 5;
     static constexpr int kPaletteNameLimit = 24;
     QStringList m_recentColours;

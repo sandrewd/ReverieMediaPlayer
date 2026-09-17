@@ -19,6 +19,11 @@ QtObject {
                                                : (dark ? "#e8eaed" : "#1b1e23")
     readonly property color accent:     custom ? SystemTheme.customAccent
                                                : (dark ? "#4da3ff" : "#1f6feb")
+    // The visualiser stage. Dark in both schemes on purpose - what sits on it is video or a
+    // Milkdrop preset, which read best against dark - but not pure black, because a black stage
+    // on a black desktop leaves the window with no visible edge.
+    readonly property color stage:      custom ? SystemTheme.customStage
+                                               : (dark ? "#08090c" : "#1b1e23")
 
     // Derived. Nudging towards or away from the surface keeps hover states and borders
     // visible whichever direction the user's theme leans.

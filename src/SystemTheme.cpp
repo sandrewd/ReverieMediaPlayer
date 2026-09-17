@@ -26,6 +26,12 @@ SystemTheme::SystemTheme(QObject *parent)
     m_customSurface = readColour("appearance/surface", "#171a21");
     m_customAccent = readColour("appearance/accent", "#4da3ff");
     m_customText = readColour("appearance/text", "#e8eaed");
+    // Defaults to the window background rather than black: a config written before this role
+    // existed should still give the visualiser area a visible edge. The QByteArray is held in a
+    // named local because readColour takes a const char* - handing it .constData() on a temporary
+    // would dangle the moment the statement ended.
+    const QByteArray stageFallback = m_customBackground.name().toUtf8();
+    m_customStage = readColour("appearance/stage", stageFallback.constData());
 
     if (qApp) {
         m_platformPalette = qApp->palette();
@@ -186,13 +192,27 @@ void SystemTheme::setCustomText(const QColor &colour)
     emit customChanged();
 }
 
+void SystemTheme::setCustomStage(const QColor &colour)
+{
+    if (!colour.isValid() || colour == m_customStage)
+        return;
+    m_customStage = colour;
+    QSettings().setValue(QStringLiteral("appearance/stage"), colour.name());
+    applyPalette();
+    emit customChanged();
+}
+
 void SystemTheme::applyPalettePreset(const QColor &background, const QColor &surface,
-                                     const QColor &accent, const QColor &text)
+                                     const QColor &accent, const QColor &text,
+                                     const QColor &stage)
 {
     setCustomBackground(background);
     setCustomSurface(surface);
     setCustomAccent(accent);
     setCustomText(text);
+    // Palettes saved before the stage role existed carry four colours; fall back to the
+    // background rather than to black, so an old palette still distinguishes the window.
+    setCustomStage(stage.isValid() ? stage : background);
     setPreference(Custom);
 }
 
@@ -218,13 +238,16 @@ QVariantList SystemTheme::savedPalettes() const
     QVariantList result;
     for (const QString &entry : m_savedPalettes) {
         const QStringList parts = entry.split(QLatin1Char('\x1f'));
-        if (parts.size() != 5)
+        // Five is a palette saved before the stage role existed; six includes it.
+        if (parts.size() != 5 && parts.size() != 6)
             continue;
         result.append(QVariantMap{{QStringLiteral("name"), parts.at(0)},
                                   {QStringLiteral("background"), parts.at(1)},
                                   {QStringLiteral("surface"), parts.at(2)},
                                   {QStringLiteral("accent"), parts.at(3)},
-                                  {QStringLiteral("text"), parts.at(4)}});
+                                  {QStringLiteral("text"), parts.at(4)},
+                                  {QStringLiteral("stage"),
+                                   parts.size() == 6 ? parts.at(5) : parts.at(1)}});
     }
     return result;
 }
@@ -236,7 +259,8 @@ void SystemTheme::savePalette(const QString &name)
         return;
 
     const QString entry = QStringList{trimmed, m_customBackground.name(), m_customSurface.name(),
-                                      m_customAccent.name(), m_customText.name()}
+                                      m_customAccent.name(), m_customText.name(),
+                                      m_customStage.name()}
                               .join(QLatin1Char('\x1f'));
 
     // Saving under a name that already exists replaces it rather than making a duplicate.
@@ -274,7 +298,8 @@ void SystemTheme::applySavedPalette(const QString &name)
         if (parts.size() != 5 || parts.at(0).compare(name, Qt::CaseInsensitive) != 0)
             continue;
         applyPalettePreset(QColor(parts.at(1)), QColor(parts.at(2)),
-                           QColor(parts.at(3)), QColor(parts.at(4)));
+                           QColor(parts.at(3)), QColor(parts.at(4)),
+                           parts.size() == 6 ? QColor(parts.at(5)) : QColor());
         return;
     }
 }
@@ -286,6 +311,7 @@ void SystemTheme::seedCustomFromCurrent()
     setCustomSurface(QColor(isDark ? "#171a21" : "#ffffff"));
     setCustomAccent(QColor(isDark ? "#4da3ff" : "#1f6feb"));
     setCustomText(QColor(isDark ? "#e8eaed" : "#1b1e23"));
+    setCustomStage(QColor(isDark ? "#0f1115" : "#f2f3f5"));
 }
 
 void SystemTheme::setPreference(Preference preference)
