@@ -644,6 +644,26 @@ void AudioEngine::setEqualiserEnabled(bool enabled)
     emit equaliserChanged();
 }
 
+void AudioEngine::chooseNoEqualiser()
+{
+    m_equaliserEnabled = false;
+    applyEqualiserToPipeline();
+    saveEqualiser();
+    emit equaliserChanged();
+}
+
+void AudioEngine::applyCustomEqualiser()
+{
+    // The stored curve is already whatever was last edited; this marks it as the chosen one and
+    // turns the equaliser on, so picking "Custom" is a real selection rather than just a way to
+    // open the editor.
+    m_equaliserPreset.clear();
+    m_equaliserEnabled = true;
+    applyEqualiserToPipeline();
+    saveEqualiser();
+    emit equaliserChanged();
+}
+
 void AudioEngine::resetEqualiser()
 {
     applyEqualiserPreset(QStringLiteral("Flat"));

@@ -812,7 +812,7 @@ ApplicationWindow {
                 checkable: true
                 ButtonGroup.group: equaliserGroup
                 checked: !AudioEngine.equaliserEnabled
-                onTriggered: AudioEngine.equaliserEnabled = false
+                onTriggered: AudioEngine.chooseNoEqualiser()
             }
             MenuSeparator {}
             // Instantiator, not Repeater: a Menu builds its items through insertItem, and a
@@ -839,7 +839,7 @@ ApplicationWindow {
                 checkable: true
                 ButtonGroup.group: equaliserGroup
                 checked: AudioEngine.equaliserEnabled && AudioEngine.equaliserPreset === ""
-                onTriggered: equaliserDialog.open()
+                onTriggered: { AudioEngine.applyCustomEqualiser(); equaliserDialog.open() }
             }
         }
 
@@ -1101,7 +1101,13 @@ ApplicationWindow {
                         }
                         Slider {
                             id: bandSlider
-                            Layout.alignment: Qt.AlignHCenter
+                            // Fills the column rather than centring at its implicit width. The
+                            // custom background sets `width: 4` and no implicitWidth, so the
+                            // Slider's own bounding box collapsed to nothing: the handle was
+                            // painted outside its bounds and looked perfectly normal while
+                            // catching no mouse events at all, which read as "the sliders do not
+                            // do anything". The hit area is the whole column now.
+                            Layout.fillWidth: true
                             Layout.fillHeight: true
                             orientation: Qt.Vertical
                             from: -24; to: 12

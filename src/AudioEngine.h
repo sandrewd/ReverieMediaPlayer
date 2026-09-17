@@ -93,6 +93,13 @@ public:
     Q_INVOKABLE void applyEqualiserPreset(const QString &name);
     Q_INVOKABLE void setEqualiserBand(int band, qreal gainDb);
     Q_INVOKABLE void resetEqualiser();
+    // These two exist so the menu's exclusive group survives re-selecting the active entry.
+    // A MenuItem's `checked` binding is detached the moment QML assigns to it on click, and it
+    // only comes back when the property it was bound to signals a change - so an item whose
+    // handler is a no-op unchecks itself and the group falls to whatever else matches. Both
+    // emit unconditionally for that reason.
+    Q_INVOKABLE void chooseNoEqualiser();
+    Q_INVOKABLE void applyCustomEqualiser();
     // Called from the streaming thread; forwards to the item on the GUI thread.
     void deliverVideoFrame(const QImage &frame);
 
