@@ -44,9 +44,16 @@ ApplicationWindow {
     // only width stays adjustable - width is the one dimension that buys anything, since a
     // longer track title has somewhere to go.
     readonly property int miniHeight: transportBar.implicitHeight
+    // Pinned to the transport's height only once the window has actually taken that size. Driving
+    // these straight from `mini` changed the limits in the same pass as the height, and on Wayland
+    // a resize is a request the compositor confirms later - so the request was clamped against
+    // limits that had not settled and the window kept its old size with the controls laid out for
+    // the new one. On X11 the resize is synchronous and it happened to work, which is exactly why
+    // this was invisible here for so long.
+    property bool heightLocked: false
     minimumWidth: mini ? 320 : Theme.minWindowWidth
-    minimumHeight: mini ? miniHeight : Theme.minWindowHeight
-    maximumHeight: mini ? miniHeight : 16777215
+    minimumHeight: heightLocked ? miniHeight : Theme.minWindowHeight
+    maximumHeight: heightLocked ? miniHeight : 16777215
 
     property bool mini: false
     property bool fullscreen: false
@@ -101,11 +108,25 @@ ApplicationWindow {
     }
 
     onMiniChanged: {
+        // Deferred a pass on purpose: `miniHeight` follows the transport bar's implicit height,
+        // which follows `compact`, which follows `mini` - so at this instant it still reports the
+        // height of the mode we are leaving.
+        Qt.callLater(applyModeSize)
+    }
+
+    // The limits move before the size, and in the direction that admits it. Getting this
+    // backwards is what broke the mini player: the height was set while minimumHeight was still
+    // the full window's 320, so a request for 62 was clamped straight back up to 320 and the
+    // window sat there with the controls at the bottom of a mostly empty pane. X11 hid it because
+    // a later resize re-clamped against the settled limits; Wayland has no such second chance.
+    function applyModeSize() {
         if (mini) {
             root.showNormal()
-            root.width = Math.max(minimumWidth, 460)
-            root.height = miniHeight
+            root.heightLocked = true
+            root.width = Math.max(320, 460)
+            root.height = root.miniHeight
         } else {
+            root.heightLocked = false
             root.width = 1100
             root.height = 680
         }

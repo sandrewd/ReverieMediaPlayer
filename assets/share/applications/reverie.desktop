@@ -10,3 +10,8 @@ Categories=AudioVideo;Player;
 MimeType=audio/mpeg;audio/flac;audio/ogg;audio/x-vorbis+ogg;audio/mp4;audio/x-wav;audio/x-m4a;audio/opus;audio/x-mpegurl;audio/aac;audio/x-aiff;audio/x-ms-wma;video/mp4;video/x-matroska;video/webm;video/x-msvideo;video/quicktime;video/mpeg;video/x-ms-wmv;video/ogg;video/3gpp;video/mp2t;
 StartupNotify=true
 StartupWMClass=reverie
+# One playlist means one window: a second would be an independent player sharing nothing. Saying
+# so stops GNOME and Cinnamon offering "New Window", which would otherwise launch a process that
+# hands off to the running instance and exits, leaving the user staring at nothing.
+X-GNOME-SingleWindow=true
+SingleMainWindow=true

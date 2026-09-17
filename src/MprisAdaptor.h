@@ -41,6 +41,9 @@ signals:
     // Files handed to us by a second process, or by anything calling MPRIS OpenUri. The
     // playlist is replaced and playback starts - see the handler in main.cpp.
     void openFilesRequested(const QStringList &uris);
+    // Carries the launching process's XDG activation token. Without one a Wayland compositor is
+    // entitled to ignore a client that asks to raise itself, and does.
+    void activateRequested(const QString &token);
 
 private slots:
     void emitPlaybackStatusChanged();
@@ -98,6 +101,7 @@ public:
 
 public slots:
     void OpenFiles(const QStringList &uris);
+    void Activate(const QString &activationToken);
 
 private:
     MprisPlayer *m_owner;

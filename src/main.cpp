@@ -21,6 +21,7 @@
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
 #include <QDBusInterface>
+#include <QWindow>
 
 namespace {
 
@@ -145,14 +146,18 @@ int main(int argc, char *argv[])
                                        QString::fromLatin1(MprisPlayer::appInterface()), bus);
                 reverie.call(QStringLiteral("OpenFiles"), uris);
             }
-            // Bring the existing window forward either way, so launching the application twice
-            // looks like focusing it rather than doing nothing. Note this is a request the
-            // compositor may refuse: on Wayland a client cannot raise itself without a valid
-            // activation token, so expect this to be a no-op there.
-            QDBusInterface root(QString::fromLatin1(MprisPlayer::serviceName()),
-                                QString::fromLatin1(MprisPlayer::objectPath()),
-                                QStringLiteral("org.mpris.MediaPlayer2"), bus);
-            root.call(QStringLiteral("Raise"));
+            // Bring the existing window forward, so launching the application twice looks like
+            // focusing it rather than doing nothing. The desktop gives the process it launches an
+            // activation token; handing that over is what lets the running instance raise itself
+            // on Wayland, where a client without one is ignored. X11's equivalent is
+            // DESKTOP_STARTUP_ID.
+            QString token = qEnvironmentVariable("XDG_ACTIVATION_TOKEN");
+            if (token.isEmpty())
+                token = qEnvironmentVariable("DESKTOP_STARTUP_ID");
+            QDBusInterface reverieApp(QString::fromLatin1(MprisPlayer::serviceName()),
+                                      QString::fromLatin1(MprisPlayer::objectPath()),
+                                      QString::fromLatin1(MprisPlayer::appInterface()), bus);
+            reverieApp.call(QStringLiteral("Activate"), token);
             qInfo("another instance owns %s; handed it %lld file(s) and exiting",
                   MprisPlayer::serviceName(), static_cast<long long>(handoff.size()));
             return 0;
@@ -248,6 +253,21 @@ int main(int argc, char *argv[])
     QObject::connect(mpris, &MprisPlayer::raiseRequested, window, [window]() {
         QMetaObject::invokeMethod(window, "show");
         QMetaObject::invokeMethod(window, "raise");
+        if (auto *w = qobject_cast<QWindow *>(window))
+            w->requestActivate();
+    });
+    // A relaunch: the process that was started handed us its activation token before exiting.
+    // Qt's Wayland plugin reads the token from the environment when a window asks to be
+    // activated, so putting it there is what turns requestActivate() from a request the
+    // compositor may ignore into one it will honour. Harmless on X11, where raise() suffices.
+    QObject::connect(mpris, &MprisPlayer::activateRequested, window,
+                     [window](const QString &token) {
+        if (!token.isEmpty())
+            qputenv("XDG_ACTIVATION_TOKEN", token.toUtf8());
+        QMetaObject::invokeMethod(window, "show");
+        QMetaObject::invokeMethod(window, "raise");
+        if (auto *w = qobject_cast<QWindow *>(window))
+            w->requestActivate();
     });
     QObject::connect(mpris, &MprisPlayer::quitRequested, &app, &QGuiApplication::quit);
     mpris->registerService();

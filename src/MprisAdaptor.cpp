@@ -244,3 +244,8 @@ void ReverieAppAdaptor::OpenFiles(const QStringList &uris)
     if (!uris.isEmpty())
         emit m_owner->openFilesRequested(uris);
 }
+
+void ReverieAppAdaptor::Activate(const QString &activationToken)
+{
+    emit m_owner->activateRequested(activationToken);
+}
