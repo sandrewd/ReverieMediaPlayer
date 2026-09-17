@@ -1,10 +1,16 @@
 cmake_minimum_required(VERSION 3.22)
 project(player VERSION 0.3.0 LANGUAGES CXX)
 
-# Shown in About. The homepage is a placeholder until the project actually has a remote -
-# better an obvious placeholder than a plausible-looking URL that goes nowhere.
-set(PLAYER_HOMEPAGE "https://example.invalid/reverie" CACHE STRING
+# Shown in About. Real since 2026-09-16; it was deliberately an obvious placeholder until the
+# project had a remote, because a plausible-looking URL that goes nowhere is worse than one that
+# announces itself. FORCE so an older cache carrying the placeholder is overwritten.
+set(PLAYER_HOMEPAGE "https://github.com/sandrewd/ReverieMediaPlayer" CACHE STRING
     "Project homepage shown in the About dialog" FORCE)
+# Reverse-DNS application ID, derived from the repository host. Flathub requires the ID to match
+# a domain or forge account the project actually controls, and it is also the .desktop, icon and
+# metainfo basename once packaged there.
+set(PLAYER_APP_ID "io.github.sandrewd.ReverieMediaPlayer" CACHE STRING
+    "Reverse-DNS application ID used for packaging")
 set(PLAYER_LICENSE "MIT" CACHE STRING
     "Licence Reverie itself is released under, shown in the About dialog")
 
@@ -202,3 +208,51 @@ target_link_libraries(player PRIVATE
     libprojectM::projectM
     libprojectM::playlist
 )
+
+# --- packaging ------------------------------------------------------------------------------
+#
+# A .deb first, deliberately, even though Flatpak is the distribution goal. The immediate need is
+# a second machine to test A/V sync on, and a sandbox introduces audio routing through portals,
+# GL driver access and bus-name permissions - all of which would muddy exactly that measurement.
+# Zorin 18 and Mint 22.3 are both Ubuntu 24.04, so one .deb covers both targets.
+#
+# projectM is vendored into a private ${CMAKE_INSTALL_LIBDIR}/reverie, so dpkg-shlibdeps has to be
+# told where it is or it reports our own libraries as unresolved dependencies.
+set(CPACK_PACKAGE_NAME "reverie")
+set(CPACK_PACKAGE_VENDOR "Reverie")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Media player with built-in Milkdrop-style visualisations")
+set(CPACK_PACKAGE_HOMEPAGE_URL "${PLAYER_HOMEPAGE}")
+set(CPACK_PACKAGE_CONTACT "Reverie <noreply@example.invalid>")
+set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
+set(CPACK_STRIP_FILES ON)
+
+set(CPACK_GENERATOR "DEB")
+set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+set(CPACK_DEBIAN_PACKAGE_SECTION "sound")
+set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+# The build tree's copy, not the install prefix: at package time nothing has been installed yet,
+# and pointing dpkg-shlibdeps at a directory that does not exist fails the whole run.
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS_PRIVATE_DIRS "${_pm_libdir}")
+
+# Runtime dependencies shlibdeps cannot see. QML modules are loaded by name at runtime rather
+# than linked, and GStreamer decoders are plugins autoplugged by playbin3 - nothing in the ELF
+# headers mentions either, so both have to be declared by hand. Without the decoders the
+# application starts perfectly and then refuses to play anything, which is the worst failure to
+# debug on someone else's machine.
+set(CPACK_DEBIAN_PACKAGE_DEPENDS
+    "qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, \
+qml6-module-qtquick-dialogs, qml6-module-qtquick-window, qml6-module-qtqml-workerscript, \
+gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, gstreamer1.0-plugins-bad, \
+gstreamer1.0-libav, libqt6svg6")
+# Not a hard dependency: the visualiser works on llvmpipe, it is just slower. See section 4.
+set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "gstreamer1.0-pulseaudio | gstreamer1.0-alsa")
+
+set(CPACK_DEBIAN_PACKAGE_DESCRIPTION
+"Reverie plays music and video with visualisations rendered in the same
+ window, rather than as a separate application. It has transport controls,
+ one playlist, internet radio streams and a mini-player mode, and it does
+ not manage a library.")
+
+include(CPack)

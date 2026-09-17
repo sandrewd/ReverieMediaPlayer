@@ -2,7 +2,14 @@ build/
 .cache/
 compile_commands.json
 *.user
+
+# The preset pack is fetched separately - see README. 157 MB, its own project.
 assets/presets/
+
+# Local test media, never published.
 assets/test-audio/
-_reference/extracted/
 assets/test-video/
+
+# Working notes and design handoff material: local only.
+CLAUDE.md
+_reference/
