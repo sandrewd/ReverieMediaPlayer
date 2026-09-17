@@ -1,5 +1,6 @@
 #include "AudioEngine.h"
 #include <cmath>
+#include <cstring>
 #include <QSettings>
 
 #include <QDebug>
@@ -172,14 +173,30 @@ void AudioEngine::buildPipeline()
             m_makeupGain = nullptr;
         }
     }
-    // Which concrete sink autoaudiosink picks is the first thing worth knowing when a machine
-    // is silent, and it is invisible otherwise.
-    if (sink) {
+    // autoaudiosink falls back to a *fake* sink when it cannot open a real device, and says
+    // nothing. Everything then behaves perfectly - the pipeline plays, the position advances, the
+    // visualiser runs off the tee - while no audio ever reaches the sound server. That is the
+    // worst possible failure for a media player, and it is exactly what one machine was doing.
+    //
+    // So the fallback is detected and reported rather than accepted in silence.
+    if (sink && GST_IS_BIN(sink)) {
         g_signal_connect(sink, "element-added",
-                         G_CALLBACK(+[](GstBin *, GstElement *element, gpointer) {
-                             qInfo("audio: output sink is %s",
-                                   gst_element_get_name(element));
-                         }), nullptr);
+                         G_CALLBACK(+[](GstBin *, GstElement *element, gpointer data) {
+                             auto *self = static_cast<AudioEngine *>(data);
+                             const gchar *name = gst_element_get_name(element);
+                             qInfo("audio: output sink is %s", name);
+                             if (name && strstr(name, "fake")) {
+                                 qWarning("audio: no real output device could be opened - "
+                                          "autoaudiosink fell back to a fake sink, so there "
+                                          "will be no sound");
+                                 QMetaObject::invokeMethod(
+                                     self, [self]() {
+                                         emit self->errorOccurred(
+                                             tr("No audio output could be opened, so there is no "
+                                                "sound. Check the system's sound settings."));
+                                     }, Qt::QueuedConnection);
+                             }
+                         }), this);
     }
 
     if (!equaliserLinked) {
