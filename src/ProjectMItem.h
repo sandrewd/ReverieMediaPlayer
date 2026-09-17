@@ -52,8 +52,8 @@ class ProjectMItem : public QQuickFramebufferObject
     // scheduled this way. See the note in the brief.
     Q_PROPERTY(bool yieldToDesktop READ yieldToDesktop WRITE setYieldToDesktop NOTIFY yieldToDesktopChanged)
 
-    // Stats for the frame-time overlay. Observed smoothness over RustDesk tells you about
-    // the video stream, not about us, so the app has to report its own numbers.
+    // Stats for the frame-time overlay. Observed smoothness over a remote desktop tells you
+    // about the video stream, not about us, so the app has to report its own numbers.
     Q_PROPERTY(qreal frameTimeMs READ frameTimeMs NOTIFY statsChanged)
     Q_PROPERTY(qreal fps READ fps NOTIFY statsChanged)
     Q_PROPERTY(QSize renderSize READ renderSize NOTIFY statsChanged)

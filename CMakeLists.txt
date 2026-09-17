@@ -223,7 +223,7 @@ set(CPACK_PACKAGE_VENDOR "Reverie")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Media player with built-in Milkdrop-style visualisations")
 set(CPACK_PACKAGE_HOMEPAGE_URL "${PLAYER_HOMEPAGE}")
-set(CPACK_PACKAGE_CONTACT "Reverie <noreply@example.invalid>")
+set(CPACK_PACKAGE_CONTACT "Reverie Media Player <sandrewd@users.noreply.github.com>")
 set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
 set(CPACK_STRIP_FILES ON)
 

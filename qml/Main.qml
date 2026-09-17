@@ -288,7 +288,7 @@ ApplicationWindow {
                     onPositionChanged: root.revealControls()
                 }
 
-                // Frame-time overlay, required from the first commit: over RustDesk observed
+                // Frame-time overlay, required from the first commit: over a remote desktop the observed
                 // smoothness describes the video stream, not the application.
                 Rectangle {
                     visible: overlayToggle.checked
