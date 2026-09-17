@@ -288,24 +288,37 @@ ApplicationWindow {
                 // Double-click the visualiser for fullscreen, the same gesture every video
                 // player uses. Moving the mouse brings the controls back.
                 TapHandler {
-                    onDoubleTapped: root.fullscreen = !root.fullscreen
+                    // Guarded for the same reason: with button filtering skipped, a right-click
+                    // double-tap would otherwise toggle fullscreen as well as open the picker.
+                    onDoubleTapped: function(point, button) {
+                        if (button === Qt.LeftButton || button === Qt.NoButton)
+                            root.fullscreen = !root.fullscreen
+                    }
                 }
-                // Mouse and touchpad only, and this is the important part: `acceptedButtons`
-                // filters *mouse buttons*, and a touch point carries no button at all, so the
-                // Qt.RightButton restriction does not apply to touch. On a touchscreen a plain
-                // tap therefore reached this handler - and because a tap on the chrome is also
-                // delivered to the button under the finger, tapping Options opened the options
-                // menu and this one at the same time, with the preset picker drawn on top.
+                // The button is checked in the handler, not left to `acceptedButtons`, because
+                // that filter is not always applied. Qt only consults device type, pointer type
+                // and modifiers when deciding whether a handler wants an event; button filtering
+                // is skipped for devices it considers touch-like. Under Wayland an ordinary USB
+                // mouse can be reported as QPointingDevice("touchpad" TouchPad ptrType=Finger),
+                // and then this handler accepted *left* clicks - so clicking anything over the
+                // visualiser, including the chrome buttons, also opened the preset picker.
+                //
+                // Diagnosed from qt.quick.handler logging on the affected machine: both this
+                // handler and the double-tap one below reported WANTS on a MouseButtonPress
+                // LeftButton and each took a passive grab.
                 TapHandler {
-                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                     acceptedButtons: Qt.RightButton
                     // Nothing in this menu applies to video: there is no preset on screen to
                     // change, lock or randomise.
-                    onTapped: if (!AudioEngine.hasVideo) presetMenu.popup()
+                    onTapped: function(point, button) {
+                        if (button !== Qt.RightButton)
+                            return
+                        if (!AudioEngine.hasVideo)
+                            presetMenu.popup()
+                    }
                 }
                 // Touch has no second button, so the picker gets the gesture touch actually uses
-                // for a context menu. Without this, restricting the handler above would simply
-                // remove the feature on a touchscreen.
+                // for a context menu.
                 TapHandler {
                     acceptedDevices: PointerDevice.TouchScreen
                     onLongPressed: if (!AudioEngine.hasVideo) presetMenu.popup()
