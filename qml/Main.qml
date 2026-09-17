@@ -599,6 +599,10 @@ ApplicationWindow {
             title: qsTr("Presets")
             MenuItem {
                 text: qsTr("Curated set")
+                // A package that ships only the curated presets installs no list, and then this
+                // switches between a set and itself. Hide it rather than have it do nothing.
+                visible: initialCuratedList !== ""
+                height: visible ? implicitHeight : 0
                 checkable: true
                 checked: visualizer.curatedList !== ""
                 onTriggered: {

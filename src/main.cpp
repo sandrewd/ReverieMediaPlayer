@@ -116,21 +116,47 @@ int main(int argc, char *argv[])
                                  "[files...]");
     parser.process(app);
 
-    // Find the preset library without requiring an install step during development.
-    QString presetsDir = parser.isSet(presetsOption) ? parser.value(presetsOption) : QString();
-    if (presetsDir.isEmpty()) {
-        for (const QString &candidate : {QStringLiteral("assets/presets"),
-                                         QCoreApplication::applicationDirPath() + "/assets/presets",
-                                         QStringLiteral(PLAYER_SOURCE_DIR "/assets/presets")}) {
-            if (QFileInfo::exists(candidate)) {
-                presetsDir = candidate;
-                break;
-            }
+    // Find the preset library. The order matters and is not arbitrary: an installed copy has to
+    // win on a user's machine, and the source tree has to win during development, but neither may
+    // be assumed to exist. `PLAYER_SOURCE_DIR` is a developer convenience compiled into the
+    // binary and is meaningless on anyone else's machine - resolving through it alone is why an
+    // installed build found no presets at all.
+    //
+    // QStandardPaths::GenericDataLocation searches XDG_DATA_HOME and every XDG_DATA_DIRS entry,
+    // which covers ~/.local/share, /usr/share and - importantly for packaging - the /app/share a
+    // Flatpak runtime puts on that path. So one lookup handles every install layout we care about
+    // without the binary needing to know which one it is in.
+    const auto findResource = [](const QString &relative) -> QString {
+        const QString shared = QStandardPaths::locate(
+            QStandardPaths::GenericDataLocation, QStringLiteral("reverie/") + relative,
+            relative.endsWith(QStringLiteral(".txt")) ? QStandardPaths::LocateFile
+                                                      : QStandardPaths::LocateDirectory);
+        if (!shared.isEmpty())
+            return shared;
+        // Relocatable: a prefix moved wholesale still resolves relative to the executable.
+        for (const QString &candidate : {
+                 QCoreApplication::applicationDirPath() + QStringLiteral("/../share/reverie/") + relative,
+                 QCoreApplication::applicationDirPath() + QStringLiteral("/assets/") + relative,
+                 QStringLiteral("assets/") + relative,
+                 QStringLiteral(PLAYER_SOURCE_DIR "/assets/") + relative}) {
+            if (QFileInfo::exists(candidate))
+                return QFileInfo(candidate).absoluteFilePath();
         }
-    }
-    QString curatedList = QStringLiteral(PLAYER_SOURCE_DIR "/assets/presets-curated.txt");
-    if (!QFileInfo::exists(curatedList))
-        curatedList.clear();
+        return QString();
+    };
+
+    QString presetsDir = parser.isSet(presetsOption) ? parser.value(presetsOption) : QString();
+    if (presetsDir.isEmpty())
+        presetsDir = findResource(QStringLiteral("presets"));
+    if (presetsDir.isEmpty())
+        qWarning("no preset library found; the visualiser will have nothing to show");
+    else
+        qInfo("preset library: %s", qPrintable(presetsDir));
+
+    // Only meaningful when the library is larger than the curated selection. A package that ships
+    // the curated set alone installs no list, and the menu item that switches between them hides
+    // itself rather than appearing to do nothing.
+    const QString curatedList = findResource(QStringLiteral("presets-curated.txt"));
 
     QQmlApplicationEngine engine;
 

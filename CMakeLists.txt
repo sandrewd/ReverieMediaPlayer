@@ -92,6 +92,44 @@ install(FILES ${CMAKE_SOURCE_DIR}/assets/share/applications/reverie.desktop
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
 install(TARGETS player RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+# The preset library has to be installed, not merely found in the source tree: PLAYER_SOURCE_DIR
+# is a developer convenience and means nothing on anyone else's machine.
+#
+# What ships is the curated 480, about 5 MB. The full corpus is 157 MB and 9,795 files, which is
+# not a reasonable download for a media player and would dominate any package we build. The full
+# pack stays an optional extra - see the brief - and when only the curated set is installed the
+# curated *list* is deliberately left out, so the menu item that switches between the two hides
+# itself instead of appearing to do nothing.
+set(PLAYER_PRESET_SOURCE "${CMAKE_SOURCE_DIR}/assets/presets")
+set(PLAYER_PRESET_STAGE "${CMAKE_BINARY_DIR}/staged-presets")
+set(PLAYER_CURATED_LIST "${CMAKE_SOURCE_DIR}/assets/presets-curated.txt")
+
+if(EXISTS "${PLAYER_PRESET_SOURCE}" AND EXISTS "${PLAYER_CURATED_LIST}")
+    file(STRINGS "${PLAYER_CURATED_LIST}" PLAYER_CURATED_ENTRIES)
+    file(REMOVE_RECURSE "${PLAYER_PRESET_STAGE}")
+    set(_staged 0)
+    set(_missing 0)
+    foreach(_rel IN LISTS PLAYER_CURATED_ENTRIES)
+        if(_rel MATCHES "^[ 	]*#" OR _rel STREQUAL "")
+            continue()
+        endif()
+        if(EXISTS "${PLAYER_PRESET_SOURCE}/${_rel}")
+            get_filename_component(_sub "${_rel}" DIRECTORY)
+            file(COPY "${PLAYER_PRESET_SOURCE}/${_rel}"
+                 DESTINATION "${PLAYER_PRESET_STAGE}/${_sub}")
+            math(EXPR _staged "${_staged} + 1")
+        else()
+            math(EXPR _missing "${_missing} + 1")
+        endif()
+    endforeach()
+    message(STATUS "Reverie: staged ${_staged} curated presets for install (${_missing} missing)")
+    install(DIRECTORY "${PLAYER_PRESET_STAGE}/"
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/reverie/presets)
+else()
+    message(WARNING "Reverie: no preset corpus at ${PLAYER_PRESET_SOURCE}; "
+                    "the installed application will have no visualisations")
+endif()
+
 # projectM is vendored and built alongside us, so it is not on the system loader path. Install
 # its libraries into a private directory and point the executable at them relatively - an
 # absolute build-tree RPATH would work on this machine and nowhere else, which is exactly the
