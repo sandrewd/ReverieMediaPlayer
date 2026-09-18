@@ -112,6 +112,56 @@ void AudioEngine::buildPipeline()
         return;
     }
 
+    // Hardware decode is autoplugged by playbin3 when the machine has a VA driver, and is
+    // otherwise silently absent - the va plugin ships in gstreamer1.0-plugins-bad, which is
+    // already a hard dependency, and registers no elements at all without a capable device.
+    //
+    // That silence is the problem: there is no way to tell from the outside whether a file is
+    // being decoded on the GPU or on four software threads. So the pipeline says which decoder
+    // it actually chose. §6 made the same argument about frame rate - the application has to
+    // report what it is doing, because watching it cannot tell you.
+    g_signal_connect(m_pipeline, "deep-element-added",
+                     G_CALLBACK(+[](GstBin *, GstBin *, GstElement *element, gpointer) {
+                         GstElementFactory *factory = gst_element_get_factory(element);
+                         if (!factory)
+                             return;
+                         const gchar *klass =
+                             gst_element_factory_get_metadata(factory, GST_ELEMENT_METADATA_KLASS);
+                         if (!klass || !strstr(klass, "Decoder"))
+                             return;
+                         const gchar *name = gst_plugin_feature_get_name(GST_PLUGIN_FEATURE(factory));
+                         if (!name)
+                             return;
+                         // Named so the answer is greppable in a bug report.
+                         qInfo("decoder: %s (%s)%s", name, klass,
+                               (g_str_has_prefix(name, "va") || strstr(klass, "Hardware"))
+                                   ? "  [hardware]" : "");
+                     }),
+                     nullptr);
+
+    // An escape hatch, because VA drivers are the least reliable part of this stack and a
+    // machine that cannot play video is worse than one that decodes in software. Demoting the
+    // rank leaves the elements present but never autoplugged.
+    if (qEnvironmentVariableIsSet("PLAYER_NO_HW_DECODE")) {
+        GstRegistry *registry = gst_registry_get();
+        GList *features = gst_registry_get_feature_list(registry, GST_TYPE_ELEMENT_FACTORY);
+        int demoted = 0;
+        for (GList *item = features; item; item = item->next) {
+            auto *feature = GST_PLUGIN_FEATURE(item->data);
+            const gchar *name = gst_plugin_feature_get_name(feature);
+            const gchar *klass = gst_element_factory_get_metadata(GST_ELEMENT_FACTORY(feature),
+                                                                 GST_ELEMENT_METADATA_KLASS);
+            if (name && klass && strstr(klass, "Decoder")
+                && (g_str_has_prefix(name, "va") || g_str_has_prefix(name, "nv")
+                    || g_str_has_prefix(name, "msdk"))) {
+                gst_plugin_feature_set_rank(feature, GST_RANK_NONE);
+                ++demoted;
+            }
+        }
+        gst_plugin_feature_list_free(features);
+        qInfo("decoder: hardware decoding disabled by PLAYER_NO_HW_DECODE (%d demoted)", demoted);
+    }
+
     // The audio sink is a bin that tees the decoded stream: one branch to the speakers,
     // one to an appsink delivering float32 stereo for the visualiser. This is the shape
     // the brief settled on, and it is why no second media engine is needed.

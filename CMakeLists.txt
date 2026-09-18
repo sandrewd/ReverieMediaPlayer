@@ -290,7 +290,16 @@ set(CPACK_DEBIAN_PACKAGE_DEPENDS
     "${PLAYER_QML_DEPENDS}, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, \
 gstreamer1.0-plugins-bad, gstreamer1.0-libav, libqt6svg6")
 # Not a hard dependency: the visualiser works on llvmpipe, it is just slower. See section 4.
-set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "gstreamer1.0-pulseaudio | gstreamer1.0-alsa")
+# va-driver-all is what makes hardware decoding possible. The GStreamer side needs nothing
+# added: the `va` plugin ships inside gstreamer1.0-plugins-bad, which is already a hard
+# dependency, and it registers no elements at all on a machine with no capable device - so it
+# costs nothing where it cannot be used. What is missing on such a machine is the libva driver.
+#
+# Recommends rather than Depends, because a machine with no GPU plays video perfectly well in
+# software and should not be made to carry drivers it cannot use. Both target distros install
+# these by default anyway, so for most people it is already satisfied; ~15 MB otherwise.
+set(CPACK_DEBIAN_PACKAGE_RECOMMENDS
+    "gstreamer1.0-pulseaudio | gstreamer1.0-alsa, va-driver-all")
 
 set(CPACK_DEBIAN_PACKAGE_DESCRIPTION
 "Reverie plays music and video with visualisations rendered in the same

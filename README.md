@@ -133,7 +133,26 @@ instrumentation is an environment variable away rather than a rebuild:
 QT_LOGGING_RULES='reverie.*.debug=true' reverie    # frame times, render scale, preset changes
 PLAYER_AUDIO_SINK=pulsesink reverie                # force a specific GStreamer audio sink
 PLAYER_BUS_TRACE=1 reverie                         # every GStreamer bus message
+PLAYER_NO_HW_DECODE=1 reverie                      # software decoding only
 ```
+
+### Hardware decoding
+
+It is automatic where the machine supports it. Reverie names the decoder it chose on startup, so
+you can tell rather than guess:
+
+```
+decoder: vah264dec (Codec/Decoder/Video/Hardware)  [hardware]
+decoder: avdec_h264 (Codec/Decoder/Video)
+```
+
+The GStreamer side needs nothing installed — the `va` plugin is part of `gstreamer1.0-plugins-bad`,
+already a dependency, and it registers no elements at all on a machine without a capable device.
+What such a machine is missing is the libva driver, which the package **recommends**
+(`va-driver-all`) rather than depends on, since software decoding works fine without it.
+
+If video misbehaves on a machine with a flaky VA driver, `PLAYER_NO_HW_DECODE=1` demotes the
+hardware decoders so they are never chosen.
 
 ## Licence
 
