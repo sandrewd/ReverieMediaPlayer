@@ -119,7 +119,7 @@ Reverie is usable and in active development. Known gaps, stated plainly:
 - **Wayland works but is less exercised than X11.** It has been run under both, and the mini-player
   in particular needed a Wayland-specific fix. Always-on-top for the mini-player is X11-only and
   cannot be done portably on Wayland.
-- **Hardware decode and video track selection** are not implemented.
+- **Video-specific stream selection** (several *video* streams in one file) is not implemented.
 - **The performance figures above assume software rendering.** On a machine with a working GPU
   everything is considerably faster than they suggest.
 
@@ -138,8 +138,9 @@ PLAYER_NO_HW_DECODE=1 reverie                      # software decoding only
 
 ### Hardware decoding
 
-It is automatic where the machine supports it. Reverie names the decoder it chose on startup, so
-you can tell rather than guess:
+It is automatic where the machine supports it — confirmed on Intel hardware, where an H.264 file
+decodes through `vah264dec`. Reverie names the decoder it chose on startup, so you can tell rather
+than guess:
 
 ```
 decoder: vah264dec (Codec/Decoder/Video/Hardware)  [hardware]
