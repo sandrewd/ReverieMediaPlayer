@@ -4,6 +4,9 @@
 #include <QGuiApplication>
 #include <QPalette>
 #include <QProcess>
+#include <QDBusConnection>
+#include <QDBusReply>
+#include <QDBusInterface>
 #include <QGuiApplication>
 #include <QSettings>
 
@@ -51,12 +54,13 @@ SystemTheme::SystemTheme(QObject *parent)
 
     m_savedPalettes = settings.value(QStringLiteral("appearance/savedPalettes")).toStringList();
 
+    m_portalHint = queryPortalHint();
     m_schemeHint = querySchemeHint();
     m_themeNameHint = queryThemeNameHint();
     m_systemIsDark = detectSystemDark();
-    qInfo("theme at startup: %s  (scheme hint %d, theme-name hint %d, palette hint %d)",
-          m_systemIsDark ? "dark" : "light", m_schemeHint, m_themeNameHint,
-          m_platformPaletteIsDark);
+    qInfo("theme at startup: %s  (portal hint %d, scheme hint %d, theme-name hint %d, palette hint %d)",
+          m_systemIsDark ? "dark" : "light", m_portalHint, m_schemeHint,
+          m_themeNameHint, m_platformPaletteIsDark);
 
     // Only impose a palette when the user has actually chosen one. Calling setPalette() at
     // all marks it explicitly set, after which Qt no longer refreshes it from the platform
@@ -79,15 +83,26 @@ SystemTheme::SystemTheme(QObject *parent)
 
     m_resurvey.setInterval(4000);
     connect(&m_resurvey, &QTimer::timeout, this, [this]() {
+        const int portal = queryPortalHint();
         const int scheme = querySchemeHint();
         const int name = queryThemeNameHint();
-        if (scheme == m_schemeHint && name == m_themeNameHint)
+        if (portal == m_portalHint && scheme == m_schemeHint && name == m_themeNameHint)
             return;
+        m_portalHint = portal;
         m_schemeHint = scheme;
         m_themeNameHint = name;
         redetect();
     });
     m_resurvey.start();
+
+    // The portal announces changes rather than needing to be asked, so a switch is picked up
+    // immediately instead of within the re-survey interval. The re-survey stays as the backstop,
+    // for the same reason it exists for the gsettings monitor: a signal that never arrives.
+    QDBusConnection::sessionBus().connect(
+        QStringLiteral("org.freedesktop.portal.Desktop"),
+        QStringLiteral("/org/freedesktop/portal/desktop"),
+        QStringLiteral("org.freedesktop.portal.Settings"),
+        QStringLiteral("SettingChanged"), this, SLOT(onPortalSettingChanged(QString, QString)));
 }
 
 SystemTheme::~SystemTheme()
@@ -486,6 +501,50 @@ int SystemTheme::queryThemeNameHint()
     return -1;
 }
 
+void SystemTheme::onPortalSettingChanged(const QString &nspace, const QString &key)
+{
+    if (nspace != QStringLiteral("org.freedesktop.appearance")
+        || key != QStringLiteral("color-scheme"))
+        return;
+    const int portal = queryPortalHint();
+    if (portal == m_portalHint)
+        return;
+    m_portalHint = portal;
+    redetect();
+}
+
+int SystemTheme::queryPortalHint()
+{
+    // org.freedesktop.appearance color-scheme: 0 no preference, 1 prefer dark, 2 prefer light.
+    // Reachable inside and outside a sandbox, and the portal is what the desktop is supposed to
+    // answer through. Not every backend implements it - XFCE's returns 0 whatever gsettings
+    // says - so "no preference" has to fall through to the other signals rather than mean light.
+    QDBusInterface portal(QStringLiteral("org.freedesktop.portal.Desktop"),
+                          QStringLiteral("/org/freedesktop/portal/desktop"),
+                          QStringLiteral("org.freedesktop.portal.Settings"),
+                          QDBusConnection::sessionBus());
+    if (!portal.isValid())
+        return -1;
+    const QDBusReply<QDBusVariant> reply =
+        portal.call(QStringLiteral("Read"), QStringLiteral("org.freedesktop.appearance"),
+                    QStringLiteral("color-scheme"));
+    if (!reply.isValid())
+        return -1;
+    // Read returns a variant wrapping a variant, so it has to be unwrapped twice.
+    QVariant value = reply.value().variant();
+    if (value.canConvert<QDBusVariant>())
+        value = value.value<QDBusVariant>().variant();
+    bool ok = false;
+    const uint scheme = value.toUInt(&ok);
+    if (!ok)
+        return -1;
+    if (scheme == 1)
+        return 1;
+    if (scheme == 2)
+        return 0;
+    return -1;
+}
+
 int SystemTheme::querySchemeHint()
 {
     QProcess gsettings;
@@ -514,6 +573,13 @@ bool SystemTheme::detectSystemDark() const
     // `color-scheme` cannot carry the light case at all here: switching to a light theme
     // leaves it at 'default' rather than 'prefer-light'. It is authoritative only when it
     // states a preference outright, which is the GNOME case.
+    // The portal first. It is the only one of these that works inside a Flatpak, where
+    // gsettings sees the sandbox's own dconf rather than the desktop's, and it is the
+    // freedesktop-standard answer outside one too. Like color-scheme it only counts when it
+    // states a preference.
+    if (m_portalHint >= 0)
+        return m_portalHint == 1;
+
     if (m_schemeHint >= 0)
         return m_schemeHint == 1;
 

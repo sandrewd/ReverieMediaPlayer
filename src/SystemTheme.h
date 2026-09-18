@@ -120,6 +120,9 @@ signals:
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
+private slots:
+    void onPortalSettingChanged(const QString &nspace, const QString &key);
+
 private:
     // Qt Quick Controls - menus, dialogs, buttons - paint from the application palette, not
     // from our QML tokens. Without pushing the theme into the palette a user's colours stop
@@ -132,6 +135,11 @@ private:
     bool detectSystemDark() const;
     // -1 unknown, 0 light, 1 dark
     static int paletteHint();
+    // The freedesktop settings portal. This is the only signal that survives a Flatpak
+    // sandbox, where gsettings reads the sandbox's own empty dconf and answers 'default' no
+    // matter what the desktop is set to - which made "follow system" pick light on a dark
+    // desktop. Returns 1 dark, 0 light, -1 for no preference or no portal.
+    static int queryPortalHint();
     static int querySchemeHint();
     static int queryThemeNameHint();
 
@@ -139,6 +147,7 @@ private:
     Preference m_preference = FollowSystem;
 
     // The desktop's own colour-scheme setting, when it expresses a preference at all.
+    int m_portalHint = -1;
     int m_schemeHint = -1;
     // Fallback read of the GTK theme name, for desktops that only change that.
     int m_themeNameHint = -1;
