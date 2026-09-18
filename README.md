@@ -10,10 +10,15 @@ try to organise your music collection.
 
 ![Reverie playing a track with the visualiser running](docs/screenshot.png)
 
+<p align="center">
+  <img src="docs/screenshot-presets.png" width="49%" alt="Choosing a visualisation by category">
+  <img src="docs/screenshot-equaliser.png" width="49%" alt="The ten-band equaliser">
+</p>
+
 ## What it does
 
-- **Transport** — play, pause, stop, next, previous, seek, volume, shuffle, and repeat that cycles
-  off / playlist / one track
+- **Transport** — play, pause, stop, next, previous, seek, volume, shuffle, repeat that cycles
+  off / playlist / one track, and a subtitles toggle
 - **Visualisations** — projectM (Milkdrop) presets, embedded or fullscreen, driven by the decoded
   audio. Right-click the visualiser to pick a preset by category, or leave it to rotate.
 - **Equaliser** — twelve preset curves and a ten-band custom mixer, with boosts compensated
@@ -21,8 +26,12 @@ try to organise your music collection.
 - **One playlist** — drag to reorder, multi-select, remove, save and load M3U. Not tabbed
   playlists, not a library.
 - **Video** — plays video on the same surface the visualiser uses, letterboxed, with the controls
-  over it, with **subtitles**: embedded tracks and external `.srt` files, picked from a right-click
-  on the picture. A subtitle file sitting beside the video is found on its own.
+  over it. **Hardware decoding** where the machine supports it.
+- **Subtitles** — embedded tracks and external `.srt` files. A subtitle file sitting beside the
+  video is found on its own; others can be added from the picture's right-click menu. Off by
+  default, with a button in the transport.
+- **Audio and subtitle tracks** — a file with a commentary track or two languages can be switched
+  between, and a *preferred language* for each decides which is picked when a file offers a choice
 - **Internet radio** — streams are entries in the same playlist, with station metadata in the
   now-playing line
 - **Mini-player** — a compact always-on-top layout
@@ -46,9 +55,25 @@ resolution visibly pumps is worse than one that is slightly soft.
 You can override all of it in *Options > Visual quality*, including a fixed scale and the target
 frame rate.
 
+## Installing
+
+Debian packages are attached to each [release](https://github.com/sandrewd/ReverieMediaPlayer/releases),
+built for Ubuntu 24.04 and so also Linux Mint 22.x and Zorin OS 18:
+
+```sh
+sudo apt install ./reverie_*_amd64.deb
+```
+
+A Flatpak bundle is attached as well, and needs no matching distribution:
+
+```sh
+flatpak install --user ./reverie.flatpak
+```
+
 ## Building
 
-Requires Qt 6.4+, GStreamer 1.20+, TagLib, CMake 3.22+, and a C++17 compiler.
+Requires Qt 6.4+, GStreamer 1.20+, TagLib, CMake 3.22+, and a C++17 compiler. Reverie also builds
+against much newer Qt — the Flatpak uses 6.11.
 
 On Debian/Ubuntu (24.04 or newer):
 
@@ -110,6 +135,17 @@ Or build a Debian package:
 ```sh
 cmake --build build/player --target package
 sudo apt install ./build/player/reverie_*_amd64.deb
+```
+
+### Flatpak
+
+The manifest is `packaging/flatpak/io.github.sandrewd.ReverieMediaPlayer.yml`. It builds projectM
+itself and takes TagLib and GStreamer from the KDE runtime:
+
+```sh
+flatpak install flathub org.kde.Platform//6.11 org.kde.Sdk//6.11
+flatpak-builder --user --force-clean --repo=repo build-dir \
+    packaging/flatpak/io.github.sandrewd.ReverieMediaPlayer.yml
 ```
 
 ## Status

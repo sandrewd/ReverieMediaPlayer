@@ -36,6 +36,10 @@ cleanup:
   - /include
   - /lib/pkgconfig
   - /lib/cmake
+  # projectM installs into lib64 on this runtime, so the lib/ patterns alone miss its
+  # development files and they end up shipped.
+  - /lib64/pkgconfig
+  - /lib64/cmake
   - /share/man
   - '*.a'
   - '*.la'

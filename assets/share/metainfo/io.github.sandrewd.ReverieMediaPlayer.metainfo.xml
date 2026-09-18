@@ -43,10 +43,19 @@
 
   <launchable type="desktop-id">io.github.sandrewd.ReverieMediaPlayer.desktop</launchable>
 
+  <!-- Pinned to a tag rather than main, so the images cannot change under a published listing. -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.8.1/docs/screenshot.png</image>
+      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.8.2/docs/screenshot.png</image>
       <caption>Playing a track with the visualiser running</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.8.2/docs/screenshot-presets.png</image>
+      <caption>Choosing a visualisation by category</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.8.2/docs/screenshot-equaliser.png</image>
+      <caption>The ten-band equaliser</caption>
     </screenshot>
   </screenshots>
 
@@ -80,6 +89,14 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="0.8.2" date="2026-09-18">
+      <description>
+        <p>
+          Alternate video streams no longer stall playback, and can be chosen when a file has
+          them. Packaging for Flathub, and new screenshots.
+        </p>
+      </description>
+    </release>
     <release version="0.8.1" date="2026-09-18">
       <description>
         <p>Window title fixes, and a maximised window now stays maximised after fullscreen.</p>
