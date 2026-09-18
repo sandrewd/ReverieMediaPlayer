@@ -73,6 +73,9 @@ public:
             // projectM knows why it failed; we were throwing that away. Shader compilation is
             // where drivers differ most - Mesa accepts GLSL that NVIDIA rejects - and a preset
             // that will not compile renders as nothing at all.
+            // Default is INFO, so warnings and errors already arrive - but say so explicitly,
+            // because a silent projectM is otherwise indistinguishable from a healthy one.
+            projectm_set_log_level(PROJECTM_LOG_LEVEL_DEBUG, false);
             projectm_set_log_callback(
                 [](const char *message, projectm_log_level level, void *) {
                     if (!message)

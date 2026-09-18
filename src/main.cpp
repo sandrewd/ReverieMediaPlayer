@@ -58,8 +58,25 @@ int main(int argc, char *argv[])
     // pin it to OpenGL before QGuiApplication reads the environment.
     qputenv("QSG_RHI_BACKEND", "opengl");
 
+    // Ask for 4.5, not projectM's 3.3 minimum. Mesa returns the highest version it supports
+    // whatever you request - llvmpipe hands back 4.5 for a 3.3 request - so asking for the
+    // minimum cost nothing there and hid the problem for the whole project. NVIDIA honours the
+    // request literally: asking for 3.3 gets exactly 3.3, and on that context the visualiser
+    // renders nothing at all while reporting no error. Every machine this has run on gave 4.5
+    // when it was free to; now we ask for it.
+    //
+    // PLAYER_GL_VERSION=3.3 (or any major.minor) overrides, for hardware that cannot do 4.5.
+    int major = 4, minor = 5;
+    if (qEnvironmentVariableIsSet("PLAYER_GL_VERSION")) {
+        const QString wanted = qEnvironmentVariable("PLAYER_GL_VERSION");
+        const QStringList parts = wanted.split(QLatin1Char('.'));
+        if (parts.size() == 2) {
+            major = parts.at(0).toInt();
+            minor = parts.at(1).toInt();
+        }
+    }
     QSurfaceFormat format;
-    format.setVersion(3, 3);
+    format.setVersion(major, minor);
     format.setProfile(QSurfaceFormat::CoreProfile);
     format.setDepthBufferSize(24);
     format.setStencilBufferSize(8);
