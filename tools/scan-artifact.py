@@ -99,8 +99,10 @@ def scan_tree(root, prefix):
 
 def scan_deb(path, tmp):
     """A .deb is an ar archive of tarballs; unpack both and scan the contents."""
-    out = Path(tmp) / "deb"
-    out.mkdir()
+    # One directory per artefact: scanning two packages in a single run collided here and
+    # crashed on the second, which is exactly the case a release does (package plus bundle).
+    out = Path(tmp) / f"deb-{Path(path).stem}"
+    out.mkdir(parents=True, exist_ok=True)
     subprocess.run(["ar", "x", str(Path(path).resolve())], cwd=out, check=True)
     for member in out.glob("*.tar.*"):
         dest = out / (member.name.replace(".", "_"))
