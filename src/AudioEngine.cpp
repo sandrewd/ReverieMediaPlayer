@@ -5,6 +5,8 @@
 
 #include <QDebug>
 #include <QFileInfo>
+#include <QLocale>
+#include <QDir>
 #include <QUrl>
 
 #include <gst/gst.h>
@@ -72,6 +74,10 @@ AudioEngine::AudioEngine(QObject *parent)
             m_equaliserGains.append(band < stored.size() ? stored.at(band).toDouble() : 0.0);
         m_equaliserPreset = settings.value(QStringLiteral("audio/equaliserPreset")).toString();
         m_equaliserEnabled = settings.value(QStringLiteral("audio/equaliserEnabled"), false).toBool();
+        // Subtitles default on, which is what playbin3 does anyway and what every other player
+        // does. Only the off choice is really worth carrying, and carrying it across launches
+        // saves repeating it for every file.
+        m_subtitlesWanted = settings.value(QStringLiteral("video/subtitlesEnabled"), true).toBool();
     }
 
     buildPipeline();
@@ -347,6 +353,23 @@ void AudioEngine::setSource(const QString &uriOrPath)
     m_ring->reset();
     g_object_set(m_pipeline, "uri", uri.toUtf8().constData(), nullptr);
 
+    // Subtitle state belongs to the old file. suburi in particular must be cleared explicitly:
+    // left set, it would attach the previous track's subtitle file to this one.
+    m_subtitles.clear();
+    m_otherStreamIds.clear();
+    m_subtitleTrack = -1;
+    m_selectNewSubtitle = false;
+    m_subtitleFile = sidecarSubtitleFor(uri);
+    g_object_set(m_pipeline, "suburi",
+                 m_subtitleFile.isEmpty()
+                     ? nullptr
+                     : QUrl::fromLocalFile(m_subtitleFile).toString().toUtf8().constData(),
+                 nullptr);
+    if (!m_subtitleFile.isEmpty())
+        qInfo("subtitles: found %s alongside the media",
+              qUtf8Printable(QFileInfo(m_subtitleFile).fileName()));
+    emit subtitlesChanged();
+
     m_source = uri;
     m_position = 0;
     m_duration = 0;
@@ -375,6 +398,225 @@ void AudioEngine::setSource(const QString &uriOrPath)
     emit durationChanged();
     emit streamTitleChanged();
     setState(Stopped);
+}
+
+// Subtitles
+//
+// Nothing here renders text. playbin3's playsink inserts subtitleoverlay ahead of whatever video
+// sink it is given, including our appsink, so subtitle pixels are already in the RGBA frames by
+// the time VideoItem sees them. Measured against a two-track file before any of this was written.
+//
+// What playbin3 does *not* do is let the user choose. It selects the first text stream it finds
+// and renders it, which meant Reverie had been burning in subtitles with no way to turn them off.
+
+void AudioEngine::rebuildSubtitleTracks(GstStreamCollection *collection)
+{
+    const QString previousId =
+        (m_subtitleTrack >= 0 && m_subtitleTrack < m_subtitles.size())
+            ? m_subtitles.at(m_subtitleTrack).id
+            : QString();
+
+    QVector<SubtitleTrack> found;
+    QStringList others;
+    const guint count = gst_stream_collection_get_size(collection);
+    for (guint i = 0; i < count; ++i) {
+        GstStream *stream = gst_stream_collection_get_stream(collection, i);
+        if (!stream)
+            continue;
+        const char *id = gst_stream_get_stream_id(stream);
+        if (!id)
+            continue;
+        if (!(gst_stream_get_stream_type(stream) & GST_STREAM_TYPE_TEXT)) {
+            others << QString::fromUtf8(id);
+            continue;
+        }
+        SubtitleTrack track;
+        track.id = QString::fromUtf8(id);
+        if (GstTagList *tags = gst_stream_get_tags(stream)) {
+            gchar *value = nullptr;
+            if (gst_tag_list_get_string(tags, GST_TAG_LANGUAGE_CODE, &value)) {
+                track.language = QString::fromUtf8(value);
+                g_free(value);
+            }
+            value = nullptr;
+            if (gst_tag_list_get_string(tags, GST_TAG_TITLE, &value)) {
+                track.title = QString::fromUtf8(value);
+                g_free(value);
+            }
+            gst_tag_list_unref(tags);
+        }
+        // An external file carries no language tag, which is how it is told apart from an
+        // embedded track for labelling purposes.
+        track.external = track.language.isEmpty() && !m_subtitleFile.isEmpty();
+        found << track;
+    }
+
+    const bool sameTracks = (found.size() == m_subtitles.size()) &&
+        [&] {
+            for (int i = 0; i < found.size(); ++i)
+                if (found.at(i).id != m_subtitles.at(i).id)
+                    return false;
+            return true;
+        }();
+
+    m_subtitles = found;
+    m_otherStreamIds = others;
+
+    int wanted = -1;
+    if (m_selectNewSubtitle && !m_subtitles.isEmpty()) {
+        // The stream the freshly attached file added is the one that was not there before.
+        wanted = m_subtitles.size() - 1;
+        m_selectNewSubtitle = false;
+        m_subtitlesWanted = true;
+    } else if (!previousId.isEmpty()) {
+        for (int i = 0; i < m_subtitles.size(); ++i)
+            if (m_subtitles.at(i).id == previousId)
+                wanted = i;
+    }
+    if (wanted < 0 && m_subtitlesWanted && !m_subtitles.isEmpty())
+        wanted = 0;
+
+    const bool changed = !sameTracks || wanted != m_subtitleTrack;
+    m_subtitleTrack = wanted;
+    applySubtitleSelection();
+    if (changed)
+        emit subtitlesChanged();
+}
+
+void AudioEngine::applySubtitleSelection()
+{
+    if (!m_pipeline || m_otherStreamIds.isEmpty())
+        return;
+    // select-streams replaces the entire selection, so the video and audio ids go back in every
+    // time. Leaving them out silently stops playback rather than reporting anything.
+    GList *ids = nullptr;
+    for (const QString &id : m_otherStreamIds)
+        ids = g_list_append(ids, g_strdup(id.toUtf8().constData()));
+    if (m_subtitleTrack >= 0 && m_subtitleTrack < m_subtitles.size())
+        ids = g_list_append(ids, g_strdup(m_subtitles.at(m_subtitleTrack).id.toUtf8().constData()));
+    if (ids) {
+        gst_element_send_event(m_pipeline, gst_event_new_select_streams(ids));
+        g_list_free_full(ids, g_free);
+    }
+}
+
+QVariantList AudioEngine::subtitleTracks() const
+{
+    QVariantList out;
+    for (int i = 0; i < m_subtitles.size(); ++i) {
+        const SubtitleTrack &track = m_subtitles.at(i);
+        QString label;
+        if (!track.language.isEmpty()) {
+            const QLocale locale(track.language);
+            const QString name = QLocale::languageToString(locale.language());
+            // An unrecognised code is more useful shown raw than as "C" or "Default".
+            label = (locale.language() == QLocale::C || name.isEmpty())
+                        ? track.language
+                        : name;
+        }
+        if (label.isEmpty() && !track.title.isEmpty())
+            label = track.title;
+        if (label.isEmpty())
+            label = track.external ? tr("Subtitle file") : tr("Track %1").arg(i + 1);
+        // A title alongside a language distinguishes two tracks in the same one, which is
+        // exactly the case a bare language label cannot.
+        else if (!track.title.isEmpty() && !track.language.isEmpty()
+                 && track.title.compare(label, Qt::CaseInsensitive) != 0)
+            label = tr("%1 - %2").arg(label, track.title);
+
+        QVariantMap entry;
+        entry.insert(QStringLiteral("label"), label);
+        entry.insert(QStringLiteral("language"), track.language);
+        out.append(entry);
+    }
+    return out;
+}
+
+void AudioEngine::setSubtitleTrack(int index)
+{
+    if (index < -1 || index >= m_subtitles.size())
+        index = -1;
+    // The preference is what survives to the next file; the index does not, because which
+    // track is number 0 is a property of the file rather than of the user's choice.
+    if (m_subtitlesWanted != (index >= 0)) {
+        m_subtitlesWanted = index >= 0;
+        QSettings().setValue(QStringLiteral("video/subtitlesEnabled"), m_subtitlesWanted);
+    }
+    if (index == m_subtitleTrack) {
+        emit subtitlesChanged();
+        return;
+    }
+    m_subtitleTrack = index;
+    applySubtitleSelection();
+    emit subtitlesChanged();
+}
+
+QString AudioEngine::sidecarSubtitleFor(const QString &uri) const
+{
+    const QUrl url(uri);
+    if (!url.isLocalFile())
+        return QString();
+    const QFileInfo info(url.toLocalFile());
+    const QDir dir = info.dir();
+    const QString base = info.completeBaseName();
+    // "clip.srt" first, then "clip.en.srt" and friends - a language-suffixed sidecar is the
+    // common shape and matching only the exact stem would miss all of them.
+    static const QStringList suffixes{QStringLiteral("srt"), QStringLiteral("ass"),
+                                      QStringLiteral("ssa"), QStringLiteral("vtt"),
+                                      QStringLiteral("sub")};
+    for (const QString &suffix : suffixes) {
+        const QString exact = dir.filePath(base + QLatin1Char('.') + suffix);
+        if (QFileInfo::exists(exact))
+            return exact;
+    }
+    const QFileInfoList candidates =
+        dir.entryInfoList(QStringList{base + QStringLiteral(".*")}, QDir::Files);
+    for (const QFileInfo &candidate : candidates)
+        if (suffixes.contains(candidate.suffix().toLower()))
+            return candidate.absoluteFilePath();
+    return QString();
+}
+
+bool AudioEngine::addSubtitleFile(const QString &path)
+{
+    if (!m_pipeline || m_source.isEmpty() || path.isEmpty())
+        return false;
+    // The file dialog hands back a file:// URL; the command line and tests hand back a path.
+    const QString local = path.startsWith(QStringLiteral("file://"))
+                              ? QUrl(path).toLocalFile()
+                              : path;
+    const QString absolute = QFileInfo(local).absoluteFilePath();
+    if (!QFileInfo::exists(absolute))
+        return false;
+
+    const QString uri = QUrl::fromLocalFile(absolute).toString();
+    const bool wasPlaying = (m_state == Playing || m_state == Buffering);
+
+    gint64 position = 0;
+    if (!gst_element_query_position(m_pipeline, GST_FORMAT_TIME, &position))
+        position = 0;
+
+    // playbin3 accepts suburi only below PAUSED. Setting it while playing is not an error and
+    // not a warning - the property simply reads back as unset afterwards.
+    gst_element_set_state(m_pipeline, GST_STATE_READY);
+    gst_element_get_state(m_pipeline, nullptr, nullptr, 5 * GST_SECOND);
+    g_object_set(m_pipeline, "suburi", uri.toUtf8().constData(), nullptr);
+    m_subtitleFile = absolute;
+    m_selectNewSubtitle = true;
+
+    gst_element_set_state(m_pipeline, wasPlaying ? GST_STATE_PLAYING : GST_STATE_PAUSED);
+    gst_element_get_state(m_pipeline, nullptr, nullptr, 5 * GST_SECOND);
+    bool sought = true;
+    if (position > 0)
+        sought = gst_element_seek_simple(m_pipeline, GST_FORMAT_TIME,
+                                         GstSeekFlags(GST_SEEK_FLAG_FLUSH | GST_SEEK_FLAG_KEY_UNIT),
+                                         position);
+    applyOutputLevels();
+    qInfo("subtitles: attached %s (was %s at %.1fs, seek %s)",
+          qUtf8Printable(QFileInfo(absolute).fileName()),
+          wasPlaying ? "playing" : "not playing",
+          position / double(GST_SECOND), sought ? "ok" : "REFUSED");
+    return true;
 }
 
 void AudioEngine::applyOutputLevels()
@@ -571,6 +813,8 @@ void AudioEngine::pollBus()
         }
         case GST_MESSAGE_STREAM_COLLECTION: {
             // playbin3 reports what it found this way rather than through an n-video property.
+            // It arrives more than once - an external subtitle file produces a second, larger
+            // collection - so this rebuilds rather than accumulates.
             GstStreamCollection *collection = nullptr;
             gst_message_parse_stream_collection(msg, &collection);
             if (collection) {
@@ -581,6 +825,7 @@ void AudioEngine::pollBus()
                     if (stream && (gst_stream_get_stream_type(stream) & GST_STREAM_TYPE_VIDEO))
                         video = true;
                 }
+                rebuildSubtitleTracks(collection);
                 gst_object_unref(collection);
                 if (video != m_hasVideo) {
                     m_hasVideo = video;

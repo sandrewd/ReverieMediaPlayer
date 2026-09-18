@@ -19,6 +19,7 @@
 #include "AudioRingBuffer.h"
 
 typedef struct _GstElement GstElement;
+typedef struct _GstStreamCollection GstStreamCollection;
 
 // One playbin3. Network streams, local files and the tags that come with either arrive
 // through the same path, so stream support later is a dialog and a list, not an engine.
@@ -47,6 +48,14 @@ class AudioEngine : public QObject
     // Whether the current media actually carries a video stream. playbin3 has no n-video
     // property; this comes from the stream collection it publishes on the bus.
     Q_PROPERTY(bool hasVideo READ hasVideo NOTIFY hasVideoChanged)
+
+    // Subtitles. playbin3 already renders these into the video frames before they reach our
+    // sink - verified, not assumed - so nothing here draws text. What it does is choose which
+    // text stream is selected, which is the only part the user was missing: playbin3 turns the
+    // first one on by default and offered no way to turn it off.
+    Q_PROPERTY(QVariantList subtitleTracks READ subtitleTracks NOTIFY subtitlesChanged)
+    // Index into subtitleTracks, or -1 for off.
+    Q_PROPERTY(int subtitleTrack READ subtitleTrack NOTIFY subtitlesChanged)
 
     // Tags as the decoder reports them, for any medium. TagLib stays authoritative for files -
     // see the playlist - but it reads nothing from a file that carries no tags it understands,
@@ -85,6 +94,16 @@ public:
     // Hands the QML video surface to the sink. Must be a Qt6GLVideoItem from the qml6 plugin;
     // the sink stores it as a plain QQuickItem pointer and will not accept anything else.
     Q_INVOKABLE void setVideoItem(QQuickItem *item);
+
+    QVariantList subtitleTracks() const;
+    int subtitleTrack() const { return m_subtitleTrack; }
+    // -1 turns subtitles off. The choice is remembered across tracks as a preference, so a
+    // user who turned them off does not have to do it again for every file.
+    Q_INVOKABLE void setSubtitleTrack(int index);
+    // Attaches an external subtitle file to whatever is playing. playbin3 ignores `suburi`
+    // unless it is set below PAUSED, so this cycles the pipeline through READY and seeks back -
+    // roughly 800ms, which is why it is only ever done on an explicit request.
+    Q_INVOKABLE bool addSubtitleFile(const QString &path);
 
     // Fixed by equalizer-10bands; not a preference.
     static constexpr int kEqualiserBands = 10;
@@ -143,6 +162,7 @@ signals:
     void streamStationChanged();
     void bufferingChanged();
     void hasVideoChanged();
+    void subtitlesChanged();
     void equaliserChanged();
     void tagsChanged();
     void endOfStream();
@@ -181,6 +201,27 @@ private:
     GstElement *m_videoSink = nullptr;
     class VideoItem *m_videoItem = nullptr;
     bool m_hasVideo = false;
+
+    struct SubtitleTrack {
+        QString id;
+        QString language;
+        QString title;
+        bool external = false;
+    };
+    QVector<SubtitleTrack> m_subtitles;
+    // Every non-text stream id. select-streams replaces the whole selection, so the video and
+    // audio have to be named again every time a subtitle is chosen or nothing would play.
+    QStringList m_otherStreamIds;
+    int m_subtitleTrack = -1;
+    // The preference, distinct from the index: which track is number 0 changes per file.
+    bool m_subtitlesWanted = true;
+    // Set when an external file has just been attached, so the text stream it adds is selected
+    // as soon as the collection naming it arrives.
+    QString m_subtitleFile;
+    bool m_selectNewSubtitle = false;
+    void rebuildSubtitleTracks(GstStreamCollection *collection);
+    void applySubtitleSelection();
+    QString sidecarSubtitleFor(const QString &uri) const;
     std::unique_ptr<AudioRingBuffer> m_ring;
     QTimer m_busTimer;
     QTimer m_positionTimer;

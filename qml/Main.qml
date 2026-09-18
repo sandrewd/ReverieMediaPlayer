@@ -364,15 +364,14 @@ ApplicationWindow {
                     onTapped: function(point, button) {
                         if (button !== Qt.RightButton)
                             return
-                        if (!AudioEngine.hasVideo)
-                            presetMenu.popup()
+                        root.popupStageMenu()
                     }
                 }
                 // Touch has no second button, so the picker gets the gesture touch actually uses
                 // for a context menu.
                 TapHandler {
                     acceptedDevices: PointerDevice.TouchScreen
-                    onLongPressed: if (!AudioEngine.hasVideo) presetMenu.popup()
+                    onLongPressed: root.popupStageMenu()
                 }
                 // A MouseArea reports genuine movement; HoverHandler's point also changes on
                 // scene updates, which kept restarting the idle timer every frame and meant
@@ -612,6 +611,64 @@ ApplicationWindow {
 
 
     // Right-click the visualiser. Grouped by the categories the preset pack already ships
+    // The stage carries one menu or the other. Video has no preset to change, and until now a
+    // right-click over it did nothing at all - which is where the subtitle controls go, since
+    // that is where anyone who has used another player looks for them.
+    function popupStageMenu() {
+        if (AudioEngine.hasVideo)
+            videoMenu.popup()
+        else
+            presetMenu.popup()
+    }
+
+    Menu {
+        id: videoMenu
+        onAboutToShow: root.fitMenuWidth(videoMenu, 200, 460)
+
+        MenuItem {
+            text: qsTr("SUBTITLES")
+            enabled: false
+        }
+
+        // Exclusive, because these are one choice rather than several toggles. Four independent
+        // checkable items can be left with nothing selected - clicking the active one assigns
+        // checked = false, which detaches the binding that would restore it.
+        ButtonGroup { id: subtitleGroup; exclusive: true }
+
+        MenuItem {
+            text: qsTr("Off")
+            checkable: true
+            ButtonGroup.group: subtitleGroup
+            checked: AudioEngine.subtitleTrack === -1
+            onTriggered: AudioEngine.setSubtitleTrack(-1)
+        }
+
+        // Repeater cannot build menu items - a Menu inserts through insertItem and has no
+        // visual-children property for a Repeater to assign to.
+        Instantiator {
+            id: subtitleItems
+            model: AudioEngine.subtitleTracks
+            delegate: MenuItem {
+                required property int index
+                required property var modelData
+                text: modelData.label
+                checkable: true
+                ButtonGroup.group: subtitleGroup
+                checked: AudioEngine.subtitleTrack === index
+                onTriggered: AudioEngine.setSubtitleTrack(index)
+            }
+            onObjectAdded: function(index, object) { videoMenu.insertItem(2 + index, object) }
+            onObjectRemoved: function(index, object) { videoMenu.removeItem(object) }
+        }
+
+        MenuSeparator {}
+
+        MenuItem {
+            text: qsTr("Add subtitle file…")
+            onTriggered: subtitleDialog.open()
+        }
+    }
+
     // with, then by author where an author actually has several presets in that category.
     Menu {
         id: presetMenu
@@ -1681,6 +1738,13 @@ ApplicationWindow {
         defaultSuffix: "m3u"
         nameFilters: [qsTr("M3U playlists (*.m3u *.m3u8)")]
         onAccepted: PlaylistModel.saveM3U(selectedFile)
+    }
+
+    FileDialog {
+        id: subtitleDialog
+        title: qsTr("Add subtitle file")
+        nameFilters: [qsTr("Subtitles (*.srt *.ass *.ssa *.vtt *.sub)"), qsTr("All files (*)")]
+        onAccepted: AudioEngine.addSubtitleFile(selectedFile)
     }
 
     FileDialog {
