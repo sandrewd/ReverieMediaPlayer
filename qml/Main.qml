@@ -1030,47 +1030,57 @@ ApplicationWindow {
             title: qsTr("Sound")
             onAboutToShow: root.fitMenuWidth(soundMenu, 220, 420)
 
-            // Exclusive for the same reason the appearance options are: four independent
-            // checkboxes can be left with nothing selected, because clicking the active one
-            // assigns checked = false and detaches the binding.
-            ButtonGroup { id: equaliserGroup }
+            // The twelve curves plus Custom were sitting directly in Sound, which made the menu
+            // mostly a list of equaliser presets with the track picker lost at the bottom. Sound
+            // is now two things you can name, each behind its own title.
+            Menu {
+                id: equaliserMenu
+                // "Equaliser" rather than "Equalizer" only to match the rest of the interface,
+                // which is British throughout - visualisation, colours, no equaliser.
+                title: qsTr("Equaliser")
+                onAboutToShow: root.fitMenuWidth(equaliserMenu, 200, 420)
 
-            MenuItem {
-                text: qsTr("No equaliser")
-                checkable: true
-                ButtonGroup.group: equaliserGroup
-                checked: !AudioEngine.equaliserEnabled
-                onTriggered: AudioEngine.chooseNoEqualiser()
-            }
-            MenuSeparator {}
-            // Instantiator, not Repeater: a Menu builds its items through insertItem, and a
-            // Repeater tries to assign them as visual children, which a Menu has no property for.
-            Instantiator {
-                model: AudioEngine.equaliserPresetNames
-                delegate: MenuItem {
-                    text: modelData
+                // Exclusive for the same reason the appearance options are: independent
+                // checkboxes can be left with nothing selected, because clicking the active one
+                // assigns checked = false and detaches the binding.
+                ButtonGroup { id: equaliserGroup }
+
+                MenuItem {
+                    text: qsTr("No equaliser")
                     checkable: true
                     ButtonGroup.group: equaliserGroup
-                    checked: AudioEngine.equaliserEnabled
-                             && AudioEngine.equaliserPreset === modelData
-                    onTriggered: AudioEngine.applyEqualiserPreset(modelData)
+                    checked: !AudioEngine.equaliserEnabled
+                    onTriggered: AudioEngine.chooseNoEqualiser()
                 }
-                // After "No equaliser" and its separator.
-                onObjectAdded: function(index, object) { soundMenu.insertItem(2 + index, object) }
-                onObjectRemoved: function(index, object) { soundMenu.removeItem(object) }
+                MenuSeparator {}
+                // Instantiator, not Repeater: a Menu builds its items through insertItem, and a
+                // Repeater tries to assign them as visual children, which a Menu has no property
+                // for.
+                Instantiator {
+                    model: AudioEngine.equaliserPresetNames
+                    delegate: MenuItem {
+                        text: modelData
+                        checkable: true
+                        ButtonGroup.group: equaliserGroup
+                        checked: AudioEngine.equaliserEnabled
+                                 && AudioEngine.equaliserPreset === modelData
+                        onTriggered: AudioEngine.applyEqualiserPreset(modelData)
+                    }
+                    // After "No equaliser" and its separator.
+                    onObjectAdded: function(index, object) { equaliserMenu.insertItem(2 + index, object) }
+                    onObjectRemoved: function(index, object) { equaliserMenu.removeItem(object) }
+                }
+                MenuSeparator {}
+                MenuItem {
+                    // Shown as selected when the bands have been edited by hand, which is what an
+                    // empty preset name means.
+                    text: qsTr("Custom…")
+                    checkable: true
+                    ButtonGroup.group: equaliserGroup
+                    checked: AudioEngine.equaliserEnabled && AudioEngine.equaliserPreset === ""
+                    onTriggered: { AudioEngine.applyCustomEqualiser(); equaliserDialog.open() }
+                }
             }
-            MenuSeparator {}
-            MenuItem {
-                // Shown as selected when the bands have been edited by hand, which is what an
-                // empty preset name means.
-                text: qsTr("Custom…")
-                checkable: true
-                ButtonGroup.group: equaliserGroup
-                checked: AudioEngine.equaliserEnabled && AudioEngine.equaliserPreset === ""
-                onTriggered: { AudioEngine.applyCustomEqualiser(); equaliserDialog.open() }
-            }
-
-            MenuSeparator {}
 
             // Switching here is for this file only and deliberately does not write the language
             // preference: "play the French track this once" and "prefer French from now on" are
