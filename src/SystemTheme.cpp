@@ -55,6 +55,8 @@ SystemTheme::SystemTheme(QObject *parent)
 
     m_savedPalettes = settings.value(QStringLiteral("appearance/savedPalettes")).toStringList();
 
+    m_softwareRendering =
+        QSettings().value(QStringLiteral("video/softwareRendering"), false).toBool();
     m_portalHint = queryPortalHint();
     m_schemeHint = querySchemeHint();
     m_themeNameHint = queryThemeNameHint();
@@ -213,6 +215,17 @@ void SystemTheme::setCustomText(const QColor &colour)
     QSettings().setValue(QStringLiteral("appearance/text"), colour.name());
     applyPalette();
     emit customChanged();
+}
+
+void SystemTheme::setSoftwareRendering(bool on)
+{
+    if (on == m_softwareRendering) {
+        emit softwareRenderingChanged();
+        return;
+    }
+    m_softwareRendering = on;
+    QSettings().setValue(QStringLiteral("video/softwareRendering"), on);
+    emit softwareRenderingChanged();
 }
 
 void SystemTheme::setStageTint(int percent)

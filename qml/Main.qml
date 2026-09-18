@@ -1235,6 +1235,19 @@ ApplicationWindow {
             MenuSeparator {}
 
             MenuItem {
+                text: qsTr("Software rendering")
+                checkable: true
+                checked: SystemTheme.softwareRendering
+                onTriggered: {
+                    SystemTheme.softwareRendering = checked
+                    softwareRenderingNote.open()
+                }
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Draw the visualisation on the processor instead of the "
+                                   + "graphics card. Slower, but some drivers render nothing.")
+            }
+
+            MenuItem {
                 text: qsTr("Show subtitles")
                 checkable: true
                 // The preference rather than the live track, so it still reads correctly with
@@ -1940,6 +1953,26 @@ ApplicationWindow {
         defaultSuffix: "m3u"
         nameFilters: [qsTr("M3U playlists (*.m3u *.m3u8)")]
         onAccepted: PlaylistModel.saveM3U(selectedFile)
+    }
+
+    Dialog {
+        id: softwareRenderingNote
+        title: qsTr("Software rendering")
+        modal: true
+        anchors.centerIn: Overlay.overlay
+        standardButtons: Dialog.Ok
+        // A fixed implicitWidth, not width: binding width inside a Dialog's contentItem makes
+        // the dialog size from the text while the text sizes from the dialog, which Qt reports
+        // as a binding loop on implicitWidth.
+        contentItem: Text {
+            text: SystemTheme.softwareRendering
+                  ? qsTr("Software rendering will be used the next time Reverie starts.")
+                  : qsTr("The graphics card will be used again the next time Reverie starts.")
+            color: Theme.text
+            wrapMode: Text.WordWrap
+            implicitWidth: 320
+        }
+        background: Rectangle { color: Theme.surface; border.color: Theme.border; radius: 6 }
     }
 
     FileDialog {

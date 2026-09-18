@@ -8,6 +8,7 @@
 #include <QQuickWindow>
 #include <QDir>
 #include <QFile>
+#include <QSettings>
 #include <QFileInfo>
 #include <QStandardPaths>
 #include <QUrl>
@@ -57,6 +58,27 @@ int main(int argc, char *argv[])
     // Qt 6 renders through RHI and would otherwise be free to pick a different backend, so
     // pin it to OpenGL before QGuiApplication reads the environment.
     qputenv("QSG_RHI_BACKEND", "opengl");
+
+    // Software rendering, as a user-facing escape hatch. Some drivers accept every projectM
+    // call, report no error, and draw nothing - on such a machine a visualiser that works
+    // slowly beats one that does not work at all. This has to happen before QGuiApplication
+    // exists, because the GL implementation is chosen when the first context is created, which
+    // is why it is a setting applied at startup rather than something switchable while running.
+    //
+    // QSettings needs the application identity before it can be read, and the QGuiApplication
+    // that normally sets it does not exist yet - so name it explicitly here.
+    QCoreApplication::setOrganizationName(QStringLiteral("reverie"));
+    QCoreApplication::setApplicationName(QStringLiteral("reverie"));
+    if (QSettings().value(QStringLiteral("video/softwareRendering"), false).toBool()) {
+        // LIBGL_ALWAYS_SOFTWARE is a Mesa variable and NVIDIA's libGL ignores it, so on a
+        // libglvnd system the Mesa GLX vendor has to be selected as well or the setting does
+        // nothing at all. Measured on an NVIDIA machine: without this the renderer string still
+        // came back as the GPU.
+        qputenv("__GLX_VENDOR_LIBRARY_NAME", "mesa");
+        qputenv("LIBGL_ALWAYS_SOFTWARE", "1");
+        qputenv("GALLIUM_DRIVER", "llvmpipe");
+        qInfo("video: software rendering forced by preference");
+    }
 
     // Ask for 4.5, not projectM's 3.3 minimum. Mesa returns the highest version it supports
     // whatever you request - llvmpipe hands back 4.5 for a 3.3 request - so asking for the

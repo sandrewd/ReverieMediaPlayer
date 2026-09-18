@@ -3,6 +3,7 @@
 
 #include <QElapsedTimer>
 #include <QOpenGLContext>
+#include <QOpenGLExtraFunctions>
 #include <QSet>
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLFramebufferObject>
@@ -279,11 +280,83 @@ public:
         if (fns)
             while (fns->glGetError() != GL_NO_ERROR) { }
 
+        // Qt leaves the draw buffer set to GL_BACK on our framebuffer object. For an FBO the
+        // draw buffer must name a colour attachment; GL_BACK is meaningless there and every
+        // draw targeting it is discarded - silently, with no GL error, which is exactly the
+        // symptom. Mesa evidently tolerates it; NVIDIA does not.
+        if (QOpenGLFramebufferObject *t0 = framebufferObject(); t0 && fns
+            && !qEnvironmentVariableIsSet("PLAYER_NO_DRAWBUFFER_FIX")) {
+            fns->glBindFramebuffer(GL_FRAMEBUFFER, t0->handle());
+            GLint before = 0;
+            fns->glGetIntegerv(GL_DRAW_BUFFER0, &before);
+            const GLenum att = GL_COLOR_ATTACHMENT0;
+            if (auto *e = QOpenGLContext::currentContext()->extraFunctions())
+                e->glDrawBuffers(1, &att);
+            if (!m_drawBufferLogged) {
+                m_drawBufferLogged = true;
+                GLint after = 0;
+                fns->glGetIntegerv(GL_DRAW_BUFFER0, &after);
+                qInfo("gl: draw buffer on target fbo was 0x%04x, set to 0x%04x", before, after);
+            }
+        }
+
+        // Render into an FBO of our own making, then blit into Qt's. projectM renders correctly
+        // into a plain hand-built FBO on this same GPU - proven by a standalone GLX harness - so
+        // if this works, the fault is in the framebuffer object Qt hands us rather than in
+        // projectM or the driver.
+        if (qEnvironmentVariableIsSet("PLAYER_OWN_FBO") && fns) {
+            auto *ef = QOpenGLContext::currentContext()->extraFunctions();
+            if (m_ownFbo == 0 || m_ownSize != m_fboSize) {
+                if (m_ownFbo) { ef->glDeleteFramebuffers(1, &m_ownFbo); ef->glDeleteTextures(1, &m_ownTex);
+                                ef->glDeleteRenderbuffers(1, &m_ownRbo); }
+                ef->glGenFramebuffers(1, &m_ownFbo);
+                ef->glBindFramebuffer(GL_FRAMEBUFFER, m_ownFbo);
+                ef->glGenTextures(1, &m_ownTex);
+                ef->glBindTexture(GL_TEXTURE_2D, m_ownTex);
+                ef->glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_fboSize.width(), m_fboSize.height(),
+                                 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+                ef->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                ef->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                ef->glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_ownTex, 0);
+                ef->glGenRenderbuffers(1, &m_ownRbo);
+                ef->glBindRenderbuffer(GL_RENDERBUFFER, m_ownRbo);
+                ef->glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8,
+                                          m_fboSize.width(), m_fboSize.height());
+                ef->glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+                                              GL_RENDERBUFFER, m_ownRbo);
+                m_ownSize = m_fboSize;
+                qInfo("gl: own fbo %u %dx%d status 0x%04x", m_ownFbo, m_fboSize.width(),
+                      m_fboSize.height(), ef->glCheckFramebufferStatus(GL_FRAMEBUFFER));
+            }
+            ef->glBindFramebuffer(GL_FRAMEBUFFER, m_ownFbo);
+            projectm_opengl_render_frame_fbo(m_pm, m_ownFbo);
+            if (QOpenGLFramebufferObject *t = framebufferObject()) {
+                ef->glBindFramebuffer(GL_READ_FRAMEBUFFER, m_ownFbo);
+                ef->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, t->handle());
+                ef->glBlitFramebuffer(0, 0, m_fboSize.width(), m_fboSize.height(),
+                                      0, 0, t->width(), t->height(),
+                                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
+                ef->glBindFramebuffer(GL_FRAMEBUFFER, t->handle());
+            }
+        } else
 #if defined(PROJECTM_HAS_RENDER_FRAME_FBO)
         if (QOpenGLFramebufferObject *target = framebufferObject()) {
             if (fns && !m_fboChecked) {
                 m_fboChecked = true;
                 const GLenum status = fns->glCheckFramebufferStatus(GL_FRAMEBUFFER);
+                const QOpenGLFramebufferObjectFormat ff = target->format();
+                GLint samples = 0, drawBuf = 0, srgb = 0;
+                fns->glGetIntegerv(GL_SAMPLES, &samples);
+                fns->glGetIntegerv(GL_DRAW_BUFFER0, &drawBuf);
+                fns->glGetIntegerv(GL_FRAMEBUFFER_SRGB, &srgb);
+                const QSurfaceFormat sf = QOpenGLContext::currentContext()->format();
+                qInfo("gl fbo detail: samples %d (fmt %d) | texfmt 0x%04x | attach %d | "
+                      "drawbuf 0x%04x | srgb %d | surface rgba %d%d%d%d d%d s%d samples %d",
+                      samples, ff.samples(), ff.internalTextureFormat(), int(ff.attachment()),
+                      drawBuf, srgb,
+                      sf.redBufferSize(), sf.greenBufferSize(), sf.blueBufferSize(),
+                      sf.alphaBufferSize(), sf.depthBufferSize(), sf.stencilBufferSize(),
+                      sf.samples());
                 qInfo("gl: render target fbo %u, %dx%d, status 0x%04x%s",
                       target->handle(), target->width(), target->height(), status,
                       status == GL_FRAMEBUFFER_COMPLETE ? " (complete)" : " (INCOMPLETE)");
@@ -295,6 +368,39 @@ public:
 #else
         projectm_opengl_render_frame(m_pm);
 #endif
+
+        // Is the target reachable at all? A known-good clear after projectM has drawn tells
+        // the two failures apart: if the clear shows and projectM does not, the FBO and the
+        // probe are fine and projectM's draws are being discarded.
+        if (qEnvironmentVariableIsSet("PLAYER_TEST_CLEAR") && fns) {
+            fns->glBindFramebuffer(GL_FRAMEBUFFER, framebufferObject() ? framebufferObject()->handle() : 0);
+            fns->glDisable(GL_SCISSOR_TEST);
+            fns->glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+            fns->glClearColor(0.0f, 0.55f, 0.0f, 1.0f);
+            fns->glClear(GL_COLOR_BUFFER_BIT);
+        }
+
+        // What state did the scene graph leave us in? Any of these can silently discard every
+        // draw: a scissor rectangle that excludes the target, a zeroed viewport, a colour mask
+        // with the channels switched off.
+        if (!m_stateDumped && fns) {
+            m_stateDumped = true;
+            GLint vp[4] = {0,0,0,0}, sc[4] = {0,0,0,0}, dfb = 0, rfb = 0;
+            GLboolean cm[4] = {0,0,0,0};
+            fns->glGetIntegerv(GL_VIEWPORT, vp);
+            fns->glGetIntegerv(GL_SCISSOR_BOX, sc);
+            fns->glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &dfb);
+            fns->glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &rfb);
+            fns->glGetBooleanv(GL_COLOR_WRITEMASK, cm);
+            qInfo("gl state: viewport %d,%d %dx%d | scissor %s box %d,%d %dx%d | "
+                  "draw fbo %d read fbo %d | colormask %d%d%d%d | depth %s | blend %s | cull %s",
+                  vp[0], vp[1], vp[2], vp[3],
+                  fns->glIsEnabled(GL_SCISSOR_TEST) ? "ON" : "off", sc[0], sc[1], sc[2], sc[3],
+                  dfb, rfb, cm[0], cm[1], cm[2], cm[3],
+                  fns->glIsEnabled(GL_DEPTH_TEST) ? "on" : "off",
+                  fns->glIsEnabled(GL_BLEND) ? "on" : "off",
+                  fns->glIsEnabled(GL_CULL_FACE) ? "on" : "off");
+        }
 
         if (fns) {
             GLenum err = fns->glGetError();
@@ -643,6 +749,10 @@ private:
     QSize m_fboSize;
         QOpenGLVertexArrayObject m_vao;
         bool m_fboChecked = false;
+        bool m_stateDumped = false;
+        bool m_drawBufferLogged = false;
+        GLuint m_ownFbo = 0, m_ownTex = 0, m_ownRbo = 0;
+        QSize m_ownSize;
         QSet<GLenum> m_seenGlErrors;
     QString m_presetPath;
     bool m_pendingPreset = false;

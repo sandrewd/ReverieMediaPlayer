@@ -47,6 +47,12 @@ class SystemTheme : public QObject
     Q_PROPERTY(QStringList recentColours READ recentColours NOTIFY recentColoursChanged)
     Q_PROPERTY(int recentColoursLimit READ recentColoursLimit CONSTANT)
     Q_PROPERTY(QVariantList savedPalettes READ savedPalettes NOTIFY savedPalettesChanged)
+
+    // Applied at startup, not while running: the GL implementation is chosen when the first
+    // context is created, long before anything can be toggled. Some drivers accept every
+    // projectM call, report no error and draw nothing; on those a slow visualiser beats none.
+    Q_PROPERTY(bool softwareRendering READ softwareRendering WRITE setSoftwareRendering
+                   NOTIFY softwareRenderingChanged)
     Q_PROPERTY(int paletteNameMaximum READ paletteNameLimit CONSTANT)
 
 public:
@@ -108,6 +114,9 @@ public:
     Q_INVOKABLE void applySavedPalette(const QString &name);
     static int paletteNameLimit() { return kPaletteNameLimit; }
 
+    bool softwareRendering() const { return m_softwareRendering; }
+    void setSoftwareRendering(bool on);
+
 signals:
     void darkChanged();
     void systemIsDarkChanged();
@@ -116,6 +125,7 @@ signals:
     void layoutChanged();
     void recentColoursChanged();
     void savedPalettesChanged();
+    void softwareRenderingChanged();
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -147,6 +157,7 @@ private:
     Preference m_preference = FollowSystem;
 
     // The desktop's own colour-scheme setting, when it expresses a preference at all.
+    bool m_softwareRendering = false;
     int m_portalHint = -1;
     int m_schemeHint = -1;
     // Fallback read of the GTK theme name, for desktops that only change that.
