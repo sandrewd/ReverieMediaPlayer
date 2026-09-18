@@ -124,7 +124,9 @@ jobs:
       - name: Compare the manifest pin against the newest tag
         run: |
           MANIFEST=packaging/flatpak/io.github.sandrewd.ReverieMediaPlayer.yml
-          TAG="$(git describe --tags --abbrev=0)"
+          # Only release tags. Asset-bearing tags such as the preset packs are not releases of
+          # the application, and a bare `git describe` would pick one up and fail against it.
+          TAG="$(git describe --tags --abbrev=0 --match 'v[0-9]*')"
           WANT_COMMIT="$(git rev-parse "${TAG}^{commit}")"
           GOT_TAG="$(awk '/^[[:space:]]+tag:/ {v=$2} END {print v}' "$MANIFEST" | tr -d "\"'")"
           GOT_COMMIT="$(awk '/^[[:space:]]+commit:/ {v=$2} END {print v}' "$MANIFEST" | tr -d "\"'")"

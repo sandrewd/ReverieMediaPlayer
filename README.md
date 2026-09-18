@@ -20,7 +20,9 @@ try to organise your music collection.
 - **Transport** — play, pause, stop, next, previous, seek, volume, shuffle, repeat that cycles
   off / playlist / one track, and a subtitles toggle
 - **Visualisations** — projectM (Milkdrop) presets, embedded or fullscreen, driven by the decoded
-  audio. Right-click the visualiser to pick a preset by category, or leave it to rotate.
+  audio. Right-click the visualiser to pick a preset by category, or leave it to rotate. The
+  packages carry a curated 480; the full collection of **9,795** is an optional 2.7 MB download
+  from *Options > Visualisation*.
 - **Equaliser** — twelve preset curves and a ten-band custom mixer, with boosts compensated
   automatically so a loud curve cannot clip
 - **One playlist** — drag to reorder, multi-select, remove, save and load M3U. Not tabbed
@@ -123,6 +125,12 @@ git clone --depth 1 \
 The build installs the 480 presets listed in `assets/presets-curated.txt`, roughly 5 MB, chosen
 to spread across categories and to avoid the most expensive presets. Point `--presets` at any
 directory to use a different set.
+
+Users of a built package do not need any of the above: *Options > Visualisation > Get more
+visualisations…* downloads the complete collection, which is
+[published as its own release](https://github.com/sandrewd/ReverieMediaPlayer/releases/tag/presets-v1)
+and pinned by digest. It installs alongside the packaged set rather than over it, so switching
+back is a menu item rather than a reinstall.
 
 ### Installing
 

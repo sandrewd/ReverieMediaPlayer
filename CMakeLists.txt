@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(player VERSION 0.8.8 LANGUAGES CXX)
+project(player VERSION 0.9.0 LANGUAGES CXX)
 
 # Shown in About. Real since 2026-09-16; it was deliberately an obvious placeholder until the
 # project had a remote, because a plausible-looking URL that goes nowhere is worse than one that
@@ -37,7 +37,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Quick OpenGL DBus Svg)
+find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Quick OpenGL DBus Svg Network)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GST REQUIRED IMPORTED_TARGET
     gstreamer-1.0 gstreamer-app-1.0 gstreamer-audio-1.0 gstreamer-tag-1.0 gstreamer-video-1.0)
@@ -98,6 +98,8 @@ qt_add_executable(player
     src/SystemTheme.h
     src/PresetLibrary.cpp
     src/PresetLibrary.h
+    src/PresetPack.cpp
+    src/PresetPack.h
     src/AppInfo.cpp
     src/AppInfo.h
     src/VideoItem.cpp
@@ -234,6 +236,9 @@ target_link_libraries(player PRIVATE
     Qt6::OpenGL
     Qt6::DBus
     Qt6::Svg
+    # Only for fetching the optional preset pack. Streams go through GStreamer, so nothing else
+    # in Reverie speaks HTTP.
+    Qt6::Network
     PkgConfig::GST
     PkgConfig::TAGLIB
     libprojectM::projectM

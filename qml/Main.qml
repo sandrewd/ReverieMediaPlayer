@@ -223,8 +223,35 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
-        PresetLibrary.rootPath = initialPresetsPath
-        PresetLibrary.curatedList = initialCuratedList
+        // The packaged library is the fallback; PresetPack decides whether the downloaded one
+        // is in use and publishes the answer as activePresetsPath.
+        PresetPack.bundledPresetsPath = initialPresetsPath
+        applyPresetLibrary()
+    }
+
+    // Swapping the library has to reach four things at once, and applying it at startup is as
+    // important as applying it on a change: `presetsPath: initialPresetsPath` on the visualiser
+    // is a one-time assignment, so a handler that only reacts to later changes leaves a restored
+    // preference silently unapplied. The brief records the same shape costing a whole setting
+    // once already, where a binding overwrote what the constructor had loaded.
+    function applyPresetLibrary() {
+        const path = PresetPack.activePresetsPath
+        // The curated list names presets by relative path, and those same paths exist inside the
+        // full pack - so leaving it set would narrow the download straight back down to the 480
+        // it was meant to replace.
+        const list = PresetPack.useFullPack ? "" : initialCuratedList
+        PresetLibrary.rootPath = path
+        PresetLibrary.curatedList = list
+        visualizer.presetsPath = path
+        visualizer.curatedList = list
+        // A category narrowing names presets that no longer exist once the tree changes.
+        visualizer.setPresetList([])
+    }
+
+    Connections {
+        target: PresetPack
+        function onActivePresetsPathChanged() { root.applyPresetLibrary() }
+        function onUseFullPackChanged() { root.applyPresetLibrary() }
     }
 
     // One invariant, enforced in one place: if no row is current, nothing should be playing.
@@ -919,7 +946,9 @@ ApplicationWindow {
                 text: qsTr("Use the curated selection")
                 // A package that ships only the curated presets installs no list, and then this
                 // switches between a set and itself. Hide it rather than have it do nothing.
-                visible: initialCuratedList !== ""
+                // Hidden over the full pack too, where the library choice above governs instead
+                // and this would narrow 9,795 back to the 480 that were just replaced.
+                visible: initialCuratedList !== "" && !PresetPack.useFullPack
                 height: visible ? implicitHeight : 0
                 checkable: true
                 checked: visualizer.curatedList !== ""
@@ -937,6 +966,48 @@ ApplicationWindow {
                 checked: visualizer.shuffle
                 onTriggered: visualizer.shuffle = checked
             }
+
+            MenuSeparator {
+                visible: PresetPack.installed
+                height: visible ? implicitHeight : 0
+            }
+
+            // Which library is in play. Two directories rather than a list narrowing a corpus:
+            // the packaged 480 and the downloaded 9,795 are separate trees, so this needs no
+            // curated list and works in a package, where the list is deliberately not installed.
+            ButtonGroup { id: presetLibraryGroup }
+
+            MenuItem {
+                text: qsTr("Curated selection")
+                visible: PresetPack.installed
+                height: visible ? implicitHeight : 0
+                checkable: true
+                ButtonGroup.group: presetLibraryGroup
+                checked: !PresetPack.useFullPack
+                onTriggered: PresetPack.useFullPack = false
+            }
+            MenuItem {
+                text: qsTr("Every visualisation (%1)").arg(PresetPack.installedCount)
+                visible: PresetPack.installed
+                height: visible ? implicitHeight : 0
+                checkable: true
+                ButtonGroup.group: presetLibraryGroup
+                checked: PresetPack.useFullPack
+                onTriggered: PresetPack.useFullPack = true
+            }
+            MenuItem {
+                text: qsTr("Get more visualisations…")
+                visible: !PresetPack.installed
+                height: visible ? implicitHeight : 0
+                onTriggered: presetPackDialog.open()
+            }
+            MenuItem {
+                text: qsTr("Remove the extra visualisations")
+                visible: PresetPack.installed
+                height: visible ? implicitHeight : 0
+                onTriggered: PresetPack.remove()
+            }
+
             MenuSeparator {}
 
             // These were four plain items with no checked state, so nothing showed which one was
@@ -1627,6 +1698,93 @@ ApplicationWindow {
                     onClicked: AudioEngine.flattenCustomEqualiser()
                 }
             }
+        }
+    }
+
+    Dialog {
+        id: presetPackDialog
+        title: qsTr("More visualisations")
+        // Not modal: this downloads while you listen, and a modal dialog would block the
+        // transport and the playlist for the duration, the same reason the equaliser is not one.
+        modal: false
+        anchors.centerIn: parent
+        width: Math.min(460, root.width - 60)
+        closePolicy: Popup.CloseOnEscape
+        standardButtons: Dialog.NoButton
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 12
+
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                color: Theme.text
+                text: qsTr("Reverie comes with a selection of %1 visualisations. The full Milkdrop collection has %2.")
+                          .arg(PresetLibrary.count)
+                          .arg(PresetPack.packCount)
+            }
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                color: Theme.textDim
+                font.pixelSize: 11
+                // Said plainly because it is the honest trade: more to look at, and a slower
+                // tail. Measured - the curated set is chosen to avoid the most expensive
+                // presets, not to be prettier.
+                text: qsTr("A %1 download. More variety, and some of them are slower to draw. "
+                           + "You can switch back at any time.").arg(PresetPack.downloadSize)
+            }
+
+            ProgressBar {
+                Layout.fillWidth: true
+                visible: PresetPack.state !== PresetPack.Idle && PresetPack.state !== PresetPack.Failed
+                height: visible ? implicitHeight : 0
+                from: 0; to: 1
+                value: PresetPack.progress
+                indeterminate: PresetPack.state === PresetPack.Extracting
+            }
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                visible: PresetPack.message !== ""
+                height: visible ? implicitHeight : 0
+                text: PresetPack.message
+                // No dedicated error colour: every token is derived from the user's four so that
+                // no theme can produce invisible text, and a fifth hand-picked one would not be.
+                // Full-strength text against dimmed is enough to mark a failure, and the message
+                // says so in words regardless.
+                color: PresetPack.state === PresetPack.Failed ? Theme.text : Theme.textDim
+                font.pixelSize: 11
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                Item { Layout.fillWidth: true }
+                Button {
+                    text: qsTr("Close")
+                    visible: PresetPack.state === PresetPack.Idle || PresetPack.state === PresetPack.Failed
+                    onClicked: presetPackDialog.close()
+                }
+                Button {
+                    text: qsTr("Cancel")
+                    visible: !(PresetPack.state === PresetPack.Idle || PresetPack.state === PresetPack.Failed)
+                    onClicked: PresetPack.cancel()
+                }
+                Button {
+                    text: PresetPack.state === PresetPack.Failed ? qsTr("Try again") : qsTr("Download")
+                    enabled: PresetPack.state === PresetPack.Idle || PresetPack.state === PresetPack.Failed
+                    visible: !PresetPack.installed
+                    highlighted: true
+                    onClicked: PresetPack.install()
+                }
+            }
+        }
+
+        Connections {
+            target: PresetPack
+            function onFinished(ok) { if (ok) presetPackDialog.close() }
         }
     }
 
