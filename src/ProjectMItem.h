@@ -30,6 +30,9 @@ class ProjectMItem : public QQuickFramebufferObject
     Q_PROPERTY(QString presetsPath READ presetsPath WRITE setPresetsPath NOTIFY presetsPathChanged)
     Q_PROPERTY(QString curatedList READ curatedList WRITE setCuratedList NOTIFY curatedListChanged)
     Q_PROPERTY(QString presetName READ presetName NOTIFY presetChanged)
+    // The file behind presetName. Favourites and recents address presets by path, because two
+    // packs can hold presets of the same name and a name cannot be reopened.
+    Q_PROPERTY(QString presetFile READ presetFile NOTIFY presetChanged)
     Q_PROPERTY(int presetIndex READ presetIndex NOTIFY presetChanged)
     Q_PROPERTY(int presetCount READ presetCount NOTIFY presetChanged)
     Q_PROPERTY(bool presetLocked READ presetLocked WRITE setPresetLocked NOTIFY presetLockedChanged)
@@ -77,6 +80,7 @@ public:
     QString curatedList() const { return m_curatedList; }
     void setCuratedList(const QString &path);
     QString presetName() const { return m_presetName; }
+    QString presetFile() const { return m_presetFile; }
     int presetIndex() const { return m_presetIndex; }
     int presetCount() const { return m_presetCount; }
     bool presetLocked() const { return m_presetLocked; }
@@ -129,7 +133,7 @@ public:
 public slots:
     // Both called from the render thread via a queued connection, so they land on the GUI thread.
     void applyStats(qreal frameTimeMs, qreal fps, int width, int height);
-    void applyPreset(const QString &name, int index, int count);
+    void applyPreset(const QString &name, const QString &file, int index, int count);
     void applyAdaptiveScale(qreal scale);
 
 signals:
@@ -160,6 +164,7 @@ private:
     QString m_presetsPath;
     QString m_curatedList;
     QString m_presetName;
+    QString m_presetFile;
     int m_presetIndex = 0;
     int m_presetCount = 0;
     bool m_presetLocked = false;

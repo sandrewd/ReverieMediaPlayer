@@ -178,6 +178,25 @@ AbstractButton {
                     ctx.moveTo(w * 0.95, h * 0.65); ctx.lineTo(w * 0.95, h * 0.95); ctx.lineTo(w * 0.65, h * 0.95)
                     ctx.moveTo(w * 0.35, h * 0.95); ctx.lineTo(w * 0.05, h * 0.95); ctx.lineTo(w * 0.05, h * 0.65)
                     ctx.stroke(); break
+                case "star":
+                case "starFilled":
+                    // Drawn rather than set as a glyph character, like every other icon here:
+                    // a star from the system font is not guaranteed to exist and not guaranteed
+                    // to be the same shape twice.
+                    ctx.strokeStyle = ctx.fillStyle
+                    ctx.lineWidth = Math.max(1, w * 0.10)
+                    ctx.lineJoin = "round"
+                    ctx.beginPath()
+                    for (let k = 0; k < 10; ++k) {
+                        const r = (k % 2 === 0) ? w * 0.44 : w * 0.18
+                        const a = -Math.PI / 2 + k * Math.PI / 5
+                        const px = w * 0.5 + r * Math.cos(a)
+                        const py = h * 0.5 + r * Math.sin(a)
+                        if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py)
+                    }
+                    ctx.closePath()
+                    if (control.glyph === "starFilled") ctx.fill(); else ctx.stroke()
+                    break
                 case "chevronRight":
                     ctx.strokeStyle = ctx.fillStyle
                     ctx.lineWidth = Math.max(1.5, w * 0.16)

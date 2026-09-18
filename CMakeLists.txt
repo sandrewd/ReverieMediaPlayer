@@ -100,6 +100,8 @@ qt_add_executable(player
     src/PresetLibrary.h
     src/PresetPack.cpp
     src/PresetPack.h
+    src/PresetHistory.cpp
+    src/PresetHistory.h
     src/AppInfo.cpp
     src/AppInfo.h
     src/VideoItem.cpp
@@ -206,7 +208,7 @@ qt_add_qml_module(player
         qml/PlaylistPanel.qml
         qml/ColourRow.qml
         qml/ReverieMark.qml
-        qml/PresetBrowser.qml
+        qml/PresetPanel.qml
         qml/VideoSurface.qml
         qml/Ticker.qml
 )

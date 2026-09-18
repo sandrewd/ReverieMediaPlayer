@@ -43,6 +43,11 @@ class SystemTheme : public QObject
     // the role was added for.
     Q_PROPERTY(int stageTint READ stageTint WRITE setStageTint NOTIFY customChanged)
     Q_PROPERTY(int playlistWidth READ playlistWidth WRITE setPlaylistWidth NOTIFY layoutChanged)
+    // The visualisation browser is a panel on the left, mirroring the playlist on the right.
+    // It is a panel rather than a dialog because a floating window always covers the stage you
+    // opened it to look at, and because a second top-level window inherits every Wayland
+    // decoration problem the brief records.
+    Q_PROPERTY(int presetPanelWidth READ presetPanelWidth WRITE setPresetPanelWidth NOTIFY layoutChanged)
     Q_PROPERTY(int transportHeight READ transportHeight WRITE setTransportHeight NOTIFY layoutChanged)
     Q_PROPERTY(QStringList recentColours READ recentColours NOTIFY recentColoursChanged)
     Q_PROPERTY(int recentColoursLimit READ recentColoursLimit CONSTANT)
@@ -75,6 +80,8 @@ public:
     int stageTint() const { return m_stageTint; }
     void setStageTint(int percent);
     int playlistWidth() const { return m_playlistWidth; }
+    int presetPanelWidth() const { return m_presetPanelWidth; }
+    void setPresetPanelWidth(int width);
     void setPlaylistWidth(int width);
     int transportHeight() const { return m_transportHeight; }
     void setTransportHeight(int height);
@@ -170,6 +177,7 @@ private:
     QColor m_customStage;
     int m_stageTint = 0;
     int m_playlistWidth = 340;
+    int m_presetPanelWidth = 320;
     int m_transportHeight = 88;
     static constexpr int kRecentLimit = 5;
     static constexpr int kPaletteNameLimit = 24;

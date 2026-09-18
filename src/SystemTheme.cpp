@@ -46,6 +46,9 @@ SystemTheme::SystemTheme(QObject *parent)
     m_playlistWidth = qBound(kMinPlaylistWidth,
                              settings.value(QStringLiteral("layout/playlistWidth"), 340).toInt(),
                              2000);
+    m_presetPanelWidth = qBound(kMinPlaylistWidth,
+                                settings.value(QStringLiteral("layout/presetPanelWidth"), 320).toInt(),
+                                2000);
     m_transportHeight = qBound(kMinTransportHeight,
                                settings.value(QStringLiteral("layout/transportHeight"), 88).toInt(),
                                kMaxTransportHeight);
@@ -245,6 +248,16 @@ void SystemTheme::setPlaylistWidth(int width)
         return;
     m_playlistWidth = width;
     QSettings().setValue(QStringLiteral("layout/playlistWidth"), width);
+    emit layoutChanged();
+}
+
+void SystemTheme::setPresetPanelWidth(int width)
+{
+    width = qBound(kMinPlaylistWidth, width, 2000);
+    if (width == m_presetPanelWidth)
+        return;
+    m_presetPanelWidth = width;
+    QSettings().setValue(QStringLiteral("layout/presetPanelWidth"), width);
     emit layoutChanged();
 }
 

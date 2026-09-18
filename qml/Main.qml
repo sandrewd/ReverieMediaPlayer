@@ -59,6 +59,7 @@ ApplicationWindow {
     property bool mini: false
     property bool fullscreen: false
     property bool playlistVisible: true
+    property bool presetPanelVisible: false
     property bool alwaysOnTop: false
 
     // Our renditions in these four roles, not reproductions of anyone's published scheme.
@@ -98,6 +99,10 @@ ApplicationWindow {
     // (inside TransportBar), then the artist line. The transport itself never collapses.
     readonly property bool roomForPlaylist: width >= 700
     readonly property bool showPlaylist: !mini && !fullscreen && playlistVisible && roomForPlaylist
+    // Same rules as the playlist: no panel in mini or fullscreen, and not below the width where
+    // the stage would be squeezed out. It also cannot open over video, which has no presets.
+    readonly property bool showPresetPanel: !mini && !fullscreen && presetPanelVisible
+                                            && roomForPlaylist && !AudioEngine.hasVideo
 
     // What the window was before it went fullscreen, so leaving restores that rather than
     // always dropping to Windowed - which silently un-maximised a maximised window.
@@ -168,6 +173,32 @@ ApplicationWindow {
     // choosing one switches to the custom theme rather than quietly storing it for later.
     // Clamped against the live window width as well as the stored bounds, so a width saved on a
     // wide screen cannot leave the stage unusable on a narrow one.
+    function clampPresetPanelWidth(w) {
+        const room = root.width - (root.showPlaylist ? playlistPanel.width : 0) - 360
+        return Math.max(200, Math.min(w, Math.max(200, room)))
+    }
+
+    // Playing one specific visualisation, from the menu or a list. Deliberately locks: choosing
+    // a preset by name is a request for that preset, and the rotation would move off it inside
+    // half a minute otherwise.
+    function playPreset(path) {
+        if (!path)
+            return
+        const all = PresetLibrary.paths("")
+        const i = all.indexOf(path)
+        if (i >= 0) {
+            visualizer.setPresetList(all)
+            visualizer.jumpTo(i)
+        } else {
+            // A favourite from the full pack while the curated set is active. Append rather
+            // than replace, so the rotation still has somewhere to go if it is unlocked again.
+            const widened = all.concat([path])
+            visualizer.setPresetList(widened)
+            visualizer.jumpTo(widened.length - 1)
+        }
+        visualizer.presetLocked = true
+    }
+
     function clampPlaylistWidth(w) {
         const limit = Math.max(SystemTheme.kMinPlaylistWidth !== undefined ? 200 : 200,
                                root.width - 360 - 6)
@@ -304,6 +335,71 @@ ApplicationWindow {
             Layout.fillHeight: true
             visible: !root.mini
             spacing: 0
+
+            // The visualisation browser, mirroring the playlist on the other side. A panel
+            // rather than a floating dialog: it shrinks the stage instead of covering the one
+            // thing it exists to show you.
+            PresetPanel {
+                id: presetPanel
+                visible: Layout.preferredWidth > 0
+                clip: true
+                visualizer: visualizer
+                Layout.preferredWidth: root.showPresetPanel
+                                       ? root.clampPresetPanelWidth(SystemTheme.presetPanelWidth) : 0
+                Layout.fillHeight: true
+                Behavior on Layout.preferredWidth {
+                    enabled: !presetSplitterArea.pressed
+                    NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+                }
+                onCollapseRequested: root.presetPanelVisible = false
+            }
+
+            Item {
+                id: presetSplitter
+                visible: root.showPresetPanel
+                Layout.preferredWidth: visible ? 6 : 0
+                Layout.fillHeight: true
+
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 2
+                    height: 34
+                    radius: 1
+                    color: presetSplitterArea.containsMouse || presetSplitterArea.pressed
+                           ? Theme.accent : Theme.border
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                }
+
+                MouseArea {
+                    id: presetSplitterArea
+                    anchors.fill: parent
+                    anchors.leftMargin: -3
+                    anchors.rightMargin: -3
+                    hoverEnabled: true
+                    cursorShape: Qt.SplitHCursor
+                    property real grabX: 0
+                    property int grabWidth: 0
+                    onPressed: function(mouse) {
+                        grabX = mapToItem(null, mouse.x, 0).x
+                        grabWidth = SystemTheme.presetPanelWidth
+                    }
+                    onPositionChanged: function(mouse) {
+                        if (!pressed)
+                            return
+                        // This panel is on the left, so dragging right widens it - the opposite
+                        // of the playlist's splitter.
+                        const dx = mapToItem(null, mouse.x, 0).x - grabX
+                        SystemTheme.presetPanelWidth = root.clampPresetPanelWidth(grabWidth + dx)
+                    }
+                }
+            }
+
+            Rectangle {
+                visible: presetPanel.Layout.preferredWidth > 0
+                Layout.preferredWidth: 1
+                Layout.fillHeight: true
+                color: Theme.border
+            }
 
             // The visualiser is the default Now Playing state, not a mode to discover.
             Item {
@@ -601,6 +697,57 @@ ApplicationWindow {
 
     // --- chrome ------------------------------------------------------------------------
 
+    // Marking the visualisation you are actually watching. It sits opposite the chrome and
+    // follows exactly the same visibility rules, so it fades with the controls in fullscreen
+    // rather than being left floating over the picture on its own.
+    Rectangle {
+        id: favouriteChrome
+        anchors { left: parent.left; top: parent.top; margins: 10 }
+        // Clear of the browser panel when that is open, the way the chrome clears the playlist.
+        anchors.leftMargin: root.showPresetPanel ? presetPanel.width + presetSplitter.width + 10
+                                                 : 10
+        // Nothing to favourite over video, and nothing to favourite above a black stage: a
+        // preset is loaded whether or not audio is running, but offering to mark one you
+        // cannot see is the same misreading that removed the idle animation and that makes the
+        // menu header show an em dash when idle.
+        visible: !root.mini && !AudioEngine.hasVideo && visualizer.active
+                 && visualizer.presetFile !== ""
+                 && (!root.fullscreen || root.controlsVisible)
+        opacity: root.controlsVisible ? 1.0 : 0.0
+        Behavior on opacity { NumberAnimation { duration: 180 } }
+        width: favouriteButton.implicitWidth + 12
+        height: favouriteButton.implicitHeight + 8
+        radius: Theme.radius
+        color: Theme.overlayBackground
+
+        // Named first so QML binds to it: isFavourite() is a plain call and registers no
+        // dependency by itself.
+        readonly property bool marked:
+            (PresetHistory.favourites, PresetHistory.isFavourite(visualizer.presetFile))
+
+        IconButton {
+            id: favouriteButton
+            anchors.centerIn: parent
+            glyph: favouriteChrome.marked ? "starFilled" : "star"
+            overVideo: true
+            onClicked: PresetHistory.toggleFavourite(visualizer.presetFile)
+            ToolTip.visible: hovered
+            ToolTip.text: favouriteChrome.marked ? qsTr("Remove from favourites")
+                                                 : qsTr("Add to favourites")
+        }
+    }
+
+    // Every visualisation that becomes current is remembered, automatic rotations included -
+    // that is the point. Without it there is no way back to the one that just went past, which
+    // is exactly when someone decides they liked it.
+    Connections {
+        target: visualizer
+        function onPresetChanged() {
+            if (visualizer.presetFile !== "")
+                PresetHistory.noteUsed(visualizer.presetFile)
+        }
+    }
+
     Rectangle {
         // Keep clear of the playlist panel: this chrome belongs to the visualiser area. It
         // carries its own backdrop because the preset behind it can be any colour.
@@ -785,12 +932,72 @@ ApplicationWindow {
         MenuSeparator {}
 
         MenuItem {
+            readonly property bool marked:
+                (PresetHistory.favourites, PresetHistory.isFavourite(visualizer.presetFile))
+            text: marked ? qsTr("Remove from favourites") : qsTr("Add to favourites")
+            enabled: visualizer.presetFile !== ""
+            onTriggered: PresetHistory.toggleFavourite(visualizer.presetFile)
+        }
+
+        Menu {
+            id: favouritesMenu
+            title: qsTr("Favourites")
+            onAboutToShow: root.fitMenuWidth(favouritesMenu, 200, 460)
+            MenuItem {
+                text: qsTr("None yet")
+                enabled: false
+                visible: PresetHistory.favouriteCount === 0
+                height: visible ? implicitHeight : 0
+            }
+            // A Repeater cannot build menu items - a Menu inserts them rather than parenting
+            // them, and assigning them as visual children fails on a property it does not have.
+            Instantiator {
+                model: PresetHistory.favourites
+                delegate: MenuItem {
+                    required property var modelData
+                    text: modelData.title
+                    onTriggered: root.playPreset(modelData.path)
+                }
+                onObjectAdded: function(index, object) { favouritesMenu.insertItem(1 + index, object) }
+                onObjectRemoved: function(index, object) { favouritesMenu.removeItem(object) }
+            }
+        }
+
+        Menu {
+            // Not `recentMenu` - that id already belongs to the recent-colours menu in the
+            // theme editor.
+            id: recentPresetsMenu
+            title: qsTr("Recent")
+            onAboutToShow: root.fitMenuWidth(recentPresetsMenu, 200, 460)
+            MenuItem {
+                text: qsTr("Nothing yet")
+                enabled: false
+                visible: PresetHistory.recents.length === 0
+                height: visible ? implicitHeight : 0
+            }
+            Instantiator {
+                model: PresetHistory.recents
+                delegate: MenuItem {
+                    required property var modelData
+                    text: modelData.title
+                    // Picking one out of the history is choosing it, so it locks like any other
+                    // deliberate selection - otherwise the rotation carries you off it within
+                    // half a minute and the list looks broken.
+                    onTriggered: root.playPreset(modelData.path)
+                }
+                onObjectAdded: function(index, object) { recentPresetsMenu.insertItem(1 + index, object) }
+                onObjectRemoved: function(index, object) { recentPresetsMenu.removeItem(object) }
+            }
+        }
+
+        MenuSeparator {}
+        MenuItem {
             // What the eleven category submenus used to be. A cascading menu cannot present a
             // corpus: it was already a measurable stall to build at 480 presets, and the full
             // pack is 9,795 across 184 styles. One way in, not two - the same reason the old
             // chrome toggle went when the playlist grew its own collapse control.
-            text: qsTr("Browse all…")
-            onTriggered: presetBrowser.open()
+            text: root.presetPanelVisible ? qsTr("Hide the browser") : qsTr("Browse all…")
+            onTriggered: root.presetPanelVisible = !root.presetPanelVisible
         }
         MenuSeparator {}
         MenuItem {
@@ -1610,12 +1817,6 @@ ApplicationWindow {
                 }
             }
         }
-    }
-
-    PresetBrowser {
-        id: presetBrowser
-        parent: Overlay.overlay
-        visualizer: visualizer
     }
 
     Dialog {

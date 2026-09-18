@@ -579,15 +579,17 @@ private:
         m_presetSettleTimer.restart();
 
         QString name;
+        QString file;
         if (count > 0) {
             if (char *item = projectm_playlist_item(m_playlist, index)) {
-                name = QFileInfo(QString::fromUtf8(item)).completeBaseName();
+                file = QString::fromUtf8(item);
+                name = QFileInfo(file).completeBaseName();
                 projectm_playlist_free_string(item);
             }
         }
         QMetaObject::invokeMethod(m_item, "applyPreset", Qt::QueuedConnection,
-                                  Q_ARG(QString, name), Q_ARG(int, int(index)),
-                                  Q_ARG(int, int(count)));
+                                  Q_ARG(QString, name), Q_ARG(QString, file),
+                                  Q_ARG(int, int(index)), Q_ARG(int, int(count)));
     }
 
     QSize scaledSize(const QSize &itemSize) const
@@ -962,9 +964,10 @@ void ProjectMItem::applyAdaptiveScale(qreal scale)
     setRenderScale(scale);
 }
 
-void ProjectMItem::applyPreset(const QString &name, int index, int count)
+void ProjectMItem::applyPreset(const QString &name, const QString &file, int index, int count)
 {
     m_presetName = name;
+    m_presetFile = file;
     m_presetIndex = index;
     m_presetCount = count;
     emit presetChanged();
