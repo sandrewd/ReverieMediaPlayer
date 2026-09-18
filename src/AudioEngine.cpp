@@ -169,17 +169,24 @@ void AudioEngine::buildPipeline()
                              auto *self = static_cast<AudioEngine *>(data);
                              const gchar *name = gst_element_get_name(element);
                              qInfo("audio: output sink is %s", name);
-                             if (name && strstr(name, "fake")) {
-                                 qWarning("audio: no real output device could be opened - "
-                                          "autoaudiosink fell back to a fake sink, so there "
-                                          "will be no sound");
-                                 QMetaObject::invokeMethod(
-                                     self, [self]() {
-                                         emit self->errorOccurred(
-                                             tr("No audio output could be opened, so there is no "
-                                                "sound. Check the system's sound settings."));
-                                     }, Qt::QueuedConnection);
-                             }
+                             if (!name || !strstr(name, "fake"))
+                                 return;
+                             // Decided on the GUI thread, where the playback state can be read
+                             // safely - and where it means something. autoaudiosink also swaps
+                             // its fake sink in while the pipeline is torn down at the end of a
+                             // track, which raised the banner every time a track finished. It is
+                             // only a real failure if we still believe we are playing.
+                             QMetaObject::invokeMethod(
+                                 self, [self]() {
+                                     if (self->m_state != Playing && self->m_state != Buffering)
+                                         return;
+                                     qWarning("audio: no real output device could be opened - "
+                                              "autoaudiosink fell back to a fake sink, so there "
+                                              "will be no sound");
+                                     emit self->errorOccurred(
+                                         tr("No audio output could be opened, so there is no "
+                                            "sound. Check the system's sound settings."));
+                                 }, Qt::QueuedConnection);
                          }), this);
     }
 
