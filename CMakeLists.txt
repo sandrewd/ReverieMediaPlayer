@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(player VERSION 0.7.0 LANGUAGES CXX)
+project(player VERSION 0.7.1 LANGUAGES CXX)
 
 # Shown in About. Real since 2026-09-16; it was deliberately an obvious placeholder until the
 # project had a remote, because a plausible-looking URL that goes nowhere is worse than one that
@@ -85,6 +85,8 @@ qt_add_executable(player
     src/AppInfo.h
     src/VideoItem.cpp
     src/VideoItem.h
+    src/Logging.cpp
+    src/Logging.h
 )
 
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)

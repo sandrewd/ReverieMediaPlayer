@@ -1,4 +1,5 @@
 #include "ProjectMItem.h"
+#include "Logging.h"
 
 #include <QElapsedTimer>
 #include <QOpenGLContext>
@@ -72,7 +73,7 @@ public:
             m_pendingPreset = true;
         }
 
-        qInfo("createFramebufferObject: requested %dx%d -> fbo %dx%d (scale %.2f)",
+        qCDebug(lcRender, "createFramebufferObject: requested %dx%d -> fbo %dx%d (scale %.2f)",
               size.width(), size.height(), m_fboSize.width(), m_fboSize.height(), m_renderScale);
         projectm_set_window_size(m_pm, m_fboSize.width(), m_fboSize.height());
 
@@ -98,7 +99,7 @@ public:
         const qreal wantedScale = pmItem->renderScale();
         const QSize itemSize(qRound(pmItem->width()), qRound(pmItem->height()));
         if (!qFuzzyCompare(wantedScale, m_renderScale) || scaledSize(itemSize) != m_fboSize) {
-            qInfo("invalidating fbo: scale %.2f -> %.2f, item %dx%d, current fbo %dx%d",
+            qCDebug(lcRender, "invalidating fbo: scale %.2f -> %.2f, item %dx%d, current fbo %dx%d",
                   m_renderScale, wantedScale, itemSize.width(), itemSize.height(),
                   m_fboSize.width(), m_fboSize.height());
             m_renderScale = wantedScale;
@@ -167,7 +168,7 @@ public:
             m_pendingPreset = false;
             if (!m_presetPath.isEmpty()) {
                 projectm_load_preset_file(m_pm, m_presetPath.toUtf8().constData(), false);
-                qInfo().noquote() << "loaded preset:" << m_presetPath;
+                qCDebug(lcPreset).noquote() << "loaded preset:" << m_presetPath;
             }
         }
 
@@ -301,7 +302,7 @@ public:
         }
 
         if (++m_frameCount % 30 == 0) {
-            qInfo("frame %5d | projectM %6.2f ms | %5.1f fps | fbo %dx%d",
+            qCDebug(lcRender, "frame %5d | projectM %6.2f ms | %5.1f fps | fbo %dx%d",
                   m_frameCount, m_lastFrameMs, m_fps, m_fboSize.width(), m_fboSize.height());
         }
 
@@ -773,7 +774,7 @@ void ProjectMItem::syncScheduling()
             ++changed;
     }
 
-    qInfo("rendering threads set to %s (%d threads)",
+    qCDebug(lcRender, "rendering threads set to %s (%d threads)",
           wanted ? "SCHED_BATCH" : "SCHED_OTHER", changed);
     m_batchState = wanted;
 #endif
