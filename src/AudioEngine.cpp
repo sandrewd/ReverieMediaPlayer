@@ -256,11 +256,24 @@ GstFlowReturn onNewVideoSample(GstAppSink *sink, gpointer userData)
         const int height = GST_VIDEO_INFO_HEIGHT(&info);
         const int stride = GST_VIDEO_INFO_PLANE_STRIDE(&info, 0);
 
-        // copy() detaches from the mapped buffer, which is unmapped the moment we return.
-        const QImage frame = QImage(map.data, width, height, stride,
-                                    QImage::Format_RGBA8888).copy();
-        gst_buffer_unmap(buffer, &map);
-        engine->deliverVideoFrame(frame);
+        // The dimensions come from the caps and the bytes come from the buffer, and nothing
+        // guarantees the two agree. A file is untrusted input by definition here, so a stream
+        // whose caps claim more than the buffer holds must not be handed to QImage - it would
+        // read past the mapping. Cheap to check, and the alternative is an out-of-bounds read on
+        // a malformed or hostile video.
+        const bool sane = width > 0 && height > 0 && stride > 0
+                          && map.size >= static_cast<gsize>(height) * static_cast<gsize>(stride);
+        if (sane) {
+            // copy() detaches from the mapped buffer, which is unmapped the moment we return.
+            const QImage frame = QImage(map.data, width, height, stride,
+                                        QImage::Format_RGBA8888).copy();
+            gst_buffer_unmap(buffer, &map);
+            engine->deliverVideoFrame(frame);
+        } else {
+            qWarning("video: frame %dx%d stride %d does not fit in %zu bytes; dropped",
+                     width, height, stride, static_cast<size_t>(map.size));
+            gst_buffer_unmap(buffer, &map);
+        }
     }
 
     gst_sample_unref(sample);

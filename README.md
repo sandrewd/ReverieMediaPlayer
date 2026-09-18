@@ -12,9 +12,12 @@ try to organise your music collection.
 
 ## What it does
 
-- **Transport** — play, pause, stop, next, previous, seek, volume
+- **Transport** — play, pause, stop, next, previous, seek, volume, shuffle, and repeat that cycles
+  off / playlist / one track
 - **Visualisations** — projectM (Milkdrop) presets, embedded or fullscreen, driven by the decoded
   audio. Right-click the visualiser to pick a preset by category, or leave it to rotate.
+- **Equaliser** — twelve preset curves and a ten-band custom mixer, with boosts compensated
+  automatically so a loud curve cannot clip
 - **One playlist** — drag to reorder, multi-select, remove, save and load M3U. Not tabbed
   playlists, not a library.
 - **Video** — plays video on the same surface the visualiser uses, letterboxed, with the controls
@@ -22,8 +25,10 @@ try to organise your music collection.
 - **Internet radio** — streams are entries in the same playlist, with station metadata in the
   now-playing line
 - **Mini-player** — a compact always-on-top layout
+- **A resizable window** — drag the divider to rebalance the playlist against the visualiser, and
+  the top of the transport to make it taller; the controls scale with it
 - **Themes** — follows the desktop's light/dark setting, with ten ready-made palettes and a
-  four-colour custom editor
+  five-colour custom editor, including the visualiser background and how strongly it tints
 - **MPRIS** — media keys and desktop integration
 
 **Deliberately not included:** library management, lyrics, social features, third-party service
@@ -110,12 +115,24 @@ sudo apt install ./build/player/reverie_*_amd64.deb
 
 Reverie is usable and in active development. Known gaps, stated plainly:
 
-- **Wayland is untested.** It should work — nothing is architected against it — but the only
-  platform it has been exercised on is X11. Always-on-top for the mini-player is X11-only and
+- **Wayland works but is less exercised than X11.** It has been run under both, and the mini-player
+  in particular needed a Wayland-specific fix. Always-on-top for the mini-player is X11-only and
   cannot be done portably on Wayland.
 - **Subtitles, hardware decode and video track selection** are not implemented.
-- **Performance figures assume software rendering.** On a GPU everything below is far better than
-  the numbers above suggest.
+- **The performance figures above assume software rendering.** On a machine with a working GPU
+  everything is considerably faster than they suggest.
+
+## Diagnostics
+
+A normal run prints a handful of lines: where the presets came from, what the audio chain did,
+which output sink was chosen, and any warnings. If something needs investigating, the detailed
+instrumentation is an environment variable away rather than a rebuild:
+
+```sh
+QT_LOGGING_RULES='reverie.*.debug=true' reverie    # frame times, render scale, preset changes
+PLAYER_AUDIO_SINK=pulsesink reverie                # force a specific GStreamer audio sink
+PLAYER_BUS_TRACE=1 reverie                         # every GStreamer bus message
+```
 
 ## Licence
 
