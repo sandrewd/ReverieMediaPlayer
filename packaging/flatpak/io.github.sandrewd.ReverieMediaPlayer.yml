@@ -40,18 +40,10 @@ cleanup:
   - '*.a'
   - '*.la'
 
+# TagLib and GStreamer both come from the runtime (2.1.1 and 1.26 in org.kde.Sdk 6.11), so
+# neither is built here. Only projectM has to be, because no distribution carries a version
+# new enough - see below.
 modules:
-  - name: taglib
-    buildsystem: cmake-ninja
-    config-opts:
-      - -DCMAKE_BUILD_TYPE=Release
-      - -DBUILD_SHARED_LIBS=ON
-      - -DBUILD_TESTING=OFF
-    sources:
-      - type: archive
-        url: https://taglib.org/releases/taglib-1.13.1.tar.gz
-        sha256: c8da2b10f1bfec2cd7dbfcd33f4a2338db0765d851a50583d410bacf055cfd0b
-
   # Pinned to a master commit, not a release, and deliberately so. Every tagged projectM up to
   # and including v4.1.7 hardcodes glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0) for its final
   # composite, which makes it impossible to render into a Qt Quick scene graph: the item comes
