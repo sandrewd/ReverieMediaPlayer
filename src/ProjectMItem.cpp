@@ -90,6 +90,7 @@ public:
                 },
                 false, nullptr);
 
+            m_creationContext = QOpenGLContext::currentContext();
             m_pm = projectm_create();
             if (!m_pm) {
                 qWarning() << "projectm_create() failed - no GL context, or context too old";
@@ -144,7 +145,17 @@ public:
         // A scale or size change means the offscreen buffer is the wrong size. There is no
         // API to resize it, so drop it and let Qt ask for a new one on the next frame.
         const qreal wantedScale = pmItem->renderScale();
-        const QSize itemSize(qRound(pmItem->width()), qRound(pmItem->height()));
+        // In DEVICE pixels, which is what createFramebufferObject is handed. The item's own
+        // width() and height() are logical, so on a high-DPI screen the two never agree: the
+        // comparison below fired on every frame, the buffer was destroyed and rebuilt ~44 times
+        // a second, and Milkdrop presets - which draw on top of the previous frame - had nothing
+        // to accumulate into. The visualiser was simply black, with no error anywhere.
+        //
+        // Measured on a 4K screen: item 753x592 logical against an FBO built for 1506x1184.
+        // On a 1x display the two are equal, which is why this survived every test until one
+        // ran on a high-DPI machine.
+        const qreal dpr = pmItem->window() ? pmItem->window()->effectiveDevicePixelRatio() : 1.0;
+        const QSize itemSize(qRound(pmItem->width() * dpr), qRound(pmItem->height() * dpr));
         if (!qFuzzyCompare(wantedScale, m_renderScale) || scaledSize(itemSize) != m_fboSize) {
             qCDebug(lcRender, "invalidating fbo: scale %.2f -> %.2f, item %dx%d, current fbo %dx%d",
                   m_renderScale, wantedScale, itemSize.width(), itemSize.height(),
@@ -209,6 +220,18 @@ public:
         if (m_pendingLibrary) {
             m_pendingLibrary = false;
             loadLibrary();
+            // What does projectM actually think it is showing? A populated playlist and no
+            // active preset produce a silent black frame - RenderFrame returns early when it
+            // has no preset and the idle preset will not load.
+            if (m_playlist) {
+                const uint32_t n = projectm_playlist_size(m_playlist);
+                const uint32_t pos = projectm_playlist_get_position(m_playlist);
+                char *item = n ? projectm_playlist_item(m_playlist, pos) : nullptr;
+                qInfo("preset state: playlist %u entries, position %u, item %s", n, pos,
+                      item ? item : "(none)");
+                if (item)
+                    projectm_free_string(item);
+            }
         }
 
         if (m_pendingPreset) {
@@ -385,6 +408,11 @@ public:
         // with the channels switched off.
         if (!m_stateDumped && fns) {
             m_stateDumped = true;
+            auto *now = QOpenGLContext::currentContext();
+            qInfo("gl: context at creation %p, at render %p%s", (void *)m_creationContext,
+                  (void *)now,
+                  m_creationContext == now ? " (same)"
+                                           : "  <-- DIFFERENT: projectM's objects belong to a dead context");
             GLint vp[4] = {0,0,0,0}, sc[4] = {0,0,0,0}, dfb = 0, rfb = 0;
             GLboolean cm[4] = {0,0,0,0};
             fns->glGetIntegerv(GL_VIEWPORT, vp);
@@ -750,6 +778,7 @@ private:
         QOpenGLVertexArrayObject m_vao;
         bool m_fboChecked = false;
         bool m_stateDumped = false;
+        QOpenGLContext *m_creationContext = nullptr;
         bool m_drawBufferLogged = false;
         GLuint m_ownFbo = 0, m_ownTex = 0, m_ownRbo = 0;
         QSize m_ownSize;

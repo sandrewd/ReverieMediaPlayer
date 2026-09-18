@@ -1961,16 +1961,16 @@ ApplicationWindow {
         modal: true
         anchors.centerIn: Overlay.overlay
         standardButtons: Dialog.Ok
-        // A fixed implicitWidth, not width: binding width inside a Dialog's contentItem makes
-        // the dialog size from the text while the text sizes from the dialog, which Qt reports
-        // as a binding loop on implicitWidth.
+        // The dialog gets an explicit width and the text fills it. Sizing the dialog from the
+        // text while the text wraps to the dialog is what produced a binding loop; Text's
+        // implicitWidth is read-only, so the width has to come from the dialog.
+        width: 380
         contentItem: Text {
             text: SystemTheme.softwareRendering
                   ? qsTr("Software rendering will be used the next time Reverie starts.")
                   : qsTr("The graphics card will be used again the next time Reverie starts.")
             color: Theme.text
             wrapMode: Text.WordWrap
-            implicitWidth: 320
         }
         background: Rectangle { color: Theme.surface; border.color: Theme.border; radius: 6 }
     }
