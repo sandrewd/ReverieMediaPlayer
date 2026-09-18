@@ -7,6 +7,8 @@
 #include <QQmlContext>
 #include <QQuickWindow>
 #include <QDir>
+#include <clocale>
+
 #include <QFile>
 #include <QSettings>
 #include <QFileInfo>
@@ -110,6 +112,21 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     // QSettings and QStandardPaths key off these. applicationName stays lowercase and
     // space-free because it becomes a directory and a filename; the display name is separate.
+    // Qt calls setlocale(LC_ALL, "") when QGuiApplication is constructed, which activates the
+    // user's locale for C library functions. Where LC_NUMERIC uses a comma as the decimal
+    // separator - sr_RS, de_DE, fr_FR and many others - strtod("2.000") stops at the dot and
+    // returns 2. projectM parses Milkdrop presets and shader source full of such literals, so
+    // every float in every preset was silently truncated and the visualiser rendered nothing at
+    // all: no error, no warning, a complete framebuffer, an empty picture.
+    //
+    // This cost a very long investigation, because the machine that showed it differed from the
+    // development machine only in this. The giveaway was in its own logs the whole time - frame
+    // statistics printed as "mean 0,0" rather than "mean 0.0".
+    //
+    // Numbers stay in the C locale for the whole process. Qt's own formatting goes through
+    // QLocale and is unaffected; only the C library functions that parsers rely on change.
+    std::setlocale(LC_NUMERIC, "C");
+
     app.setOrganizationName("reverie");
     app.setApplicationName("reverie");
     app.setApplicationDisplayName("Reverie Media Player");
