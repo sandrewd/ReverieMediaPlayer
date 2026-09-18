@@ -160,7 +160,6 @@ Reverie is usable and in active development. Known gaps, stated plainly:
   handles the buttons but not that gesture — the maximise button beside it works normally. This is
   not specific to Reverie. Running with `QT_QPA_PLATFORM=xcb` uses XWayland and the window
   manager's own decorations, where double-click behaves as expected.
-- **Video-specific stream selection** (several *video* streams in one file) is not implemented.
 - **The performance figures above assume software rendering.** On a machine with a working GPU
   everything is considerably faster than they suggest.
 
