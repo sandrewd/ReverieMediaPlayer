@@ -14,6 +14,14 @@ set(PLAYER_APP_ID "io.github.sandrewd.ReverieMediaPlayer" CACHE STRING
 set(PLAYER_LICENSE "MIT" CACHE STRING
     "Licence Reverie itself is released under, shown in the About dialog")
 
+option(PLAYER_EMBED_SOURCE_DIR
+    "Compile the source tree path into the binary so it can find assets without installing" OFF)
+if(PLAYER_EMBED_SOURCE_DIR)
+    set(PLAYER_EMBEDDED_SOURCE_DIR "${CMAKE_SOURCE_DIR}")
+else()
+    set(PLAYER_EMBEDDED_SOURCE_DIR "")
+endif()
+
 string(TIMESTAMP PLAYER_BUILD_DATE "%Y-%m-%d" UTC)
 find_package(Git QUIET)
 set(PLAYER_GIT_COMMIT "unknown")
@@ -190,7 +198,13 @@ set_target_properties(player PROPERTIES OUTPUT_NAME reverie)
 
 target_include_directories(player PRIVATE src)
 target_compile_definitions(player PRIVATE
-    PLAYER_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+    # Empty unless explicitly asked for. This is a developer convenience - it lets the binary
+    # find assets in the source tree without installing - but it is an absolute path from the
+    # build machine, and Qt stores it as UTF-16, so it is invisible to `strings` while still
+    # sitting in any distributed binary for anyone who looks. A shipped package should not carry
+    # its author's home directory. Configure with -DPLAYER_EMBED_SOURCE_DIR=ON when working from
+    # a build tree.
+    PLAYER_SOURCE_DIR="${PLAYER_EMBEDDED_SOURCE_DIR}"
     PLAYER_VERSION="${PROJECT_VERSION}"
     PLAYER_BUILD_DATE="${PLAYER_BUILD_DATE}"
     PLAYER_GIT_COMMIT="${PLAYER_GIT_COMMIT}"

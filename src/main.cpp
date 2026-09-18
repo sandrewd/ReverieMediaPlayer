@@ -199,8 +199,14 @@ int main(int argc, char *argv[])
         for (const QString &candidate : {
                  QCoreApplication::applicationDirPath() + QStringLiteral("/../share/reverie/") + relative,
                  QCoreApplication::applicationDirPath() + QStringLiteral("/assets/") + relative,
-                 QStringLiteral("assets/") + relative,
-                 QStringLiteral(PLAYER_SOURCE_DIR "/assets/") + relative}) {
+                 QStringLiteral("assets/") + relative}) {
+            if (QFileInfo::exists(candidate))
+                return QFileInfo(candidate).absoluteFilePath();
+        }
+        // Only present in a build configured with -DPLAYER_EMBED_SOURCE_DIR=ON. A released
+        // binary carries an empty string here rather than the build machine's home directory.
+        if (qstrlen(PLAYER_SOURCE_DIR) > 0) {
+            const QString candidate = QStringLiteral(PLAYER_SOURCE_DIR "/assets/") + relative;
             if (QFileInfo::exists(candidate))
                 return QFileInfo(candidate).absoluteFilePath();
         }

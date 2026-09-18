@@ -9,7 +9,3 @@ assets/presets/
 # Local test media, never published.
 assets/test-audio/
 assets/test-video/
-
-# Working notes and design handoff material: local only.
-CLAUDE.md
-_reference/
