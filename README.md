@@ -21,7 +21,8 @@ try to organise your music collection.
 - **One playlist** — drag to reorder, multi-select, remove, save and load M3U. Not tabbed
   playlists, not a library.
 - **Video** — plays video on the same surface the visualiser uses, letterboxed, with the controls
-  over it
+  over it, with **subtitles**: embedded tracks and external `.srt` files, picked from a right-click
+  on the picture. A subtitle file sitting beside the video is found on its own.
 - **Internet radio** — streams are entries in the same playlist, with station metadata in the
   now-playing line
 - **Mini-player** — a compact always-on-top layout
@@ -118,7 +119,7 @@ Reverie is usable and in active development. Known gaps, stated plainly:
 - **Wayland works but is less exercised than X11.** It has been run under both, and the mini-player
   in particular needed a Wayland-specific fix. Always-on-top for the mini-player is X11-only and
   cannot be done portably on Wayland.
-- **Subtitles, hardware decode and video track selection** are not implemented.
+- **Hardware decode and video track selection** are not implemented.
 - **The performance figures above assume software rendering.** On a machine with a working GPU
   everything is considerably faster than they suggest.
 
