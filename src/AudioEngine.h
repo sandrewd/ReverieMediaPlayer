@@ -178,7 +178,6 @@ private:
     QList<qreal> m_equaliserGains;
 
     GstElement *m_pipeline = nullptr;
-    GstElement *m_appsink = nullptr;
     GstElement *m_videoSink = nullptr;
     class VideoItem *m_videoItem = nullptr;
     bool m_hasVideo = false;

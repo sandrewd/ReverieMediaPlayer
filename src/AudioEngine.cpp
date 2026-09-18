@@ -16,26 +16,39 @@
 
 namespace {
 
-constexpr int kPcmRate = 44100;
 
-// Called on a GStreamer streaming thread.
-GstFlowReturn onNewSample(GstAppSink *sink, gpointer userData)
+// Called on a GStreamer streaming thread, watching the audio on its way to the speakers.
+//
+// This replaced a tee with a second appsink branch. A tee's branches negotiate independently, so
+// a failure on one is silent on the other: the visualiser branch ran happily while the speaker
+// branch failed to negotiate and no error was ever posted. A probe cannot fail that way - there
+// is only one chain, and if it does not negotiate nothing plays and GStreamer says so. Strawberry
+// takes the same approach for its analyser.
+GstPadProbeReturn onAudioProbe(GstPad *pad, GstPadProbeInfo *info, gpointer userData)
 {
     auto *ring = static_cast<AudioRingBuffer *>(userData);
-    GstSample *sample = gst_app_sink_pull_sample(sink);
-    if (!sample)
-        return GST_FLOW_OK;
+    GstBuffer *buffer = GST_PAD_PROBE_INFO_BUFFER(info);
+    if (!ring || !buffer)
+        return GST_PAD_PROBE_OK;
 
-    GstBuffer *buffer = gst_sample_get_buffer(sample);
+    // The format is pinned to F32LE by a capsfilter; the channel count is whatever the track has,
+    // deliberately, so watching the audio never reshapes it.
+    int channels = 0;
+    if (GstCaps *caps = gst_pad_get_current_caps(pad)) {
+        gst_structure_get_int(gst_caps_get_structure(caps, 0), "channels", &channels);
+        gst_caps_unref(caps);
+    }
+    if (channels <= 0)
+        return GST_PAD_PROBE_OK;
+
     GstMapInfo map;
-    if (buffer && gst_buffer_map(buffer, &map, GST_MAP_READ)) {
-        const int frames = static_cast<int>(map.size / (sizeof(float) * AudioRingBuffer::kChannels));
+    if (gst_buffer_map(buffer, &map, GST_MAP_READ)) {
+        const int frames = static_cast<int>(map.size / (sizeof(float) * channels));
         if (frames > 0)
-            ring->write(reinterpret_cast<const float *>(map.data), frames);
+            ring->write(reinterpret_cast<const float *>(map.data), frames, channels);
         gst_buffer_unmap(buffer, &map);
     }
-    gst_sample_unref(sample);
-    return GST_FLOW_OK;
+    return GST_PAD_PROBE_OK;
 }
 
 } // namespace
@@ -98,8 +111,6 @@ void AudioEngine::buildPipeline()
     // gstreamer1.0-plugins-good, which is already a dependency, and costs about 0.2% of a core.
     m_equaliser = gst_element_factory_make("equalizer-10bands", nullptr);
     m_makeupGain = gst_element_factory_make("volume", nullptr);
-    GstElement *tee = gst_element_factory_make("tee", nullptr);
-    GstElement *playQueue = gst_element_factory_make("queue", nullptr);
     // Test seam: automated runs need the pipeline to decode normally without putting sound
     // through the speakers. Overriding the sink element is honest about what it changes,
     // unlike re-ranking plugins globally, which also perturbs decoder autoplugging.
@@ -114,18 +125,16 @@ void AudioEngine::buildPipeline()
         && g_object_class_find_property(G_OBJECT_GET_CLASS(sink), "sync")) {
         g_object_set(sink, "sync", TRUE, nullptr);
     }
-    // The speaker branch needs its own conversion. It had none: the tee fed autoaudiosink
-    // directly, so whatever the equaliser negotiated had to be something the device accepted
-    // as-is. equalizer-10bands can output F64LE and pulsesink cannot take it - and when the sink
-    // fails to negotiate, autoaudiosink silently substitutes a fake sink and the machine goes
-    // quiet with everything else looking perfect. The visualiser branch always had converters;
-    // the branch that actually feeds the speakers did not.
+
+    // Pins the format the probe reads, and nothing else. Channels and rate are left alone on
+    // purpose: the visualiser must not reshape the audio on its way to the speakers, and forcing
+    // stereo here would quietly downmix multichannel video soundtracks.
+    GstElement *pcmCaps = gst_element_factory_make("capsfilter", nullptr);
+    // Always convert and resample immediately before the sink. equalizer-10bands can emit F64LE
+    // and pulsesink cannot accept it; without these the sink simply fails to link, and
+    // autoaudiosink answers that by silently substituting a fake sink.
     GstElement *playConvert = gst_element_factory_make("audioconvert", nullptr);
     GstElement *playResample = gst_element_factory_make("audioresample", nullptr);
-    GstElement *pcmQueue = gst_element_factory_make("queue", nullptr);
-    GstElement *pcmConvert = gst_element_factory_make("audioconvert", nullptr);
-    GstElement *pcmResample = gst_element_factory_make("audioresample", nullptr);
-    m_appsink = gst_element_factory_make("appsink", nullptr);
 
     // The equaliser is optional: if the plugin is missing the player still plays, it just has no
     // tone controls. Failing the whole output bin over it would be the wrong trade.
@@ -136,57 +145,24 @@ void AudioEngine::buildPipeline()
         if (m_makeupGain) { gst_object_unref(m_makeupGain); m_makeupGain = nullptr; }
     }
 
-    if (!bin || !convert || !tee || !playQueue || !sink || !playConvert || !playResample
-        || !pcmQueue || !pcmConvert || !pcmResample || !m_appsink) {
+    if (!bin || !convert || !sink || !pcmCaps || !playConvert || !playResample) {
         emit errorOccurred(QStringLiteral("Failed to create the audio output bin"));
         return;
     }
 
     GstCaps *caps = gst_caps_new_simple("audio/x-raw",
                                         "format", G_TYPE_STRING, "F32LE",
-                                        "channels", G_TYPE_INT, AudioRingBuffer::kChannels,
-                                        "rate", G_TYPE_INT, kPcmRate,
                                         "layout", G_TYPE_STRING, "interleaved",
                                         nullptr);
-    gst_app_sink_set_caps(GST_APP_SINK(m_appsink), caps);
+    g_object_set(pcmCaps, "caps", caps, nullptr);
     gst_caps_unref(caps);
 
-    // Never let the visualiser branch stall playback: drop rather than block.
-    g_object_set(m_appsink, "emit-signals", FALSE, "sync", FALSE, "max-buffers", 4,
-                 "drop", TRUE, nullptr);
-    GstAppSinkCallbacks callbacks = {};
-    callbacks.new_sample = onNewSample;
-    gst_app_sink_set_callbacks(GST_APP_SINK(m_appsink), &callbacks, m_ring.get(), nullptr);
+    gst_bin_add_many(GST_BIN(bin), convert, pcmCaps, playConvert, playResample, sink, nullptr);
 
-    g_object_set(pcmQueue, "leaky", 2 /* downstream */, "max-size-buffers", 8, nullptr);
-
-    gst_bin_add_many(GST_BIN(bin), convert, tee, playQueue, playConvert, playResample, sink,
-                     pcmQueue, pcmConvert, pcmResample, m_appsink, nullptr);
-    // The link is checked. If the equaliser cannot sit in the chain on this machine, falling
-    // back to a direct connection keeps the player playing: silence with no explanation is a far
-    // worse failure than having no tone controls.
-    bool equaliserLinked = false;
-    if (haveEqualiser) {
-        gst_bin_add_many(GST_BIN(bin), m_equaliser, m_makeupGain, nullptr);
-        equaliserLinked = gst_element_link_many(convert, m_equaliser, m_makeupGain, tee, nullptr);
-        if (equaliserLinked) {
-            applyEqualiserToPipeline();
-            qInfo("audio: equaliser in the chain");
-        } else {
-            qWarning("audio: could not link the equaliser; continuing without tone controls");
-            gst_element_unlink_many(convert, m_equaliser, m_makeupGain, tee, nullptr);
-            gst_bin_remove(GST_BIN(bin), m_equaliser);
-            gst_bin_remove(GST_BIN(bin), m_makeupGain);
-            m_equaliser = nullptr;
-            m_makeupGain = nullptr;
-        }
-    }
     // autoaudiosink falls back to a *fake* sink when it cannot open a real device, and says
     // nothing. Everything then behaves perfectly - the pipeline plays, the position advances, the
-    // visualiser runs off the tee - while no audio ever reaches the sound server. That is the
-    // worst possible failure for a media player, and it is exactly what one machine was doing.
-    //
-    // So the fallback is detected and reported rather than accepted in silence.
+    // visualiser runs - while no audio reaches the sound server at all. That is the worst failure
+    // a media player can have, and it is exactly what one machine was doing.
     if (sink && GST_IS_BIN(sink)) {
         g_signal_connect(sink, "element-added",
                          G_CALLBACK(+[](GstBin *, GstElement *element, gpointer data) {
@@ -207,24 +183,38 @@ void AudioEngine::buildPipeline()
                          }), this);
     }
 
-    if (!equaliserLinked) {
-        if (!gst_element_link(convert, tee))
-            qWarning("audio: could not link the output bin at all - there will be no sound");
-        else
-            qInfo("audio: equaliser bypassed");
+    // One chain, so there is no branch that can fail quietly. The equaliser is spliced in when it
+    // is available and skipped when it is not; either way the link is checked, because silence
+    // with no explanation is far worse than having no tone controls.
+    bool linked = false;
+    if (haveEqualiser) {
+        gst_bin_add_many(GST_BIN(bin), m_equaliser, m_makeupGain, nullptr);
+        linked = gst_element_link_many(convert, m_equaliser, m_makeupGain, pcmCaps,
+                                       playConvert, playResample, sink, nullptr);
+        if (linked) {
+            applyEqualiserToPipeline();
+            qInfo("audio: equaliser in the chain");
+        } else {
+            qWarning("audio: could not link the equaliser; continuing without tone controls");
+            gst_element_unlink_many(convert, m_equaliser, m_makeupGain, pcmCaps, nullptr);
+            gst_bin_remove(GST_BIN(bin), m_equaliser);
+            gst_bin_remove(GST_BIN(bin), m_makeupGain);
+            m_equaliser = nullptr;
+            m_makeupGain = nullptr;
+        }
     }
-    if (!gst_element_link_many(playQueue, playConvert, playResample, sink, nullptr))
-        qWarning("audio: could not link the speaker branch");
-    gst_element_link_many(pcmQueue, pcmConvert, pcmResample, m_appsink, nullptr);
+    if (!linked) {
+        linked = gst_element_link_many(convert, pcmCaps, playConvert, playResample, sink, nullptr);
+        qInfo("audio: %s", linked ? "equaliser bypassed" : "output bin did not link");
+    }
+    if (!linked)
+        qWarning("audio: the output chain could not be linked - there will be no sound");
 
-    GstPad *teePlay = gst_element_request_pad_simple(tee, "src_%u");
-    GstPad *teePcm = gst_element_request_pad_simple(tee, "src_%u");
-    GstPad *playIn = gst_element_get_static_pad(playQueue, "sink");
-    GstPad *pcmIn = gst_element_get_static_pad(pcmQueue, "sink");
-    gst_pad_link(teePlay, playIn);
-    gst_pad_link(teePcm, pcmIn);
-    gst_object_unref(playIn);
-    gst_object_unref(pcmIn);
+    // Watch the audio on its way past, rather than splitting it off. See onAudioProbe.
+    if (GstPad *pcmPad = gst_element_get_static_pad(pcmCaps, "src")) {
+        gst_pad_add_probe(pcmPad, GST_PAD_PROBE_TYPE_BUFFER, onAudioProbe, m_ring.get(), nullptr);
+        gst_object_unref(pcmPad);
+    }
 
     GstPad *binSink = gst_element_get_static_pad(convert, "sink");
     gst_element_add_pad(bin, gst_ghost_pad_new("sink", binSink));

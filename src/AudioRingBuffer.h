@@ -18,10 +18,21 @@ public:
 
     void write(const float *interleaved, int frames)
     {
+        write(interleaved, frames, kChannels);
+    }
+
+    // Takes audio at its native channel count and stores stereo, so the playback path never has
+    // to be forced to two channels just to feed the visualiser. Mono is duplicated; anything
+    // wider keeps the front pair, which is what a 2D waveform can represent anyway.
+    void write(const float *interleaved, int frames, int channels)
+    {
+        if (!interleaved || frames <= 0 || channels <= 0)
+            return;
+        const int right = channels > 1 ? 1 : 0;
         QMutexLocker lock(&m_mutex);
         for (int i = 0; i < frames; ++i) {
-            m_data[m_writePos * kChannels] = interleaved[i * kChannels];
-            m_data[m_writePos * kChannels + 1] = interleaved[i * kChannels + 1];
+            m_data[m_writePos * kChannels] = interleaved[i * channels];
+            m_data[m_writePos * kChannels + 1] = interleaved[i * channels + right];
             m_writePos = (m_writePos + 1) % kCapacityFrames;
         }
         m_written += frames;
