@@ -114,6 +114,14 @@ void AudioEngine::buildPipeline()
         && g_object_class_find_property(G_OBJECT_GET_CLASS(sink), "sync")) {
         g_object_set(sink, "sync", TRUE, nullptr);
     }
+    // The speaker branch needs its own conversion. It had none: the tee fed autoaudiosink
+    // directly, so whatever the equaliser negotiated had to be something the device accepted
+    // as-is. equalizer-10bands can output F64LE and pulsesink cannot take it - and when the sink
+    // fails to negotiate, autoaudiosink silently substitutes a fake sink and the machine goes
+    // quiet with everything else looking perfect. The visualiser branch always had converters;
+    // the branch that actually feeds the speakers did not.
+    GstElement *playConvert = gst_element_factory_make("audioconvert", nullptr);
+    GstElement *playResample = gst_element_factory_make("audioresample", nullptr);
     GstElement *pcmQueue = gst_element_factory_make("queue", nullptr);
     GstElement *pcmConvert = gst_element_factory_make("audioconvert", nullptr);
     GstElement *pcmResample = gst_element_factory_make("audioresample", nullptr);
@@ -128,8 +136,8 @@ void AudioEngine::buildPipeline()
         if (m_makeupGain) { gst_object_unref(m_makeupGain); m_makeupGain = nullptr; }
     }
 
-    if (!bin || !convert || !tee || !playQueue || !sink || !pcmQueue || !pcmConvert
-        || !pcmResample || !m_appsink) {
+    if (!bin || !convert || !tee || !playQueue || !sink || !playConvert || !playResample
+        || !pcmQueue || !pcmConvert || !pcmResample || !m_appsink) {
         emit errorOccurred(QStringLiteral("Failed to create the audio output bin"));
         return;
     }
@@ -152,8 +160,8 @@ void AudioEngine::buildPipeline()
 
     g_object_set(pcmQueue, "leaky", 2 /* downstream */, "max-size-buffers", 8, nullptr);
 
-    gst_bin_add_many(GST_BIN(bin), convert, tee, playQueue, sink, pcmQueue, pcmConvert,
-                     pcmResample, m_appsink, nullptr);
+    gst_bin_add_many(GST_BIN(bin), convert, tee, playQueue, playConvert, playResample, sink,
+                     pcmQueue, pcmConvert, pcmResample, m_appsink, nullptr);
     // The link is checked. If the equaliser cannot sit in the chain on this machine, falling
     // back to a direct connection keeps the player playing: silence with no explanation is a far
     // worse failure than having no tone controls.
@@ -205,7 +213,8 @@ void AudioEngine::buildPipeline()
         else
             qInfo("audio: equaliser bypassed");
     }
-    gst_element_link_many(playQueue, sink, nullptr);
+    if (!gst_element_link_many(playQueue, playConvert, playResample, sink, nullptr))
+        qWarning("audio: could not link the speaker branch");
     gst_element_link_many(pcmQueue, pcmConvert, pcmResample, m_appsink, nullptr);
 
     GstPad *teePlay = gst_element_request_pad_simple(tee, "src_%u");
