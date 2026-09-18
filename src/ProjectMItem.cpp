@@ -14,6 +14,8 @@
 #include <QDebug>
 
 #include <projectM-4/projectM.h>
+#include <projectM-4/logging.h>
+#include <projectM-4/callbacks.h>
 #include <projectM-4/playlist.h>
 
 #include <QRandomGenerator>
@@ -53,11 +55,50 @@ public:
         m_fboSize = scaledSize(size);
 
         if (!m_pm) {
+            // What context did we actually get? We ask for 3.3 core, but a request is not a
+            // grant, and every measurement in this project was taken on llvmpipe or AMD. A
+            // driver that silently hands back something else is invisible without this.
+            if (QOpenGLContext *ctx = QOpenGLContext::currentContext()) {
+                auto *gl = ctx->functions();
+                const QSurfaceFormat fmt = ctx->format();
+                qInfo("gl: %s | %s | %s | context %d.%d %s",
+                      gl->glGetString(GL_VENDOR) ? reinterpret_cast<const char *>(gl->glGetString(GL_VENDOR)) : "?",
+                      gl->glGetString(GL_RENDERER) ? reinterpret_cast<const char *>(gl->glGetString(GL_RENDERER)) : "?",
+                      gl->glGetString(GL_VERSION) ? reinterpret_cast<const char *>(gl->glGetString(GL_VERSION)) : "?",
+                      fmt.majorVersion(), fmt.minorVersion(),
+                      fmt.profile() == QSurfaceFormat::CoreProfile ? "core"
+                          : fmt.profile() == QSurfaceFormat::CompatibilityProfile ? "compat" : "none");
+            }
+
+            // projectM knows why it failed; we were throwing that away. Shader compilation is
+            // where drivers differ most - Mesa accepts GLSL that NVIDIA rejects - and a preset
+            // that will not compile renders as nothing at all.
+            projectm_set_log_callback(
+                [](const char *message, projectm_log_level level, void *) {
+                    if (!message)
+                        return;
+                    if (level >= PROJECTM_LOG_LEVEL_WARN)
+                        qWarning("projectM: %s", message);
+                    else
+                        qCDebug(lcRender, "projectM: %s", message);
+                },
+                false, nullptr);
+
             m_pm = projectm_create();
             if (!m_pm) {
                 qWarning() << "projectm_create() failed - no GL context, or context too old";
                 return new QOpenGLFramebufferObject(size);
             }
+
+            // A preset that fails to load is the difference between "the visualiser is broken"
+            // and "this preset is broken", and only projectM can tell them apart.
+            projectm_set_preset_switch_failed_event_callback(
+                m_pm,
+                [](const char *preset, const char *message, void *) {
+                    qWarning("projectM: preset failed: %s (%s)",
+                             preset ? preset : "?", message ? message : "no detail");
+                },
+                nullptr);
             // Mesh size is deliberately left at the default. Section 4 measured mesh size as
             // irrelevant (48x32 and 16x12 both land at ~87ms); the workload is fragment-bound.
             projectm_set_fps(m_pm, 60);

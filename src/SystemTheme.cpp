@@ -5,6 +5,7 @@
 #include <QPalette>
 #include <QProcess>
 #include <QDBusConnection>
+#include <QDBusError>
 #include <QDBusReply>
 #include <QDBusInterface>
 #include <QGuiApplication>
@@ -519,17 +520,35 @@ int SystemTheme::queryPortalHint()
     // Reachable inside and outside a sandbox, and the portal is what the desktop is supposed to
     // answer through. Not every backend implements it - XFCE's returns 0 whatever gsettings
     // says - so "no preference" has to fall through to the other signals rather than mean light.
+    // Once a desktop has been found to have no portal, stop asking. Without this the re-survey
+    // retries every four seconds, and each retry can provoke a D-Bus activation attempt.
+    static bool portalMissing = false;
+    if (portalMissing)
+        return -1;
+
     QDBusInterface portal(QStringLiteral("org.freedesktop.portal.Desktop"),
                           QStringLiteral("/org/freedesktop/portal/desktop"),
                           QStringLiteral("org.freedesktop.portal.Settings"),
                           QDBusConnection::sessionBus());
-    if (!portal.isValid())
+    // Bounded, because this runs on the GUI thread. QDBusInterface::call() blocks for 25 seconds
+    // by default, which on a desktop whose portal is slow or absent would stall the interface
+    // every time the re-survey fired. A theme hint is never worth a frozen window.
+    portal.setTimeout(300);
+    if (!portal.isValid()) {
+        portalMissing = true;
         return -1;
+    }
     const QDBusReply<QDBusVariant> reply =
         portal.call(QStringLiteral("Read"), QStringLiteral("org.freedesktop.appearance"),
                     QStringLiteral("color-scheme"));
-    if (!reply.isValid())
+    if (!reply.isValid()) {
+        // A portal that is present but does not answer this key is not worth re-asking either.
+        if (reply.error().type() == QDBusError::Timeout
+            || reply.error().type() == QDBusError::NoReply
+            || reply.error().type() == QDBusError::ServiceUnknown)
+            portalMissing = true;
         return -1;
+    }
     // Read returns a variant wrapping a variant, so it has to be unwrapped twice.
     QVariant value = reply.value().variant();
     if (value.canConvert<QDBusVariant>())
