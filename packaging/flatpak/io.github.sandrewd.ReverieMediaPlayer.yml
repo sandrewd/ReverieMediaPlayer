@@ -84,9 +84,9 @@ modules:
     sources:
       - type: git
         url: https://github.com/sandrewd/ReverieMediaPlayer.git
-        tag: v0.8.3
+        tag: v0.8.8
         # Pinned alongside the tag: a tag can be moved, a commit cannot.
-        commit: b9f780bb0d2050202ded1e421f8bede796bbe5d0
+        commit: 18e6d68f5e65ce9b19461ba6b501aa8835d03c39
       # Pinned to the v0.8.2 asset deliberately: the preset selection has not changed, and the
       # sha256 fixes the content regardless of which release carries it.
       # The curated 480 presets, extracted where the build expects the corpus. The full
