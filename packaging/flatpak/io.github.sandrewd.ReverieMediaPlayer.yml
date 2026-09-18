@@ -61,6 +61,15 @@ modules:
       - -DBUILD_SHARED_LIBS=ON
       - -DENABLE_PLAYLIST=ON
       - -DBUILD_TESTING=OFF
+    # Flathub requires each module's licence to be installed under the application ID. projectM
+    # is LGPL-2.1 and bundles projectm-eval and hlslparser, both MIT, so all three ship.
+    post-install:
+      - install -Dm644 LICENSE.txt
+        ${FLATPAK_DEST}/share/licenses/${FLATPAK_ID}/projectM-LICENSE.txt
+      - install -Dm644 vendor/projectm-eval/LICENSE.md
+        ${FLATPAK_DEST}/share/licenses/${FLATPAK_ID}/projectm-eval-LICENSE.md
+      - install -Dm644 vendor/hlslparser/LICENSE
+        ${FLATPAK_DEST}/share/licenses/${FLATPAK_ID}/hlslparser-LICENSE
     sources:
       - type: git
         url: https://github.com/projectM-visualizer/projectm.git
@@ -70,6 +79,8 @@ modules:
     buildsystem: cmake-ninja
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
+    post-install:
+      - install -Dm644 LICENSE ${FLATPAK_DEST}/share/licenses/${FLATPAK_ID}/LICENSE
     sources:
       - type: git
         url: https://github.com/sandrewd/ReverieMediaPlayer.git
