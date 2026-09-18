@@ -1,0 +1,143 @@
+# Every check in this project was run by hand until now, and the failure mode was always the
+# same: silence. A missing QML module, a leaked build path, a Flatpak manifest still pointing at
+# an old tag - each one built cleanly, installed cleanly, and failed somewhere else. This turns
+# that class of thing into a red X.
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # The curated 480 presets, as published alongside a release. The full corpus is 157 MB across
+  # 9,795 files and cloning it per run would dominate the job; this is the same archive the
+  # Flatpak manifest consumes, pinned to the same digest, so the two cannot drift.
+  PRESETS_URL: https://github.com/sandrewd/ReverieMediaPlayer/releases/download/v0.8.2/reverie-presets-curated.tar.xz
+  PRESETS_SHA: 3e136b59bb7592f68e0fd1e8c4d56e2c279bdac16223d117c1da675996535378
+
+jobs:
+  deb:
+    name: Debian package (Ubuntu 24.04)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build git \
+            qt6-base-dev qt6-declarative-dev libqt6svg6-dev \
+            qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts \
+            qml6-module-qtquick-dialogs qml6-module-qtquick-window \
+            qml6-module-qtquick-templates qml6-module-qtquick-shapes \
+            qml6-module-qtqml-workerscript \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            libtag1-dev
+
+      - name: Fetch the curated preset pack
+        run: |
+          curl -fsSL "$PRESETS_URL" -o presets.tar.xz
+          echo "$PRESETS_SHA  presets.tar.xz" | sha256sum -c -
+          mkdir -p assets/presets
+          tar -xJf presets.tar.xz -C assets/presets
+          echo "presets staged: $(find assets/presets -name '*.milk' | wc -l)"
+
+      - name: Build vendored projectM
+        run: |
+          cmake -S vendor/projectm -B build/projectm -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
+            -DENABLE_PLAYLIST=ON -DBUILD_TESTING=OFF \
+            -DCMAKE_INSTALL_PREFIX="$PWD/build/projectm-master-install"
+          cmake --build build/projectm -j"$(nproc)"
+          cmake --install build/projectm
+
+      - name: Build Reverie
+        run: |
+          cmake -S . -B build/player -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/player -j"$(nproc)"
+
+      - name: Package
+        run: cmake --build build/player --target package
+
+      # The check that matters most, and the one no compiler performs. Both encodings, because
+      # Qt stores QStringLiteral as UTF-16 and a build path shipped that way once already.
+      - name: Scan the package for build-host paths
+        run: python3 tools/scan-artifact.py build/player/reverie_*_amd64.deb
+
+      # Installing is the only way to exercise what install actually produces: the RPATH is
+      # rewritten, the presets move to /usr/share, and the QML module has to resolve from the
+      # binary's own resources rather than from a directory that happens to sit beside it.
+      - name: Install and verify from the installed location
+        run: |
+          sudo apt-get install -y ./build/player/reverie_*_amd64.deb
+          echo "--- installed binary, run from elsewhere ---"
+          cd /tmp
+          test -x /usr/bin/reverie
+          ldd /usr/bin/reverie | grep -i projectm || true
+          echo "--- presets resolved from the package, not a source tree ---"
+          test -d /usr/share/reverie/presets
+          find /usr/share/reverie/presets -name '*.milk' | wc -l
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reverie-deb
+          path: build/player/reverie_*_amd64.deb
+          if-no-files-found: error
+
+  flatpak-lint:
+    name: Flatpak manifest lint
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub/flatpak-builder-lint:latest
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint the manifest
+        run: |
+          flatpak-builder-lint manifest \
+            packaging/flatpak/io.github.sandrewd.ReverieMediaPlayer.yml
+
+  manifest-pin:
+    name: Flatpak manifest tracks the latest tag
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # The Flatpak bundle is built from whatever tag the manifest names, so a manifest left on
+      # the previous tag builds an old version perfectly and warns about nothing. That shipped
+      # once: the published bundle sat five releases behind while the .deb was current.
+      #
+      # This deliberately checks main rather than the tag. A commit cannot contain its own hash,
+      # so the manifest inside tag vX can never name vX - the bump necessarily lands one commit
+      # after the tag. What is checkable, and what actually matters, is that the tip of main
+      # names the newest tag: that is the state any Flatpak build will be made from.
+      - name: Compare the manifest pin against the newest tag
+        run: |
+          MANIFEST=packaging/flatpak/io.github.sandrewd.ReverieMediaPlayer.yml
+          TAG="$(git describe --tags --abbrev=0)"
+          WANT_COMMIT="$(git rev-parse "${TAG}^{commit}")"
+          GOT_TAG="$(awk '/^[[:space:]]+tag:/ {v=$2} END {print v}' "$MANIFEST" | tr -d "\"'")"
+          GOT_COMMIT="$(awk '/^[[:space:]]+commit:/ {v=$2} END {print v}' "$MANIFEST" | tr -d "\"'")"
+          echo "newest tag     : $TAG ($WANT_COMMIT)"
+          echo "manifest names : $GOT_TAG ($GOT_COMMIT)"
+          fail=0
+          if [ "$GOT_TAG" != "$TAG" ]; then
+            echo "::error file=$MANIFEST::manifest tag is $GOT_TAG but the newest tag is $TAG - the Flatpak would be built from the wrong release"
+            fail=1
+          fi
+          if [ "$GOT_COMMIT" != "$WANT_COMMIT" ]; then
+            echo "::error file=$MANIFEST::manifest commit is $GOT_COMMIT but $TAG is $WANT_COMMIT"
+            fail=1
+          fi
+          [ $fail -eq 0 ] && echo "manifest is current"
+          exit $fail
