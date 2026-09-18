@@ -92,7 +92,28 @@ Rectangle {
             clip: true
             model: PlaylistModel
             boundsBehavior: Flickable.StopAtBounds
-            ScrollBar.vertical: ScrollBar {}
+
+            // The stock scrollbar is a few translucent pixels that fade out when idle, which on
+            // a long playlist reads as "there is nothing below". Shown whenever the content
+            // overflows, and wide enough to grab.
+            ScrollBar.vertical: ScrollBar {
+                id: listScroll
+                policy: list.contentHeight > list.height ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                width: 10
+                background: Rectangle {
+                    color: Theme.surfaceHigh
+                    opacity: 0.35
+                }
+                contentItem: Rectangle {
+                    implicitWidth: 10
+                    radius: 5
+                    color: listScroll.pressed ? Theme.accent
+                         : listScroll.hovered ? Qt.lighter(Theme.textDim, 1.3)
+                         : Theme.textDim
+                    opacity: listScroll.pressed || listScroll.hovered ? 1.0 : 0.65
+                    Behavior on opacity { NumberAnimation { duration: 90 } }
+                }
+            }
 
             // Drag reorder: the dragged delegate floats, and the row under the cursor swaps.
             property int draggingIndex: -1
@@ -100,7 +121,12 @@ Rectangle {
             delegate: Rectangle {
                 id: row
                 width: list.width
-                height: 40
+                // Was a flat 40 whether or not there was a second line to show. Most tracks have
+                // no artist - a title derived from the filename leaves it empty - so the common
+                // row was two thirds padding. Sized to its content instead, which fits noticeably
+                // more of the playlist on screen without shrinking the text or the hit target
+                // below what section 1 asks for.
+                height: model.artist !== "" ? 36 : 28
                 color: model.isCurrent ? Theme.accentDim
                      : root.isSelected(index) ? Theme.surfaceHigh
                      : (hover.hovered ? Qt.lighter(Theme.surface, 1.35) : "transparent")
@@ -127,7 +153,9 @@ Rectangle {
                 RowLayout {
                     anchors.fill: parent
                     anchors.leftMargin: 10
-                    anchors.rightMargin: 10
+                    // Clear of the scrollbar when one is showing, so the duration is never
+                    // sitting underneath it.
+                    anchors.rightMargin: list.contentHeight > list.height ? 16 : 10
                     spacing: 8
 
                     Item {

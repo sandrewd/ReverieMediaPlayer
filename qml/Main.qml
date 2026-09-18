@@ -1235,7 +1235,7 @@ ApplicationWindow {
             MenuSeparator {}
 
             MenuItem {
-                text: qsTr("Software rendering")
+                text: qsTr("Software rendering (requires restart)")
                 checkable: true
                 checked: SystemTheme.softwareRendering
                 onTriggered: {
