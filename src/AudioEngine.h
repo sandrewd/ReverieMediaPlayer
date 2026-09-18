@@ -63,6 +63,8 @@ class AudioEngine : public QObject
     // languages has several, and playbin3 picks one with no way to change it.
     Q_PROPERTY(QVariantList audioTracks READ audioTracks NOTIFY audioTracksChanged)
     Q_PROPERTY(int audioTrack READ audioTrack NOTIFY audioTracksChanged)
+    Q_PROPERTY(QVariantList videoTracks READ videoTracks NOTIFY videoTracksChanged)
+    Q_PROPERTY(int videoTrack READ videoTrack NOTIFY videoTracksChanged)
     // ISO 639-1 code, or empty for "follow the system locale". Applied whenever a file turns
     // out to have more than one audio track, so the choice does not have to be made per file.
     Q_PROPERTY(QString preferredAudioLanguage READ preferredAudioLanguage
@@ -127,7 +129,13 @@ public:
 
     QVariantList audioTracks() const;
     int audioTrack() const { return m_audioTrack; }
+    QVariantList videoTracks() const;
+    int videoTrack() const { return m_videoTrack; }
     Q_INVOKABLE void setAudioTrack(int index);
+    // Several video streams in one file is rare - alternate angles, mostly - so this menu is
+    // hidden unless the file actually has them. It exists because the alternative is being
+    // unable to reach the second stream at all.
+    Q_INVOKABLE void setVideoTrack(int index);
     QString preferredAudioLanguage() const { return m_preferredAudioLanguage; }
     void setPreferredAudioLanguage(const QString &code);
     // The languages offered in the menus, as {code, label}. Nothing is derived from the media:
@@ -196,6 +204,7 @@ signals:
     void hasVideoChanged();
     void subtitlesChanged();
     void audioTracksChanged();
+    void videoTracksChanged();
     void preferredAudioLanguageChanged();
     void preferredSubtitleLanguageChanged();
     void equaliserChanged();
@@ -252,8 +261,11 @@ private:
     void rebuildAudioTracks(GstStreamCollection *collection);
     QString effectiveAudioLanguage() const;
     int trackForLanguage(const QVector<SubtitleTrack> &tracks, const QString &code) const;
-    // Video ids only. Audio and text are chosen, so they cannot live in the keep-list.
-    QStringList m_videoStreamIds;
+    // One video stream is *selected*, not all of them. Handing select-streams every video id
+    // stalls the pipeline outright - playsink has a single video chain - so a file with two
+    // video streams did not play at all.
+    QVector<SubtitleTrack> m_videoStreams;
+    int m_videoTrack = -1;
     int m_subtitleTrack = -1;
     // The preference, distinct from the index: which track is number 0 changes per file.
     bool m_subtitlesWanted = true;

@@ -411,7 +411,8 @@ void AudioEngine::setSource(const QString &uriOrPath)
     // Subtitle state belongs to the old file. suburi in particular must be cleared explicitly:
     // left set, it would attach the previous track's subtitle file to this one.
     m_subtitles.clear();
-    m_videoStreamIds.clear();
+    m_videoStreams.clear();
+    m_videoTrack = -1;
     m_audioStreams.clear();
     m_audioTrack = -1;
     m_subtitleTrack = -1;
@@ -475,7 +476,7 @@ void AudioEngine::rebuildSubtitleTracks(GstStreamCollection *collection)
             : QString();
 
     QVector<SubtitleTrack> found;
-    QStringList videoIds;
+    QVector<SubtitleTrack> videos;
     const guint count = gst_stream_collection_get_size(collection);
     for (guint i = 0; i < count; ++i) {
         GstStream *stream = gst_stream_collection_get_stream(collection, i);
@@ -485,7 +486,21 @@ void AudioEngine::rebuildSubtitleTracks(GstStreamCollection *collection)
         if (!id)
             continue;
         if (gst_stream_get_stream_type(stream) & GST_STREAM_TYPE_VIDEO) {
-            videoIds << QString::fromUtf8(id);
+            SubtitleTrack video;
+            video.id = QString::fromUtf8(id);
+            // Video streams carry no language, so the useful label is the frame size - which is
+            // also what actually distinguishes one angle or quality from another.
+            if (GstCaps *caps = gst_stream_get_caps(stream)) {
+                if (gst_caps_get_size(caps) > 0) {
+                    gint w = 0, h = 0;
+                    GstStructure *st = gst_caps_get_structure(caps, 0);
+                    if (gst_structure_get_int(st, "width", &w)
+                        && gst_structure_get_int(st, "height", &h) && w > 0 && h > 0)
+                        video.title = QStringLiteral("%1x%2").arg(w).arg(h);
+                }
+                gst_caps_unref(caps);
+            }
+            videos << video;
             continue;
         }
         if (!(gst_stream_get_stream_type(stream) & GST_STREAM_TYPE_TEXT))
@@ -520,7 +535,28 @@ void AudioEngine::rebuildSubtitleTracks(GstStreamCollection *collection)
         }();
 
     m_subtitles = found;
-    m_videoStreamIds = videoIds;
+
+    const QString previousVideoId = (m_videoTrack >= 0 && m_videoTrack < m_videoStreams.size())
+                                        ? m_videoStreams.at(m_videoTrack).id
+                                        : QString();
+    const bool sameVideo = (videos.size() == m_videoStreams.size()) && [&] {
+        for (int i = 0; i < videos.size(); ++i)
+            if (videos.at(i).id != m_videoStreams.at(i).id)
+                return false;
+        return true;
+    }();
+    m_videoStreams = videos;
+    int wantedVideo = -1;
+    if (!previousVideoId.isEmpty())
+        for (int i = 0; i < m_videoStreams.size(); ++i)
+            if (m_videoStreams.at(i).id == previousVideoId)
+                wantedVideo = i;
+    if (wantedVideo < 0 && !m_videoStreams.isEmpty())
+        wantedVideo = 0;
+    const bool videoChanged = !sameVideo || wantedVideo != m_videoTrack;
+    m_videoTrack = wantedVideo;
+    if (videoChanged)
+        emit videoTracksChanged();
 
     int wanted = -1;
     if (m_selectNewSubtitle && !m_subtitles.isEmpty()) {
@@ -558,14 +594,17 @@ void AudioEngine::rebuildSubtitleTracks(GstStreamCollection *collection)
 
 void AudioEngine::applySubtitleSelection()
 {
-    if (!m_pipeline || (m_videoStreamIds.isEmpty() && m_audioStreams.isEmpty()))
+    if (!m_pipeline || (m_videoStreams.isEmpty() && m_audioStreams.isEmpty()))
         return;
     // select-streams replaces the entire selection, so every stream that should keep playing has
     // to be named again each time. Leaving one out silently stops it rather than reporting
     // anything - the same quiet failure the tee used to produce on the speaker branch.
     GList *ids = nullptr;
-    for (const QString &id : m_videoStreamIds)
-        ids = g_list_append(ids, g_strdup(id.toUtf8().constData()));
+    // Exactly one video stream. Naming all of them stalls the pipeline completely: playsink has
+    // a single video chain, and a second video stream has nowhere to go. Measured - a two-video
+    // file sat at position 0 indefinitely.
+    if (m_videoTrack >= 0 && m_videoTrack < m_videoStreams.size())
+        ids = g_list_append(ids, g_strdup(m_videoStreams.at(m_videoTrack).id.toUtf8().constData()));
     if (m_audioTrack >= 0 && m_audioTrack < m_audioStreams.size())
         ids = g_list_append(ids, g_strdup(m_audioStreams.at(m_audioTrack).id.toUtf8().constData()));
     if (m_subtitleTrack >= 0 && m_subtitleTrack < m_subtitles.size())
@@ -677,6 +716,33 @@ QVariantList AudioEngine::audioTracks() const
         out.append(entry);
     }
     return out;
+}
+
+QVariantList AudioEngine::videoTracks() const
+{
+    QVariantList out;
+    for (int i = 0; i < m_videoStreams.size(); ++i) {
+        QVariantMap entry;
+        const QString size = m_videoStreams.at(i).title;
+        entry.insert(QStringLiteral("label"),
+                     size.isEmpty() ? tr("Track %1").arg(i + 1)
+                                    : tr("Track %1 (%2)").arg(i + 1).arg(size));
+        out.append(entry);
+    }
+    return out;
+}
+
+void AudioEngine::setVideoTrack(int index)
+{
+    if (index < 0 || index >= m_videoStreams.size() || index == m_videoTrack)
+        return;
+    m_videoTrack = index;
+    applySubtitleSelection();
+    qInfo("video: switched to stream %d (%s)", index,
+          qUtf8Printable(m_videoStreams.at(index).title.isEmpty()
+                             ? QStringLiteral("unknown size")
+                             : m_videoStreams.at(index).title));
+    emit videoTracksChanged();
 }
 
 void AudioEngine::setAudioTrack(int index)

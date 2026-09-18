@@ -706,6 +706,34 @@ ApplicationWindow {
             onObjectAdded: function(index, object) { videoMenu.addItem(object) }
             onObjectRemoved: function(index, object) { videoMenu.removeItem(object) }
         }
+
+        // Alternate video streams - different angles, mostly - are rare enough that this is
+        // hidden for essentially every file. It exists because selecting one stream is required
+        // anyway (naming them all stalls the pipeline), so once there is an index, reaching the
+        // second stream costs a menu rather than a feature.
+        readonly property bool severalVideo: AudioEngine.videoTracks.length > 1
+
+        MenuSeparator { visible: videoMenu.severalVideo }
+        MenuItem {
+            text: qsTr("VIDEO STREAM")
+            enabled: false
+            visible: videoMenu.severalVideo
+        }
+        ButtonGroup { id: videoTrackGroup }
+        Instantiator {
+            model: videoMenu.severalVideo ? AudioEngine.videoTracks : []
+            delegate: MenuItem {
+                required property int index
+                required property var modelData
+                text: modelData.label
+                checkable: true
+                ButtonGroup.group: videoTrackGroup
+                checked: AudioEngine.videoTrack === index
+                onTriggered: AudioEngine.setVideoTrack(index)
+            }
+            onObjectAdded: function(index, object) { videoMenu.addItem(object) }
+            onObjectRemoved: function(index, object) { videoMenu.removeItem(object) }
+        }
     }
 
     // with, then by author where an author actually has several presets in that category.
