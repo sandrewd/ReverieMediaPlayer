@@ -176,6 +176,22 @@ Rectangle {
             }
             IconButton {
                 overVideo: root.overVideo
+                glyph: "subtitles"
+                size: Theme.controlSizeSmall * root.uiScale
+                // Kept in place and greyed out rather than hidden when there is nothing to
+                // show, so the control does not appear and disappear between tracks - a button
+                // that moves is harder to find than one that is simply dim.
+                visible: !root.compact
+                enabled: AudioEngine.subtitleTracks.length > 0
+                active: AudioEngine.subtitleTrack >= 0
+                onClicked: AudioEngine.setSubtitlesEnabled(AudioEngine.subtitleTrack < 0)
+                ToolTip.visible: hovered
+                ToolTip.text: !enabled ? qsTr("No subtitles in this track")
+                                       : AudioEngine.subtitleTrack >= 0 ? qsTr("Subtitles are on")
+                                                                        : qsTr("Subtitles")
+            }
+            IconButton {
+                overVideo: root.overVideo
                 glyph: PlaylistModel.repeatMode === PlaylistModel.RepeatOne ? "repeatOne" : "repeat"
                 size: Theme.controlSizeSmall * root.uiScale
                 visible: !root.compact

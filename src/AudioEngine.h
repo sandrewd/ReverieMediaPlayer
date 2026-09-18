@@ -56,6 +56,21 @@ class AudioEngine : public QObject
     Q_PROPERTY(QVariantList subtitleTracks READ subtitleTracks NOTIFY subtitlesChanged)
     // Index into subtitleTracks, or -1 for off.
     Q_PROPERTY(int subtitleTrack READ subtitleTrack NOTIFY subtitlesChanged)
+    // The preference, which outlives any one file. subtitleTrack is what is on right now.
+    Q_PROPERTY(bool subtitlesEnabled READ subtitlesEnabled NOTIFY subtitlesChanged)
+
+    // Audio tracks, the same mechanism as subtitles. A film with a commentary track or two
+    // languages has several, and playbin3 picks one with no way to change it.
+    Q_PROPERTY(QVariantList audioTracks READ audioTracks NOTIFY audioTracksChanged)
+    Q_PROPERTY(int audioTrack READ audioTrack NOTIFY audioTracksChanged)
+    // ISO 639-1 code, or empty for "follow the system locale". Applied whenever a file turns
+    // out to have more than one audio track, so the choice does not have to be made per file.
+    Q_PROPERTY(QString preferredAudioLanguage READ preferredAudioLanguage
+                   WRITE setPreferredAudioLanguage NOTIFY preferredAudioLanguageChanged)
+    // Same idea for subtitles: which track to turn on when a file has several. It does not
+    // decide whether subtitles are on at all - that is the separate on/off preference.
+    Q_PROPERTY(QString preferredSubtitleLanguage READ preferredSubtitleLanguage
+                   WRITE setPreferredSubtitleLanguage NOTIFY preferredSubtitleLanguageChanged)
 
     // Tags as the decoder reports them, for any medium. TagLib stays authoritative for files -
     // see the playlist - but it reads nothing from a file that carries no tags it understands,
@@ -97,13 +112,30 @@ public:
 
     QVariantList subtitleTracks() const;
     int subtitleTrack() const { return m_subtitleTrack; }
+    bool subtitlesEnabled() const { return m_subtitlesWanted; }
     // -1 turns subtitles off. The choice is remembered across tracks as a preference, so a
     // user who turned them off does not have to do it again for every file.
     Q_INVOKABLE void setSubtitleTrack(int index);
+    // On/off as the user thinks of it. "On" means the preferred language if the file has it,
+    // otherwise the first track - never a fixed index. Works with nothing playing, in which
+    // case it only records the preference for the next file.
+    Q_INVOKABLE void setSubtitlesEnabled(bool on);
     // Attaches an external subtitle file to whatever is playing. playbin3 ignores `suburi`
     // unless it is set below PAUSED, so this cycles the pipeline through READY and seeks back -
     // roughly 800ms, which is why it is only ever done on an explicit request.
     Q_INVOKABLE bool addSubtitleFile(const QString &path);
+
+    QVariantList audioTracks() const;
+    int audioTrack() const { return m_audioTrack; }
+    Q_INVOKABLE void setAudioTrack(int index);
+    QString preferredAudioLanguage() const { return m_preferredAudioLanguage; }
+    void setPreferredAudioLanguage(const QString &code);
+    // The languages offered in the menus, as {code, label}. Nothing is derived from the media:
+    // the preference has to be settable before anything is loaded. The empty code means
+    // different things for the two, so the first entry is labelled accordingly.
+    Q_INVOKABLE QVariantList languageChoices(bool subtitles) const;
+    QString preferredSubtitleLanguage() const { return m_preferredSubtitleLanguage; }
+    void setPreferredSubtitleLanguage(const QString &code);
 
     // Fixed by equalizer-10bands; not a preference.
     static constexpr int kEqualiserBands = 10;
@@ -163,6 +195,9 @@ signals:
     void bufferingChanged();
     void hasVideoChanged();
     void subtitlesChanged();
+    void audioTracksChanged();
+    void preferredAudioLanguageChanged();
+    void preferredSubtitleLanguageChanged();
     void equaliserChanged();
     void tagsChanged();
     void endOfStream();
@@ -209,9 +244,16 @@ private:
         bool external = false;
     };
     QVector<SubtitleTrack> m_subtitles;
-    // Every non-text stream id. select-streams replaces the whole selection, so the video and
-    // audio have to be named again every time a subtitle is chosen or nothing would play.
-    QStringList m_otherStreamIds;
+    // Audio streams carry the same three fields, so the struct is shared.
+    QVector<SubtitleTrack> m_audioStreams;
+    int m_audioTrack = -1;
+    QString m_preferredAudioLanguage;
+    QString m_preferredSubtitleLanguage;
+    void rebuildAudioTracks(GstStreamCollection *collection);
+    QString effectiveAudioLanguage() const;
+    int trackForLanguage(const QVector<SubtitleTrack> &tracks, const QString &code) const;
+    // Video ids only. Audio and text are chosen, so they cannot live in the keep-list.
+    QStringList m_videoStreamIds;
     int m_subtitleTrack = -1;
     // The preference, distinct from the index: which track is number 0 changes per file.
     bool m_subtitlesWanted = true;

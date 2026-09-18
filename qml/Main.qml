@@ -667,6 +667,34 @@ ApplicationWindow {
             text: qsTr("Add subtitle file…")
             onTriggered: subtitleDialog.open()
         }
+
+        // Only when there is actually a choice. One audio track is the overwhelming majority of
+        // files, and a section offering a single option is noise - §1's "remove the knob".
+        readonly property bool severalAudio: AudioEngine.audioTracks.length > 1
+
+        MenuSeparator { visible: videoMenu.severalAudio }
+        MenuItem {
+            text: qsTr("AUDIO TRACK")
+            enabled: false
+            visible: videoMenu.severalAudio
+        }
+        ButtonGroup { id: audioTrackGroup }
+        Instantiator {
+            // Empty model when there is nothing to choose, so no items exist at all.
+            model: videoMenu.severalAudio ? AudioEngine.audioTracks : []
+            delegate: MenuItem {
+                required property int index
+                required property var modelData
+                text: modelData.label
+                checkable: true
+                ButtonGroup.group: audioTrackGroup
+                checked: AudioEngine.audioTrack === index
+                onTriggered: AudioEngine.setAudioTrack(index)
+            }
+            // Appended, so the subtitle items keeping their fixed positions cannot displace them.
+            onObjectAdded: function(index, object) { videoMenu.addItem(object) }
+            onObjectRemoved: function(index, object) { videoMenu.removeItem(object) }
+        }
     }
 
     // with, then by author where an author actually has several presets in that category.
@@ -1040,6 +1068,131 @@ ApplicationWindow {
                 ButtonGroup.group: equaliserGroup
                 checked: AudioEngine.equaliserEnabled && AudioEngine.equaliserPreset === ""
                 onTriggered: { AudioEngine.applyCustomEqualiser(); equaliserDialog.open() }
+            }
+
+            MenuSeparator {}
+
+            // Switching here is for this file only and deliberately does not write the language
+            // preference: "play the French track this once" and "prefer French from now on" are
+            // different intentions, and conflating them makes one of them impossible.
+            Menu {
+                id: audioTrackMenu
+                title: qsTr("Audio track selection")
+                onAboutToShow: root.fitMenuWidth(audioTrackMenu, 200, 420)
+                ButtonGroup { id: audioTrackMenuGroup }
+                MenuItem {
+                    text: qsTr("No other track")
+                    enabled: false
+                    visible: AudioEngine.audioTracks.length < 2
+                }
+                Instantiator {
+                    model: AudioEngine.audioTracks.length > 1 ? AudioEngine.audioTracks : []
+                    delegate: MenuItem {
+                        required property int index
+                        required property var modelData
+                        text: modelData.label
+                        checkable: true
+                        ButtonGroup.group: audioTrackMenuGroup
+                        checked: AudioEngine.audioTrack === index
+                        onTriggered: AudioEngine.setAudioTrack(index)
+                    }
+                    onObjectAdded: function(index, object) { audioTrackMenu.insertItem(1 + index, object) }
+                    onObjectRemoved: function(index, object) { audioTrackMenu.removeItem(object) }
+                }
+            }
+        }
+
+        // Sibling of Sound rather than inside it. These are standing preferences - which
+        // language to pick when a file offers a choice - as distinct from the per-file track
+        // switching, which lives on the picture where you are looking when you want it.
+        Menu {
+            id: videoMenuOptions
+            title: qsTr("Video")
+            onAboutToShow: root.fitMenuWidth(videoMenuOptions, 220, 420)
+
+            Menu {
+                id: audioLanguageMenu
+                title: qsTr("Preferred audio language")
+                onAboutToShow: root.fitMenuWidth(audioLanguageMenu, 200, 420)
+                ButtonGroup { id: audioLanguageGroup }
+                Instantiator {
+                    model: AudioEngine.languageChoices(false)
+                    delegate: MenuItem {
+                        required property var modelData
+                        text: modelData.label
+                        checkable: true
+                        ButtonGroup.group: audioLanguageGroup
+                        checked: AudioEngine.preferredAudioLanguage === modelData.code
+                        onTriggered: AudioEngine.preferredAudioLanguage = modelData.code
+                    }
+                    onObjectAdded: function(index, object) { audioLanguageMenu.insertItem(index, object) }
+                    onObjectRemoved: function(index, object) { audioLanguageMenu.removeItem(object) }
+                }
+            }
+
+            Menu {
+                id: subtitleLanguageMenu
+                title: qsTr("Preferred subtitle language")
+                onAboutToShow: root.fitMenuWidth(subtitleLanguageMenu, 200, 420)
+                ButtonGroup { id: subtitleLanguageGroup }
+                Instantiator {
+                    model: AudioEngine.languageChoices(true)
+                    delegate: MenuItem {
+                        required property var modelData
+                        text: modelData.label
+                        checkable: true
+                        ButtonGroup.group: subtitleLanguageGroup
+                        checked: AudioEngine.preferredSubtitleLanguage === modelData.code
+                        onTriggered: AudioEngine.preferredSubtitleLanguage = modelData.code
+                    }
+                    onObjectAdded: function(index, object) { subtitleLanguageMenu.insertItem(index, object) }
+                    onObjectRemoved: function(index, object) { subtitleLanguageMenu.removeItem(object) }
+                }
+            }
+
+            Menu {
+                id: subtitleTrackMenu
+                title: qsTr("Subtitle track selection")
+                onAboutToShow: root.fitMenuWidth(subtitleTrackMenu, 200, 420)
+                ButtonGroup { id: subtitleTrackMenuGroup }
+                MenuItem {
+                    text: qsTr("Off")
+                    checkable: true
+                    ButtonGroup.group: subtitleTrackMenuGroup
+                    checked: AudioEngine.subtitleTrack === -1
+                    onTriggered: AudioEngine.setSubtitleTrack(-1)
+                }
+                MenuItem {
+                    text: qsTr("Nothing loaded has subtitles")
+                    enabled: false
+                    visible: AudioEngine.subtitleTracks.length === 0
+                }
+                Instantiator {
+                    model: AudioEngine.subtitleTracks
+                    delegate: MenuItem {
+                        required property int index
+                        required property var modelData
+                        text: modelData.label
+                        checkable: true
+                        ButtonGroup.group: subtitleTrackMenuGroup
+                        checked: AudioEngine.subtitleTrack === index
+                        onTriggered: AudioEngine.setSubtitleTrack(index)
+                    }
+                    onObjectAdded: function(index, object) { subtitleTrackMenu.insertItem(2 + index, object) }
+                    onObjectRemoved: function(index, object) { subtitleTrackMenu.removeItem(object) }
+                }
+            }
+
+            MenuSeparator {}
+
+            MenuItem {
+                text: qsTr("Show subtitles")
+                checkable: true
+                // The preference rather than the live track, so it still reads correctly with
+                // nothing playing. Same entry point as the transport button and the picture's
+                // own menu, so the three cannot disagree.
+                checked: AudioEngine.subtitlesEnabled
+                onTriggered: AudioEngine.setSubtitlesEnabled(checked)
             }
         }
 

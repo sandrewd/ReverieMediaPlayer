@@ -74,10 +74,15 @@ AudioEngine::AudioEngine(QObject *parent)
             m_equaliserGains.append(band < stored.size() ? stored.at(band).toDouble() : 0.0);
         m_equaliserPreset = settings.value(QStringLiteral("audio/equaliserPreset")).toString();
         m_equaliserEnabled = settings.value(QStringLiteral("audio/equaliserEnabled"), false).toBool();
-        // Subtitles default on, which is what playbin3 does anyway and what every other player
-        // does. Only the off choice is really worth carrying, and carrying it across launches
-        // saves repeating it for every file.
-        m_subtitlesWanted = settings.value(QStringLiteral("video/subtitlesEnabled"), true).toBool();
+        // Subtitles default OFF, which is deliberately *not* what playbin3 does - left alone it
+        // turns the first text stream on. Someone watching in their own language did not ask for
+        // them, and they are one button away. Once on, the preferred language decides which
+        // track, and the choice persists.
+        m_subtitlesWanted = settings.value(QStringLiteral("video/subtitlesEnabled"), false).toBool();
+        m_preferredAudioLanguage =
+            settings.value(QStringLiteral("audio/preferredLanguage")).toString();
+        m_preferredSubtitleLanguage =
+            settings.value(QStringLiteral("video/preferredSubtitleLanguage")).toString();
     }
 
     buildPipeline();
@@ -356,7 +361,9 @@ void AudioEngine::setSource(const QString &uriOrPath)
     // Subtitle state belongs to the old file. suburi in particular must be cleared explicitly:
     // left set, it would attach the previous track's subtitle file to this one.
     m_subtitles.clear();
-    m_otherStreamIds.clear();
+    m_videoStreamIds.clear();
+    m_audioStreams.clear();
+    m_audioTrack = -1;
     m_subtitleTrack = -1;
     m_selectNewSubtitle = false;
     m_subtitleFile = sidecarSubtitleFor(uri);
@@ -369,6 +376,7 @@ void AudioEngine::setSource(const QString &uriOrPath)
         qInfo("subtitles: found %s alongside the media",
               qUtf8Printable(QFileInfo(m_subtitleFile).fileName()));
     emit subtitlesChanged();
+    emit audioTracksChanged();
 
     m_source = uri;
     m_position = 0;
@@ -417,7 +425,7 @@ void AudioEngine::rebuildSubtitleTracks(GstStreamCollection *collection)
             : QString();
 
     QVector<SubtitleTrack> found;
-    QStringList others;
+    QStringList videoIds;
     const guint count = gst_stream_collection_get_size(collection);
     for (guint i = 0; i < count; ++i) {
         GstStream *stream = gst_stream_collection_get_stream(collection, i);
@@ -426,10 +434,12 @@ void AudioEngine::rebuildSubtitleTracks(GstStreamCollection *collection)
         const char *id = gst_stream_get_stream_id(stream);
         if (!id)
             continue;
-        if (!(gst_stream_get_stream_type(stream) & GST_STREAM_TYPE_TEXT)) {
-            others << QString::fromUtf8(id);
+        if (gst_stream_get_stream_type(stream) & GST_STREAM_TYPE_VIDEO) {
+            videoIds << QString::fromUtf8(id);
             continue;
         }
+        if (!(gst_stream_get_stream_type(stream) & GST_STREAM_TYPE_TEXT))
+            continue;
         SubtitleTrack track;
         track.id = QString::fromUtf8(id);
         if (GstTagList *tags = gst_stream_get_tags(stream)) {
@@ -460,7 +470,7 @@ void AudioEngine::rebuildSubtitleTracks(GstStreamCollection *collection)
         }();
 
     m_subtitles = found;
-    m_otherStreamIds = others;
+    m_videoStreamIds = videoIds;
 
     int wanted = -1;
     if (m_selectNewSubtitle && !m_subtitles.isEmpty()) {
@@ -473,31 +483,214 @@ void AudioEngine::rebuildSubtitleTracks(GstStreamCollection *collection)
             if (m_subtitles.at(i).id == previousId)
                 wanted = i;
     }
-    if (wanted < 0 && m_subtitlesWanted && !m_subtitles.isEmpty())
-        wanted = 0;
+    if (wanted < 0 && m_subtitlesWanted && !m_subtitles.isEmpty()) {
+        // Prefer the language the user asked for; fall back to the first track, which is what
+        // playbin3 would have done unaided.
+        wanted = trackForLanguage(m_subtitles, m_preferredSubtitleLanguage);
+        if (wanted < 0)
+            wanted = 0;
+    }
 
     const bool changed = !sameTracks || wanted != m_subtitleTrack;
     m_subtitleTrack = wanted;
     applySubtitleSelection();
-    if (changed)
+    if (changed) {
+        if (!m_subtitles.isEmpty())
+            qInfo("subtitles: %d track(s), showing %s",
+                  int(m_subtitles.size()),
+                  wanted < 0 ? "none"
+                             : qUtf8Printable(m_subtitles.at(wanted).language.isEmpty()
+                                                  ? QStringLiteral("track 1")
+                                                  : m_subtitles.at(wanted).language));
         emit subtitlesChanged();
+    }
 }
 
 void AudioEngine::applySubtitleSelection()
 {
-    if (!m_pipeline || m_otherStreamIds.isEmpty())
+    if (!m_pipeline || (m_videoStreamIds.isEmpty() && m_audioStreams.isEmpty()))
         return;
-    // select-streams replaces the entire selection, so the video and audio ids go back in every
-    // time. Leaving them out silently stops playback rather than reporting anything.
+    // select-streams replaces the entire selection, so every stream that should keep playing has
+    // to be named again each time. Leaving one out silently stops it rather than reporting
+    // anything - the same quiet failure the tee used to produce on the speaker branch.
     GList *ids = nullptr;
-    for (const QString &id : m_otherStreamIds)
+    for (const QString &id : m_videoStreamIds)
         ids = g_list_append(ids, g_strdup(id.toUtf8().constData()));
+    if (m_audioTrack >= 0 && m_audioTrack < m_audioStreams.size())
+        ids = g_list_append(ids, g_strdup(m_audioStreams.at(m_audioTrack).id.toUtf8().constData()));
     if (m_subtitleTrack >= 0 && m_subtitleTrack < m_subtitles.size())
         ids = g_list_append(ids, g_strdup(m_subtitles.at(m_subtitleTrack).id.toUtf8().constData()));
     if (ids) {
         gst_element_send_event(m_pipeline, gst_event_new_select_streams(ids));
         g_list_free_full(ids, g_free);
     }
+}
+
+// Audio tracks. Same shape as subtitles, with one difference that matters: there is no "off".
+// A file always plays some audio track, so the only questions are which one and how it is chosen
+// when the user has not said.
+void AudioEngine::rebuildAudioTracks(GstStreamCollection *collection)
+{
+    const QString previousId = (m_audioTrack >= 0 && m_audioTrack < m_audioStreams.size())
+                                   ? m_audioStreams.at(m_audioTrack).id
+                                   : QString();
+    QVector<SubtitleTrack> found;
+    const guint count = gst_stream_collection_get_size(collection);
+    for (guint i = 0; i < count; ++i) {
+        GstStream *stream = gst_stream_collection_get_stream(collection, i);
+        if (!stream || !(gst_stream_get_stream_type(stream) & GST_STREAM_TYPE_AUDIO))
+            continue;
+        const char *id = gst_stream_get_stream_id(stream);
+        if (!id)
+            continue;
+        SubtitleTrack track;
+        track.id = QString::fromUtf8(id);
+        if (GstTagList *tags = gst_stream_get_tags(stream)) {
+            gchar *value = nullptr;
+            if (gst_tag_list_get_string(tags, GST_TAG_LANGUAGE_CODE, &value)) {
+                track.language = QString::fromUtf8(value);
+                g_free(value);
+            }
+            value = nullptr;
+            if (gst_tag_list_get_string(tags, GST_TAG_TITLE, &value)) {
+                track.title = QString::fromUtf8(value);
+                g_free(value);
+            }
+            gst_tag_list_unref(tags);
+        }
+        found << track;
+    }
+
+    const bool same = (found.size() == m_audioStreams.size()) && [&] {
+        for (int i = 0; i < found.size(); ++i)
+            if (found.at(i).id != m_audioStreams.at(i).id)
+                return false;
+        return true;
+    }();
+    m_audioStreams = found;
+
+    int wanted = -1;
+    if (!previousId.isEmpty())
+        for (int i = 0; i < m_audioStreams.size(); ++i)
+            if (m_audioStreams.at(i).id == previousId)
+                wanted = i;
+    // The preference only decides anything when there is a choice to make. With one track it is
+    // irrelevant, and forcing a mismatch would mean silence on a file whose only track is in
+    // another language.
+    if (wanted < 0 && m_audioStreams.size() > 1)
+        wanted = trackForLanguage(m_audioStreams, effectiveAudioLanguage());
+    if (wanted < 0 && !m_audioStreams.isEmpty())
+        wanted = 0;
+
+    const bool changed = !same || wanted != m_audioTrack;
+    m_audioTrack = wanted;
+    if (changed) {
+        if (m_audioStreams.size() > 1 && wanted >= 0)
+            qInfo("audio: %d tracks, playing %d (%s); preference is %s",
+                  int(m_audioStreams.size()), wanted,
+                  qUtf8Printable(m_audioStreams.at(wanted).language.isEmpty()
+                                     ? QStringLiteral("no language tag")
+                                     : m_audioStreams.at(wanted).language),
+                  qUtf8Printable(effectiveAudioLanguage()));
+        emit audioTracksChanged();
+    }
+}
+
+QString AudioEngine::effectiveAudioLanguage() const
+{
+    return m_preferredAudioLanguage.isEmpty()
+               ? QLocale::system().name().section(QLatin1Char('_'), 0, 0)
+               : m_preferredAudioLanguage;
+}
+
+QVariantList AudioEngine::audioTracks() const
+{
+    QVariantList out;
+    for (int i = 0; i < m_audioStreams.size(); ++i) {
+        const SubtitleTrack &track = m_audioStreams.at(i);
+        QString label;
+        if (!track.language.isEmpty()) {
+            const QLocale locale(track.language);
+            const QString name = QLocale::languageToString(locale.language());
+            label = (locale.language() == QLocale::C || name.isEmpty()) ? track.language : name;
+        }
+        if (label.isEmpty() && !track.title.isEmpty())
+            label = track.title;
+        if (label.isEmpty())
+            label = tr("Track %1").arg(i + 1);
+        else if (!track.title.isEmpty() && !track.language.isEmpty()
+                 && track.title.compare(label, Qt::CaseInsensitive) != 0)
+            label = tr("%1 - %2").arg(label, track.title);
+        QVariantMap entry;
+        entry.insert(QStringLiteral("label"), label);
+        entry.insert(QStringLiteral("language"), track.language);
+        out.append(entry);
+    }
+    return out;
+}
+
+void AudioEngine::setAudioTrack(int index)
+{
+    if (index < 0 || index >= m_audioStreams.size())
+        return;
+    m_audioTrack = index;
+    applySubtitleSelection();
+    qInfo("audio: switched to track %d (%s) on request", index,
+          qUtf8Printable(m_audioStreams.at(index).language.isEmpty()
+                             ? QStringLiteral("no language tag")
+                             : m_audioStreams.at(index).language));
+    emit audioTracksChanged();
+}
+
+void AudioEngine::setPreferredAudioLanguage(const QString &code)
+{
+    if (code == m_preferredAudioLanguage) {
+        emit preferredAudioLanguageChanged();
+        return;
+    }
+    m_preferredAudioLanguage = code;
+    QSettings().setValue(QStringLiteral("audio/preferredLanguage"), code);
+    emit preferredAudioLanguageChanged();
+    // Anything already playing keeps the track it has; changing the preference mid-file and
+    // having the dialogue switch language underneath you would be worse than waiting.
+}
+
+void AudioEngine::setPreferredSubtitleLanguage(const QString &code)
+{
+    if (code == m_preferredSubtitleLanguage) {
+        emit preferredSubtitleLanguageChanged();
+        return;
+    }
+    m_preferredSubtitleLanguage = code;
+    QSettings().setValue(QStringLiteral("video/preferredSubtitleLanguage"), code);
+    emit preferredSubtitleLanguageChanged();
+}
+
+QVariantList AudioEngine::languageChoices(bool subtitles) const
+{
+    // Deliberately a short list. The target user is not choosing from every ISO 639 code, and
+    // a file whose language is not here still plays - the preference only breaks ties.
+    static const char *codes[] = {"en", "es", "fr", "de", "it", "pt", "nl", "pl",
+                                  "ru", "ja", "ko", "zh", "ar", "hi", "sv", "tr"};
+    QVariantList out;
+    QVariantMap first;
+    first.insert(QStringLiteral("code"), QString());
+    // For audio the fallback is the system locale, because something must play. For subtitles
+    // it is simply the first track the file offers, since there is nothing to match against
+    // until the user names a language.
+    first.insert(QStringLiteral("label"),
+                 subtitles ? tr("First available")
+                           : tr("Match the system (%1)")
+                                 .arg(QLocale::languageToString(QLocale::system().language())));
+    out.append(first);
+    for (const char *code : codes) {
+        QVariantMap entry;
+        entry.insert(QStringLiteral("code"), QString::fromLatin1(code));
+        entry.insert(QStringLiteral("label"),
+                     QLocale::languageToString(QLocale(QString::fromLatin1(code)).language()));
+        out.append(entry);
+    }
+    return out;
 }
 
 QVariantList AudioEngine::subtitleTracks() const
@@ -549,6 +742,45 @@ void AudioEngine::setSubtitleTrack(int index)
     m_subtitleTrack = index;
     applySubtitleSelection();
     emit subtitlesChanged();
+}
+
+int AudioEngine::trackForLanguage(const QVector<SubtitleTrack> &tracks, const QString &code) const
+{
+    if (code.isEmpty())
+        return -1;
+    // Codes arrive as two or three letters depending on the container, so they are compared
+    // through QLocale rather than as strings: "fr" and "fra" are the same language.
+    const QLocale::Language want = QLocale(code).language();
+    if (want == QLocale::C)
+        return -1;
+    for (int i = 0; i < tracks.size(); ++i) {
+        const QString lang = tracks.at(i).language;
+        if (!lang.isEmpty() && QLocale(lang).language() == want)
+            return i;
+    }
+    return -1;
+}
+
+void AudioEngine::setSubtitlesEnabled(bool on)
+{
+    if (!on) {
+        setSubtitleTrack(-1);
+        return;
+    }
+    int wanted = trackForLanguage(m_subtitles, m_preferredSubtitleLanguage);
+    if (wanted < 0 && !m_subtitles.isEmpty())
+        wanted = 0;
+    if (wanted < 0) {
+        // Nothing loaded that has subtitles. Record the wish so the next file honours it,
+        // rather than making the button look broken.
+        if (!m_subtitlesWanted) {
+            m_subtitlesWanted = true;
+            QSettings().setValue(QStringLiteral("video/subtitlesEnabled"), true);
+        }
+        emit subtitlesChanged();
+        return;
+    }
+    setSubtitleTrack(wanted);
 }
 
 QString AudioEngine::sidecarSubtitleFor(const QString &uri) const
@@ -825,6 +1057,7 @@ void AudioEngine::pollBus()
                     if (stream && (gst_stream_get_stream_type(stream) & GST_STREAM_TYPE_VIDEO))
                         video = true;
                 }
+                rebuildAudioTracks(collection);
                 rebuildSubtitleTracks(collection);
                 gst_object_unref(collection);
                 if (video != m_hasVideo) {

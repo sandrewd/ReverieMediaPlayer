@@ -155,6 +155,21 @@ AbstractButton {
                     ctx.beginPath(); ctx.arc(w * 0.70, h * 0.70, w * 0.08, 0, 6.3); ctx.fill()
                     ctx.beginPath(); ctx.arc(w * 0.50, h * 0.50, w * 0.08, 0, 6.3); ctx.fill()
                     break
+                case "subtitles":
+                    // The conventional captions mark: an outlined frame with two short rules
+                    // inside it. Drawn rather than set as a glyph character for the reason the
+                    // play/pause mark is - it must not depend on what the system font carries.
+                    ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = Math.max(1, w * 0.09)
+                    ctx.lineJoin = "round"
+                    ctx.beginPath()
+                    ctx.rect(w * 0.06, h * 0.18, w * 0.88, h * 0.64)
+                    ctx.stroke()
+                    ctx.lineCap = "round"
+                    ctx.lineWidth = Math.max(1, w * 0.11)
+                    ctx.beginPath()
+                    ctx.moveTo(w * 0.20, h * 0.60); ctx.lineTo(w * 0.46, h * 0.60)
+                    ctx.moveTo(w * 0.56, h * 0.60); ctx.lineTo(w * 0.80, h * 0.60)
+                    ctx.stroke(); break
                 case "expand":
                     ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = Math.max(1, w * 0.12)
                     ctx.beginPath()
