@@ -114,14 +114,14 @@ int main(int argc, char *argv[])
     // space-free because it becomes a directory and a filename; the display name is separate.
     // Qt calls setlocale(LC_ALL, "") when QGuiApplication is constructed, which activates the
     // user's locale for C library functions. Where LC_NUMERIC uses a comma as the decimal
-    // separator - sr_RS, de_DE, fr_FR and many others - strtod("2.000") stops at the dot and
-    // returns 2. projectM parses Milkdrop presets and shader source full of such literals, so
-    // every float in every preset was silently truncated and the visualiser rendered nothing at
-    // all: no error, no warning, a complete framebuffer, an empty picture.
+    // separator - which is most of Europe and much of the world - strtod("2.000") stops at the
+    // dot and returns 2. projectM parses Milkdrop presets and shader source full of such
+    // literals, so every float in every preset is silently truncated and the visualiser renders
+    // nothing at all: no error, no warning, a complete framebuffer, an empty picture.
     //
     // This cost a very long investigation, because the machine that showed it differed from the
     // development machine only in this. The giveaway was in its own logs the whole time - frame
-    // statistics printed as "mean 0,0" rather than "mean 0.0".
+    // statistics printed with a comma where the development machine printed a dot.
     //
     // Numbers stay in the C locale for the whole process. Qt's own formatting goes through
     // QLocale and is unaffected; only the C library functions that parsers rely on change.
