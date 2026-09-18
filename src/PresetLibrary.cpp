@@ -7,7 +7,7 @@
 #include <QTextStream>
 
 PresetLibrary::PresetLibrary(QObject *parent)
-    : QObject(parent)
+    : QAbstractListModel(parent)
 {
 }
 
@@ -27,12 +27,118 @@ void PresetLibrary::setCuratedList(const QString &path)
     rescan();
 }
 
-int PresetLibrary::count() const
+void PresetLibrary::setSearchText(const QString &text)
 {
-    int total = 0;
-    for (const auto &items : m_byCategory)
-        total += items.size();
-    return total;
+    if (m_searchText == text)
+        return;
+    m_searchText = text;
+    rebuildFilter();
+}
+
+void PresetLibrary::setFilterCategory(const QString &category)
+{
+    if (m_filterCategory == category)
+        return;
+    m_filterCategory = category;
+    rebuildFilter();
+}
+
+void PresetLibrary::setFilterStyle(const QString &style)
+{
+    if (m_filterStyle == style)
+        return;
+    m_filterStyle = style;
+    rebuildFilter();
+}
+
+void PresetLibrary::clearFilters()
+{
+    if (m_searchText.isEmpty() && m_filterCategory.isEmpty() && m_filterStyle.isEmpty())
+        return;
+    m_searchText.clear();
+    m_filterCategory.clear();
+    m_filterStyle.clear();
+    rebuildFilter();
+}
+
+int PresetLibrary::rowCount(const QModelIndex &parent) const
+{
+    return parent.isValid() ? 0 : int(m_filtered.size());
+}
+
+QVariant PresetLibrary::data(const QModelIndex &index, int role) const
+{
+    if (!index.isValid() || index.row() < 0 || index.row() >= m_filtered.size())
+        return {};
+    const Entry &e = m_all.at(m_filtered.at(index.row()));
+    switch (role) {
+    case NameRole:     return e.name;
+    case TitleRole:    return titleOf(e.name);
+    case AuthorRole:   return artistOf(e.name);
+    case CategoryRole: return e.category;
+    case StyleRole:    return e.style;
+    case PathRole:     return e.path;
+    default:           return {};
+    }
+}
+
+QHash<int, QByteArray> PresetLibrary::roleNames() const
+{
+    return {{NameRole, "name"},
+            {TitleRole, "title"},
+            {AuthorRole, "author"},
+            {CategoryRole, "category"},
+            {StyleRole, "style"},
+            {PathRole, "path"}};
+}
+
+QStringList PresetLibrary::styles(const QString &category) const
+{
+    QStringList result;
+    for (const Entry &e : m_all) {
+        if (e.style.isEmpty())
+            continue;
+        if (!category.isEmpty() && e.category != category)
+            continue;
+        if (!result.contains(e.style))
+            result.append(e.style);
+    }
+    result.sort(Qt::CaseInsensitive);
+    return result;
+}
+
+QStringList PresetLibrary::filteredPaths() const
+{
+    QStringList result;
+    result.reserve(m_filtered.size());
+    for (int i : m_filtered)
+        result.append(m_all.at(i).path);
+    return result;
+}
+
+void PresetLibrary::rebuildFilter()
+{
+    beginResetModel();
+    m_filtered.clear();
+    // Matched against the name, the author and the style, because a person typing "rorschach"
+    // is as likely to mean the style as a preset whose title contains it, and typing an author
+    // should find their work. Cheap enough at 9,795 entries to do on every keystroke.
+    const QString needle = m_searchText.trimmed();
+    for (int i = 0; i < m_all.size(); ++i) {
+        const Entry &e = m_all.at(i);
+        if (!m_filterCategory.isEmpty() && e.category != m_filterCategory)
+            continue;
+        if (!m_filterStyle.isEmpty() && e.style != m_filterStyle)
+            continue;
+        if (!needle.isEmpty()
+            && !e.name.contains(needle, Qt::CaseInsensitive)
+            && !e.style.contains(needle, Qt::CaseInsensitive)
+            && !e.category.contains(needle, Qt::CaseInsensitive))
+            continue;
+        m_filtered.append(i);
+    }
+    endResetModel();
+    emit filterChanged();
 }
 
 void PresetLibrary::rescan()
@@ -41,7 +147,9 @@ void PresetLibrary::rescan()
     m_categories.clear();
 
     if (m_rootPath.isEmpty()) {
+        m_all.clear();
         emit libraryChanged();
+        rebuildFilter();
         return;
     }
 
@@ -67,6 +175,7 @@ void PresetLibrary::rescan()
             relativePaths.append(root.relativeFilePath(it.next()));
     }
 
+    m_all.clear();
     for (const QString &relative : std::as_const(relativePaths)) {
         const int slash = relative.indexOf(QLatin1Char('/'));
         if (slash <= 0)
@@ -75,8 +184,15 @@ void PresetLibrary::rescan()
         // Transition effects are not standalone visuals and should not appear in a picker.
         if (category.startsWith(QLatin1Char('!')))
             continue;
-        m_byCategory[category].append({QFileInfo(relative).completeBaseName(),
-                                       root.absoluteFilePath(relative)});
+        const QString name = QFileInfo(relative).completeBaseName();
+        const QString absolute = root.absoluteFilePath(relative);
+        // Everything between the category and the file is the pack's own finer grouping. It is
+        // one level deep throughout the corpus, but joining whatever is there keeps this honest
+        // if that ever changes.
+        const QString dir = QFileInfo(relative).path();
+        const QString style = dir.mid(slash + 1);
+        m_all.append({name, absolute, category, style == QLatin1String(".") ? QString() : style});
+        m_byCategory[category].append({name, absolute});
     }
 
     for (auto &items : m_byCategory) {
@@ -88,20 +204,9 @@ void PresetLibrary::rescan()
 
     m_categories = m_byCategory.keys();
     emit libraryChanged();
+    rebuildFilter();
 }
 
-QVariantList PresetLibrary::presets(const QString &category) const
-{
-    QVariantList result;
-    const auto it = m_byCategory.constFind(category);
-    if (it == m_byCategory.constEnd())
-        return result;
-    result.reserve(it->size());
-    for (const auto &entry : *it)
-        result.append(QVariantMap{{QStringLiteral("name"), entry.first},
-                                  {QStringLiteral("path"), entry.second}});
-    return result;
-}
 
 QString PresetLibrary::artistOf(const QString &presetName)
 {
@@ -115,58 +220,7 @@ QString PresetLibrary::titleOf(const QString &presetName)
     return separator > 0 ? presetName.mid(separator + 3).trimmed() : presetName;
 }
 
-QVariantList PresetLibrary::artistGroups(const QString &category, int minimum) const
-{
-    QVariantList result;
-    const auto it = m_byCategory.constFind(category);
-    if (it == m_byCategory.constEnd())
-        return result;
 
-    QMap<QString, QVariantList> grouped;
-    QStringList order;
-    for (int i = 0; i < it->size(); ++i) {
-        const QString artist = artistOf(it->at(i).first);
-        if (artist.isEmpty())
-            continue;
-        if (!grouped.contains(artist))
-            order.append(artist);
-        grouped[artist].append(QVariantMap{{QStringLiteral("name"), titleOf(it->at(i).first)},
-                                           {QStringLiteral("index"), i}});
-    }
-
-    order.sort(Qt::CaseInsensitive);
-    for (const QString &artist : std::as_const(order)) {
-        if (grouped.value(artist).size() < minimum)
-            continue;
-        result.append(QVariantMap{{QStringLiteral("artist"), artist},
-                                  {QStringLiteral("items"), grouped.value(artist)}});
-    }
-    return result;
-}
-
-QVariantList PresetLibrary::ungrouped(const QString &category, int minimum) const
-{
-    QVariantList result;
-    const auto it = m_byCategory.constFind(category);
-    if (it == m_byCategory.constEnd())
-        return result;
-
-    QMap<QString, int> counts;
-    for (const auto &entry : *it) {
-        const QString artist = artistOf(entry.first);
-        if (!artist.isEmpty())
-            ++counts[artist];
-    }
-
-    for (int i = 0; i < it->size(); ++i) {
-        const QString artist = artistOf(it->at(i).first);
-        if (!artist.isEmpty() && counts.value(artist) >= minimum)
-            continue;
-        result.append(QVariantMap{{QStringLiteral("name"), it->at(i).first},
-                                  {QStringLiteral("index"), i}});
-    }
-    return result;
-}
 
 QStringList PresetLibrary::paths(const QString &category) const
 {

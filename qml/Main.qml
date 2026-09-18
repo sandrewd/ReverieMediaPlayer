@@ -784,7 +784,14 @@ ApplicationWindow {
         }
         MenuSeparator {}
 
-        // Categories are inserted here, above this separator.
+        MenuItem {
+            // What the eleven category submenus used to be. A cascading menu cannot present a
+            // corpus: it was already a measurable stall to build at 480 presets, and the full
+            // pack is 9,795 across 184 styles. One way in, not two - the same reason the old
+            // chrome toggle went when the playlist grew its own collapse control.
+            text: qsTr("Browse all…")
+            onTriggered: presetBrowser.open()
+        }
         MenuSeparator {}
         MenuItem {
             text: qsTr("Randomize")
@@ -796,102 +803,6 @@ ApplicationWindow {
             }
         }
 
-        Instantiator {
-            model: PresetLibrary.categories
-            delegate: categoryMenu
-            // Index 2 keeps the header and its separator on top and pushes the trailing
-            // separator, lock and Randomize down as categories arrive.
-            onObjectAdded: function(index, object) { presetMenu.insertMenu(2 + index, object) }
-            onObjectRemoved: function(index, object) { presetMenu.removeMenu(object) }
-        }
-    }
-
-    Component {
-        id: categoryMenu
-        Menu {
-            id: catMenu
-            required property string modelData
-            title: modelData
-            property bool populated: false
-
-            MenuItem {
-                text: qsTr("Randomize %1").arg(catMenu.modelData)
-                onTriggered: {
-                    presetMenu.useList(catMenu.modelData)
-                    visualizer.shuffle = true
-                    visualizer.presetLocked = false
-                    visualizer.randomPreset()
-                }
-            }
-            MenuSeparator {}
-
-            // Built on first open. Creating every menu item up front is a visible stall on a
-            // software renderer and most categories are never opened.
-            onAboutToShow: {
-                if (populated)
-                    return
-                populated = true
-                const category = catMenu.modelData
-
-                const groups = PresetLibrary.artistGroups(category)
-                for (let g = 0; g < groups.length; ++g) {
-                    const sub = artistMenu.createObject(catMenu, {
-                        title: groups[g].artist,
-                        category: category,
-                        entries: groups[g].items
-                    })
-                    catMenu.addMenu(sub)
-                }
-
-                const loose = PresetLibrary.ungrouped(category)
-                for (let i = 0; i < loose.length; ++i) {
-                    catMenu.addItem(presetItem.createObject(catMenu, {
-                        text: loose[i].name,
-                        category: category,
-                        presetIndex: loose[i].index
-                    }))
-                }
-                root.fitMenuWidth(catMenu, 200, 620)
-            }
-        }
-    }
-
-    Component {
-        id: artistMenu
-        Menu {
-            id: artist
-            property string category: ""
-            property var entries: []
-            property bool populated: false
-            onAboutToShow: {
-                if (populated)
-                    return
-                populated = true
-                for (let i = 0; i < entries.length; ++i) {
-                    artist.addItem(presetItem.createObject(artist, {
-                        text: entries[i].name,
-                        category: artist.category,
-                        presetIndex: entries[i].index
-                    }))
-                }
-                root.fitMenuWidth(artist, 180, 620)
-            }
-        }
-    }
-
-    Component {
-        id: presetItem
-        MenuItem {
-            property string category: ""
-            property int presetIndex: 0
-            // Choosing one deliberately means staying on it; the rotation would move off it
-            // in half a minute otherwise.
-            onTriggered: {
-                visualizer.setPresetList(PresetLibrary.paths(category))
-                visualizer.jumpTo(presetIndex)
-                visualizer.presetLocked = true
-            }
-        }
     }
 
     Menu {
@@ -1699,6 +1610,12 @@ ApplicationWindow {
                 }
             }
         }
+    }
+
+    PresetBrowser {
+        id: presetBrowser
+        parent: Overlay.overlay
+        visualizer: visualizer
     }
 
     Dialog {

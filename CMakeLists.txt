@@ -206,6 +206,7 @@ qt_add_qml_module(player
         qml/PlaylistPanel.qml
         qml/ColourRow.qml
         qml/ReverieMark.qml
+        qml/PresetBrowser.qml
         qml/VideoSurface.qml
         qml/Ticker.qml
 )

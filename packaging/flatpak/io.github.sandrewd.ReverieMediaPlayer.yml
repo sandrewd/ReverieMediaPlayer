@@ -87,12 +87,15 @@ modules:
         tag: v0.8.8
         # Pinned alongside the tag: a tag can be moved, a commit cannot.
         commit: 18e6d68f5e65ce9b19461ba6b501aa8835d03c39
-      # Pinned to the v0.8.2 asset deliberately: the preset selection has not changed, and the
-      # sha256 fixes the content regardless of which release carries it.
-      # The curated 480 presets, extracted where the build expects the corpus. The full
-      # Cream of the Crop collection is 157 MB across 9,795 files; this is the selection
-      # Reverie ships, and it compresses to under 200 KB because presets are plain text.
+      # The curated default, extracted where the build expects the corpus, and pinned by digest.
+      # It must match what the .deb stages from presets-curated.txt or the two packages ship
+      # different visualisations - so this moves whenever that list is regenerated.
+      #
+      # 364 presets, two from each of the pack's 183 sub-folders: the cheapest by cost proxy,
+      # which guarantees every style has something a software renderer can manage, and the
+      # median, which is what the style actually looks like. The full 9,795 are an in-app
+      # download; see the presets-v1 release.
       - type: archive
-        url: https://github.com/sandrewd/ReverieMediaPlayer/releases/download/v0.8.2/reverie-presets-curated.tar.xz
-        sha256: 3e136b59bb7592f68e0fd1e8c4d56e2c279bdac16223d117c1da675996535378
+        url: https://github.com/sandrewd/ReverieMediaPlayer/releases/download/presets-v1/reverie-presets-curated.tar.xz
+        sha256: 23e36c3f36aa5d81468646f7556bbd9fa2045d2f03f708fae372e8c4f9970447
         dest: assets/presets
