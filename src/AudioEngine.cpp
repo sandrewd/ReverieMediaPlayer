@@ -1134,7 +1134,11 @@ void AudioEngine::pollBus()
             if (tags) {
                 gchar *title = nullptr;
                 if (gst_tag_list_get_string(tags, GST_TAG_TITLE, &title) && title) {
-                    const QString value = QString::fromUtf8(title);
+                    // Trimmed, as TagLib's path already was. A container whose title tag holds
+                    // nothing but whitespace is not untagged as far as GStreamer is concerned,
+                    // and an untrimmed blank propagated all the way to the window title, which
+                    // read " - Reverie" with nothing before the dash.
+                    const QString value = QString::fromUtf8(title).trimmed();
                     if (value != m_streamTitle) {
                         m_streamTitle = value;
                         emit streamTitleChanged();
@@ -1147,7 +1151,7 @@ void AudioEngine::pollBus()
                 }
                 gchar *artist = nullptr;
                 if (gst_tag_list_get_string(tags, GST_TAG_ARTIST, &artist) && artist) {
-                    const QString value = QString::fromUtf8(artist);
+                    const QString value = QString::fromUtf8(artist).trimmed();
                     if (value != m_tagArtist) {
                         m_tagArtist = value;
                         emit tagsChanged();

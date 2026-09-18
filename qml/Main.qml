@@ -11,9 +11,10 @@ ApplicationWindow {
     width: 1100
     height: 680
     visible: true
-    title: PlaylistModel.currentTitle !== ""
-           ? PlaylistModel.currentTitle + " — Reverie"
-           : qsTr("Reverie Media Player")
+    // Just the track. Qt's formatWindowTitle already appends applicationDisplayName after an
+    // em dash on X11, so adding "— Reverie" here produced "track — Reverie — Reverie Media
+    // Player" and said the name twice. An empty title leaves Qt to show the name alone.
+    title: PlaylistModel.currentTitle
     color: Theme.background
 
     // Bind the window's palette to the tokens. Qt Quick Controls paint from the palette, and
@@ -98,12 +99,22 @@ ApplicationWindow {
     readonly property bool roomForPlaylist: width >= 700
     readonly property bool showPlaylist: !mini && !fullscreen && playlistVisible && roomForPlaylist
 
+    // What the window was before it went fullscreen, so leaving restores that rather than
+    // always dropping to Windowed - which silently un-maximised a maximised window.
+    property int visibilityBeforeFullscreen: Window.Windowed
+
     onFullscreenChanged: {
-        root.visibility = fullscreen ? Window.FullScreen : Window.Windowed
         if (fullscreen) {
+            if (root.visibility !== Window.FullScreen)
+                root.visibilityBeforeFullscreen = root.visibility
+            root.visibility = Window.FullScreen
             controlsVisible = true
             fullscreenHint.show()
             idleTimer.restart()
+        } else {
+            root.visibility = root.visibilityBeforeFullscreen === Window.FullScreen
+                              ? Window.Windowed
+                              : root.visibilityBeforeFullscreen
         }
     }
 

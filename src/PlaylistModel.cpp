@@ -210,15 +210,21 @@ void PlaylistModel::supplyMetadata(int row, const QString &title, const QString 
     Track &track = m_tracks[row];
     QList<int> roles;
 
+    // Trimmed here as well as at the source. A whitespace-only tag is not a title, and letting
+    // one through replaced a perfectly good filename with a blank - it passes isEmpty() while
+    // displaying as nothing at all.
+    const QString cleanTitle = title.trimmed();
+    const QString cleanArtist = artist.trimmed();
+
     // Only a title that was really the filename may be replaced. A file that carried a tag keeps
     // it, which is what "TagLib is authoritative" has meant since streams were added.
-    if (track.titleFromFilename && !title.isEmpty() && title != track.title) {
-        track.title = title;
+    if (track.titleFromFilename && !cleanTitle.isEmpty() && cleanTitle != track.title) {
+        track.title = cleanTitle;
         track.titleFromFilename = false;
         roles.append(TitleRole);
     }
-    if (track.artist.isEmpty() && !artist.isEmpty()) {
-        track.artist = artist;
+    if (track.artist.isEmpty() && !cleanArtist.isEmpty()) {
+        track.artist = cleanArtist;
         roles.append(ArtistRole);
     }
     if (roles.isEmpty())
