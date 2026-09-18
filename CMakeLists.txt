@@ -44,17 +44,26 @@ pkg_check_modules(GST REQUIRED IMPORTED_TARGET
 pkg_check_modules(TAGLIB REQUIRED IMPORTED_TARGET taglib)
 qt_standard_project_setup(REQUIRES 6.4)
 
-# projectM is vendored and built into build/projectm-install (see README).
-find_package(projectM4 REQUIRED CONFIG
+# projectM is vendored and built into build/projectm-install (see README) - but not everywhere.
+# A Flatpak builds it into the same prefix as Reverie, so the vendored tree does not exist and
+# an unqualified lookup is the only one that can succeed. Look in the build tree first, because
+# that is what a developer wants when both are present, then fall back to the normal search.
+find_package(projectM4 QUIET CONFIG
     PATHS "${CMAKE_SOURCE_DIR}/build/projectm-master-install/lib/cmake/projectM4"
           "${CMAKE_SOURCE_DIR}/build/projectm-install/lib/cmake/projectM4"
     NO_DEFAULT_PATH)
+if(NOT projectM4_FOUND)
+    find_package(projectM4 REQUIRED CONFIG)
+endif()
 
 # The playlist library owns preset ordering, shuffle and the automatic advance.
-find_package(projectM4Playlist REQUIRED CONFIG
+find_package(projectM4Playlist QUIET CONFIG
     PATHS "${CMAKE_SOURCE_DIR}/build/projectm-master-install/lib/cmake/projectM4Playlist"
           "${CMAKE_SOURCE_DIR}/build/projectm-install/lib/cmake/projectM4Playlist"
     NO_DEFAULT_PATH)
+if(NOT projectM4Playlist_FOUND)
+    find_package(projectM4Playlist REQUIRED CONFIG)
+endif()
 
 # projectM only gained an explicit render target in 4.2.0; without it the visualizer
 # renders to the default framebuffer and the QML item stays black.
@@ -104,8 +113,13 @@ set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 include(GNUInstallDirs)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/share/icons
         DESTINATION ${CMAKE_INSTALL_DATADIR})
-install(FILES ${CMAKE_SOURCE_DIR}/assets/share/applications/reverie.desktop
+install(FILES ${CMAKE_SOURCE_DIR}/assets/share/applications/${PLAYER_APP_ID}.desktop
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+
+# AppStream metadata. Required by Flathub, and what software centres read to describe the
+# application; harmless and useful in the .deb too.
+install(FILES ${CMAKE_SOURCE_DIR}/assets/share/metainfo/${PLAYER_APP_ID}.metainfo.xml
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
 install(TARGETS player RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # The preset library has to be installed, not merely found in the source tree: PLAYER_SOURCE_DIR
@@ -168,15 +182,15 @@ qt_add_resources(player "branding"
     PREFIX "/branding"
     BASE "${CMAKE_SOURCE_DIR}/assets/share/icons/hicolor"
     FILES
-        assets/share/icons/hicolor/16x16/apps/reverie.png
-        assets/share/icons/hicolor/22x22/apps/reverie.png
-        assets/share/icons/hicolor/24x24/apps/reverie.png
-        assets/share/icons/hicolor/32x32/apps/reverie.png
-        assets/share/icons/hicolor/48x48/apps/reverie.png
-        assets/share/icons/hicolor/64x64/apps/reverie.png
-        assets/share/icons/hicolor/128x128/apps/reverie.png
-        assets/share/icons/hicolor/256x256/apps/reverie.png
-        assets/share/icons/hicolor/scalable/apps/reverie.svg
+        assets/share/icons/hicolor/16x16/apps/io.github.sandrewd.ReverieMediaPlayer.png
+        assets/share/icons/hicolor/22x22/apps/io.github.sandrewd.ReverieMediaPlayer.png
+        assets/share/icons/hicolor/24x24/apps/io.github.sandrewd.ReverieMediaPlayer.png
+        assets/share/icons/hicolor/32x32/apps/io.github.sandrewd.ReverieMediaPlayer.png
+        assets/share/icons/hicolor/48x48/apps/io.github.sandrewd.ReverieMediaPlayer.png
+        assets/share/icons/hicolor/64x64/apps/io.github.sandrewd.ReverieMediaPlayer.png
+        assets/share/icons/hicolor/128x128/apps/io.github.sandrewd.ReverieMediaPlayer.png
+        assets/share/icons/hicolor/256x256/apps/io.github.sandrewd.ReverieMediaPlayer.png
+        assets/share/icons/hicolor/scalable/apps/io.github.sandrewd.ReverieMediaPlayer.svg
 )
 
 qt_add_qml_module(player

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.sandrewd.ReverieMediaPlayer</id>
+
+  <name>Reverie</name>
+  <summary>Media player with built-in visualisations</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <developer id="io.github.sandrewd">
+    <name>sandrewd</name>
+  </developer>
+
+  <description>
+    <p>
+      Reverie is a media player for Linux with Milkdrop-style visualisations built in — not
+      running alongside in a second window, but rendered into the same scene as the rest of the
+      interface.
+    </p>
+    <p>
+      It exists because the available options sit at two extremes: players that look like they
+      were designed in 2009, and library-management applications that happen to play audio.
+      Reverie is neither. It plays what you give it, shows something worth looking at while it
+      does, and does not try to organise your music collection.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Milkdrop visualisations driven by the decoded audio, embedded or fullscreen</li>
+      <li>Adaptive visual quality that holds a frame-rate target, so it stays usable without a GPU</li>
+      <li>One playlist: drag to reorder, multi-select, save and load M3U</li>
+      <li>Video on the same surface, with subtitles and audio track selection</li>
+      <li>A ten-band equaliser with twelve preset curves</li>
+      <li>Internet radio, with station metadata</li>
+      <li>Ten colour palettes plus a custom theme editor; follows the desktop light/dark setting</li>
+      <li>A compact mini-player, and media key support through MPRIS</li>
+    </ul>
+    <p>
+      Deliberately not included: library management, lyrics, social features and third-party
+      service integration.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">io.github.sandrewd.ReverieMediaPlayer.desktop</launchable>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.8.1/docs/screenshot.png</image>
+      <caption>Playing a track with the visualiser running</caption>
+    </screenshot>
+  </screenshots>
+
+  <url type="homepage">https://github.com/sandrewd/ReverieMediaPlayer</url>
+  <url type="bugtracker">https://github.com/sandrewd/ReverieMediaPlayer/issues</url>
+  <url type="vcs-browser">https://github.com/sandrewd/ReverieMediaPlayer</url>
+
+  <categories>
+    <category>AudioVideo</category>
+    <category>Player</category>
+  </categories>
+
+  <keywords>
+    <keyword>music</keyword>
+    <keyword>audio</keyword>
+    <keyword>video</keyword>
+    <keyword>visualiser</keyword>
+    <keyword>milkdrop</keyword>
+  </keywords>
+
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+
+  <requires>
+    <display_length compare="ge">480</display_length>
+  </requires>
+
+  <!-- Nothing to declare: no violence, language, purchases, or user interaction of any kind. -->
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="0.8.1" date="2026-09-18">
+      <description>
+        <p>Window title fixes, and a maximised window now stays maximised after fullscreen.</p>
+      </description>
+    </release>
+    <release version="0.8.0" date="2026-09-18">
+      <description>
+        <p>
+          Subtitles, audio and subtitle track selection with preferred languages, and hardware
+          decoding where the machine supports it.
+        </p>
+      </description>
+    </release>
+    <release version="0.7.3" date="2026-09-18">
+      <description>
+        <p>First tagged release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

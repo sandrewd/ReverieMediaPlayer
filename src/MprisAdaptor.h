@@ -75,7 +75,9 @@ public:
     bool canRaise() const { return true; }
     bool hasTrackList() const { return false; }
     QString identity() const { return QStringLiteral("Reverie Media Player"); }
-    QString desktopEntry() const { return QStringLiteral("reverie"); }
+    // Must match the installed .desktop basename, which is the application ID now that
+    // Flathub requires that naming.
+    QString desktopEntry() const { return QStringLiteral("io.github.sandrewd.ReverieMediaPlayer"); }
     QStringList supportedUriSchemes() const;
     QStringList supportedMimeTypes() const;
 

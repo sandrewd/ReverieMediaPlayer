@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
     // interface is theirs.
     QIcon icon;
     for (int size : {16, 22, 24, 32, 48, 64, 128, 256}) {
-        icon.addFile(QStringLiteral(":/branding/%1x%1/apps/reverie.png").arg(size),
+        icon.addFile(QStringLiteral(":/branding/%1x%1/apps/io.github.sandrewd.ReverieMediaPlayer.png").arg(size),
                      QSize(size, size));
     }
     if (!icon.isNull())
@@ -237,16 +237,34 @@ int main(int argc, char *argv[])
     // run from build/ silently resolved the module from disk and the embedded copy was never
     // exercised. Move the binary anywhere else and the application hung on startup. It only
     // surfaced when it was installed and launched from the applications menu.
+    // Both layouts, because the prefix moved in 6.5 and Reverie is built against both: 6.4.2 on
+    // the Debian target and whatever the Flatpak runtime carries. Adding an import path that
+    // does not exist costs nothing.
     engine.addImportPath(QStringLiteral("qrc:/"));
+    engine.addImportPath(QStringLiteral("qrc:/qt/qml"));
     engine.rootContext()->setContextProperty("initialPreset", parser.value(presetOption));
     engine.rootContext()->setContextProperty("initialScale", parser.value(scaleOption).toDouble());
     engine.rootContext()->setContextProperty("initialPresetsPath", presetsDir);
     engine.rootContext()->setContextProperty("initialCuratedList", curatedList);
     engine.rootContext()->setContextProperty("initialMaxFps", parser.value(fpsCapOption).toInt());
 
-    // Qt 6.4 puts QML module resources under qrc:/<URI>/; the qrc:/qt/qml/<URI>/ layout
-    // only arrives in 6.5. Noble ships 6.4.2, so this path is version-sensitive.
-    engine.load(QUrl(QStringLiteral("qrc:/Player/qml/Main.qml")));
+    // Qt 6.4 puts QML module resources under qrc:/<URI>/; 6.5 and later use qrc:/qt/qml/<URI>/.
+    // Picking one hardcodes the Qt version: the Debian target is 6.4.2 and the Flatpak runtime is
+    // far newer, and on the wrong one the application does not start at all. So ask which exists
+    // rather than assume, and say so if neither does - a silent failure here looks like a hang.
+    const QString mainQml = [] {
+        for (const QString &candidate : {QStringLiteral(":/qt/qml/Player/qml/Main.qml"),
+                                         QStringLiteral(":/Player/qml/Main.qml")}) {
+            if (QFile::exists(candidate))
+                return QStringLiteral("qrc") + candidate;
+        }
+        return QString();
+    }();
+    if (mainQml.isEmpty()) {
+        qCritical("the embedded QML module was not found under either resource layout");
+        return 1;
+    }
+    engine.load(QUrl(mainQml));
     if (engine.rootObjects().isEmpty())
         return 1;
 

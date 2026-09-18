@@ -1,0 +1,88 @@
+# Flatpak manifest for Reverie Media Player.
+#
+# Build locally with:
+#   flatpak run --command=flatpak-builder org.flatpak.Builder --force-clean --user \
+#       --install-deps-from=flathub --repo=repo build-dir \
+#       packaging/flatpak/io.github.sandrewd.ReverieMediaPlayer.yml
+id: io.github.sandrewd.ReverieMediaPlayer
+runtime: org.kde.Platform
+runtime-version: '6.10'
+sdk: org.kde.Sdk
+command: reverie
+
+finish-args:
+  # Wayland where it exists, X11 otherwise. Reverie runs natively under both; always-on-top for
+  # the mini-player only works on X11, which is a platform limitation rather than a choice.
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --socket=pulseaudio
+  # The visualiser is OpenGL, and this is also what makes hardware video decoding reachable.
+  - --device=dri
+  # Internet radio. Reverie talks to no service of its own - this is for the stream URL the
+  # user types in, and nothing else.
+  - --share=network
+  # Where media actually lives. Writable so playlists can be saved beside the music they list.
+  # Files opened from anywhere else arrive through the document portal and need no permission.
+  - --filesystem=xdg-music
+  - --filesystem=xdg-videos
+  - --filesystem=xdg-download
+  # Media keys and desktop integration.
+  - --own-name=org.mpris.MediaPlayer2.reverie
+  # Reverie's own single-instance interface: a second launch hands its arguments to the running
+  # copy and exits, rather than starting a second player that fights over the MPRIS name.
+  - --own-name=io.github.sandrewd.ReverieMediaPlayer
+
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /lib/cmake
+  - /share/man
+  - '*.a'
+  - '*.la'
+
+modules:
+  - name: taglib
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_SHARED_LIBS=ON
+      - -DBUILD_TESTING=OFF
+    sources:
+      - type: archive
+        url: https://taglib.org/releases/taglib-1.13.1.tar.gz
+        sha256: c8da2b10f1bfec2cd7dbfcd33f4a2338db0765d851a50583d410bacf055cfd0b
+
+  # Pinned to a master commit, not a release, and deliberately so. Every tagged projectM up to
+  # and including v4.1.7 hardcodes glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0) for its final
+  # composite, which makes it impossible to render into a Qt Quick scene graph: the item comes
+  # out black while still costing the full frame time. The API that fixes it,
+  # projectm_opengl_render_frame_fbo(), exists only on master. Checked again 2026-09-18: v4.1.7
+  # is the newest release and does not contain it.
+  - name: projectm
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_SHARED_LIBS=ON
+      - -DENABLE_PLAYLIST=ON
+      - -DBUILD_TESTING=OFF
+    sources:
+      - type: git
+        url: https://github.com/projectM-visualizer/projectm.git
+        commit: 1e7ef7803b69024d1e0656705670adda2ffac817
+
+  - name: reverie
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+    sources:
+      - type: git
+        url: https://github.com/sandrewd/ReverieMediaPlayer.git
+        tag: v0.8.2
+      # The curated 480 presets, extracted where the build expects the corpus. The full
+      # Cream of the Crop collection is 157 MB across 9,795 files; this is the selection
+      # Reverie ships, and it compresses to under 200 KB because presets are plain text.
+      - type: archive
+        url: https://github.com/sandrewd/ReverieMediaPlayer/releases/download/v0.8.2/reverie-presets-curated.tar.xz
+        sha256: 3e136b59bb7592f68e0fd1e8c4d56e2c279bdac16223d117c1da675996535378
+        dest: assets/presets

@@ -20,7 +20,7 @@ Item {
 
     Image {
         anchors.fill: parent
-        source: "qrc:/branding/scalable/apps/reverie.svg"
+        source: "qrc:/branding/scalable/apps/io.github.sandrewd.ReverieMediaPlayer.svg"
         // Rasterised at the displayed size rather than scaled from a default, so the stroke
         // stays crisp wherever the mark is used.
         sourceSize.width: Math.max(16, Math.round(root.width))
