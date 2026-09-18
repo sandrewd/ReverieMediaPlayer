@@ -74,6 +74,8 @@ modules:
       - type: git
         url: https://github.com/sandrewd/ReverieMediaPlayer.git
         tag: v0.8.2
+        # Pinned alongside the tag: a tag can be moved, a commit cannot.
+        commit: f064df776645682677cdbfe0ee4463d4ee8cab4d
       # The curated 480 presets, extracted where the build expects the corpus. The full
       # Cream of the Crop collection is 157 MB across 9,795 files; this is the selection
       # Reverie ships, and it compresses to under 200 KB because presets are plain text.
