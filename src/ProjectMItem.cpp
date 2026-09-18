@@ -3,6 +3,8 @@
 
 #include <QElapsedTimer>
 #include <QOpenGLContext>
+#include <QSet>
+#include <QOpenGLVertexArrayObject>
 #include <QOpenGLFramebufferObject>
 #include <QOpenGLFunctions>
 #include <QDir>
@@ -258,14 +260,57 @@ public:
         // composite, so its output lands on the window's default framebuffer and the scene
         // graph then clears over it - the item renders black while still costing full frame
         // time. 4.2.0 adds an explicit target, which is the only correct fix.
+        // A core profile requires a vertex array object to be bound for any draw call. Mesa
+        // quietly accepts the default VAO 0; NVIDIA enforces the rule and turns those draws
+        // into no-ops, which is exactly what a visualiser that initialises, consumes audio and
+        // produces an entirely black frame looks like. Binding one costs nothing where it is
+        // not needed. PLAYER_NO_VAO=1 disables it, to tell the two cases apart.
+        static const bool skipVao = qEnvironmentVariableIsSet("PLAYER_NO_VAO");
+        auto *ctx = QOpenGLContext::currentContext();
+        if (!skipVao && ctx && !m_vao.isCreated())
+            m_vao.create();
+        if (!skipVao && m_vao.isCreated())
+            m_vao.bind();
+
+        // Nothing in this codebase has ever checked a GL error. A driver that rejects a call
+        // says so here and nowhere else - projectM reported no problem at all while drawing
+        // nothing. Drained first so what follows is attributable to projectM.
+        auto *fns = ctx ? ctx->functions() : nullptr;
+        if (fns)
+            while (fns->glGetError() != GL_NO_ERROR) { }
+
 #if defined(PROJECTM_HAS_RENDER_FRAME_FBO)
-        if (QOpenGLFramebufferObject *target = framebufferObject())
+        if (QOpenGLFramebufferObject *target = framebufferObject()) {
+            if (fns && !m_fboChecked) {
+                m_fboChecked = true;
+                const GLenum status = fns->glCheckFramebufferStatus(GL_FRAMEBUFFER);
+                qInfo("gl: render target fbo %u, %dx%d, status 0x%04x%s",
+                      target->handle(), target->width(), target->height(), status,
+                      status == GL_FRAMEBUFFER_COMPLETE ? " (complete)" : " (INCOMPLETE)");
+            }
             projectm_opengl_render_frame_fbo(m_pm, target->handle());
-        else
+        } else {
             projectm_opengl_render_frame(m_pm);
+        }
 #else
         projectm_opengl_render_frame(m_pm);
 #endif
+
+        if (fns) {
+            GLenum err = fns->glGetError();
+            while (err != GL_NO_ERROR) {
+                // Once per distinct code: a per-frame flood would be unreadable and would
+                // itself slow the render thread.
+                if (!m_seenGlErrors.contains(err)) {
+                    m_seenGlErrors.insert(err);
+                    qWarning("gl: projectM render raised error 0x%04x", err);
+                }
+                err = fns->glGetError();
+            }
+        }
+
+        if (!skipVao && m_vao.isCreated())
+            m_vao.release();
 
         // llvmpipe defers work aggressively, so without a flush the measured time is the
         // time to queue commands, not the time to draw. But the flush also costs throughput:
@@ -596,6 +641,9 @@ private:
     QElapsedTimer m_presetSettleTimer;
     qreal m_renderScale = 0.5;
     QSize m_fboSize;
+        QOpenGLVertexArrayObject m_vao;
+        bool m_fboChecked = false;
+        QSet<GLenum> m_seenGlErrors;
     QString m_presetPath;
     bool m_pendingPreset = false;
     QElapsedTimer m_statsPosted;
