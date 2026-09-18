@@ -119,6 +119,11 @@ Reverie is usable and in active development. Known gaps, stated plainly:
 - **Wayland works but is less exercised than X11.** It has been run under both, and the mini-player
   in particular needed a Wayland-specific fix. Always-on-top for the mini-player is X11-only and
   cannot be done portably on Wayland.
+- **On Wayland, double-clicking the title bar does not maximise the window.** GNOME does not
+  implement the xdg-decoration protocol, so Qt draws its own title bar, and Qt 6.4's decoration
+  handles the buttons but not that gesture — the maximise button beside it works normally. This is
+  not specific to Reverie. Running with `QT_QPA_PLATFORM=xcb` uses XWayland and the window
+  manager's own decorations, where double-click behaves as expected.
 - **Video-specific stream selection** (several *video* streams in one file) is not implemented.
 - **The performance figures above assume software rendering.** On a machine with a working GPU
   everything is considerably faster than they suggest.
