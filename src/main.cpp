@@ -300,6 +300,16 @@ int main(int argc, char *argv[])
     engine.addImportPath(QStringLiteral("qrc:/qt/qml"));
     engine.rootContext()->setContextProperty("initialPreset", parser.value(presetOption));
     engine.rootContext()->setContextProperty("initialScale", parser.value(scaleOption).toDouble());
+    // Milkdrop presets can name an external texture file. Nothing we ship carries them - not the
+    // preset pack, not projectM - so this is usually empty, and then projectM is told nothing and
+    // behaves exactly as before. When it is present, which means a user has put a texture pack in
+    // ~/.local/share/reverie/textures or a packager has installed one, the presets that ask for a
+    // texture can finally find it.
+    const QString texturesDir = findResource(QStringLiteral("textures"));
+    if (!texturesDir.isEmpty())
+        qInfo("texture library: %s", qPrintable(texturesDir));
+
+    engine.rootContext()->setContextProperty("initialTexturesPath", texturesDir);
     engine.rootContext()->setContextProperty("initialPresetsPath", presetsDir);
     engine.rootContext()->setContextProperty("initialCuratedList", curatedList);
     engine.rootContext()->setContextProperty("initialMaxFps", parser.value(fpsCapOption).toInt());

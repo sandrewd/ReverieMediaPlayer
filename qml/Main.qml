@@ -182,7 +182,10 @@ ApplicationWindow {
     // a preset by name is a request for that preset, and the rotation would move off it inside
     // half a minute otherwise.
     function playPreset(path) {
-        if (!path)
+        // Belt as well as braces. The menus are closed when the stage changes, but a command
+        // can also arrive from a menu that was already open, or from a shortcut, and there is
+        // no visualiser running behind a video to receive it.
+        if (!path || AudioEngine.hasVideo)
             return
         const all = PresetLibrary.paths("")
         const i = all.indexOf(path)
@@ -444,6 +447,7 @@ ApplicationWindow {
                     Component.onCompleted: if (initialScale > 0) renderScale = initialScale
                     presetPath: initialPreset
                     presetsPath: initialPresetsPath
+                    texturesPath: initialTexturesPath
                     curatedList: initialCuratedList
                 }
 
@@ -558,6 +562,15 @@ ApplicationWindow {
                         text: qsTr("Drop music here")
                         color: Theme.overlayTextDim
                         font.pixelSize: 16
+                    }
+                    Label {
+                        Layout.alignment: Qt.AlignHCenter
+                        // Said out loud because nothing else on the opening screen says it, and
+                        // the name, the mark and the visualiser all point at audio. Video has
+                        // been supported for a while and people have no reason to guess.
+                        text: qsTr("I play videos, too!")
+                        color: Theme.overlayTextDim
+                        font.pixelSize: 12
                     }
                 }
 
@@ -799,6 +812,21 @@ ApplicationWindow {
     // The stage carries one menu or the other. Video has no preset to change, and until now a
     // right-click over it did nothing at all - which is where the subtitle controls go, since
     // that is where anyone who has used another player looks for them.
+    // The stage carries one menu for the visualiser and another for video, and which one is
+    // correct is decided by whatever is playing. A track ending mid-menu therefore leaves the
+    // wrong menu open over the new stage: the preset picker survives into a video, where its
+    // entries address a visualiser that is no longer running, and the video menu survives into
+    // an audio track, where there are no subtitle or video streams to choose. Closing both on
+    // the transition is the only guard that covers every route between them - a track ending,
+    // a manual double-click in the playlist, Next, or a second file opened from the desktop.
+    Connections {
+        target: AudioEngine
+        function onHasVideoChanged() {
+            presetMenu.close()
+            videoMenu.close()
+        }
+    }
+
     function popupStageMenu() {
         if (AudioEngine.hasVideo)
             videoMenu.popup()

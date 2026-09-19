@@ -28,6 +28,9 @@ class ProjectMItem : public QQuickFramebufferObject
     // Preset browsing. The corpus is ~9,800 presets, so this is a cursor over a library
     // rather than a list the user is ever shown in full.
     Q_PROPERTY(QString presetsPath READ presetsPath WRITE setPresetsPath NOTIFY presetsPathChanged)
+    // Where Milkdrop's external textures live, if they are installed at all. 23% of the corpus
+    // asks for one by name and projectM has no idea where to look unless it is told.
+    Q_PROPERTY(QString texturesPath READ texturesPath WRITE setTexturesPath NOTIFY texturesPathChanged)
     Q_PROPERTY(QString curatedList READ curatedList WRITE setCuratedList NOTIFY curatedListChanged)
     Q_PROPERTY(QString presetName READ presetName NOTIFY presetChanged)
     // The file behind presetName. Favourites and recents address presets by path, because two
@@ -76,6 +79,8 @@ public:
     void setAudioEngine(AudioEngine *engine);
 
     QString presetsPath() const { return m_presetsPath; }
+    QString texturesPath() const { return m_texturesPath; }
+    void setTexturesPath(const QString &path);
     void setPresetsPath(const QString &path);
     QString curatedList() const { return m_curatedList; }
     void setCuratedList(const QString &path);
@@ -141,6 +146,7 @@ signals:
     void presetPathChanged();
     void audioEngineChanged();
     void presetsPathChanged();
+    void texturesPathChanged();
     void curatedListChanged();
     void presetChanged();
     void presetLockedChanged();
@@ -162,6 +168,7 @@ private:
     QSize m_renderSize;
 
     QString m_presetsPath;
+    QString m_texturesPath;
     QString m_curatedList;
     QString m_presetName;
     QString m_presetFile;

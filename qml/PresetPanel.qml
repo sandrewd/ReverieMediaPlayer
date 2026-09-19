@@ -27,7 +27,8 @@ Rectangle {
     // picking from a filtered list stays inside that filter. Choosing one deliberately locks
     // it, because the rotation would otherwise move off it within half a minute.
     function apply(row) {
-        if (!visualizer || row < 0 || row >= PresetLibrary.filteredCount)
+        if (!visualizer || AudioEngine.hasVideo
+            || row < 0 || row >= PresetLibrary.filteredCount)
             return
         visualizer.setPresetList(PresetLibrary.filteredPaths())
         visualizer.jumpTo(row)

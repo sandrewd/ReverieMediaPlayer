@@ -83,7 +83,12 @@ public:
                 [](const char *message, projectm_log_level level, void *) {
                     if (!message)
                         return;
-                    if (level >= PROJECTM_LOG_LEVEL_WARN)
+                    // A missing external texture is reported once per preset that wants one,
+                    // which is 23% of the corpus, and there is nothing the reader can do about
+                    // it beyond installing a texture pack. That makes it diagnostic detail
+                    // rather than a warning - the same call §9n made about the frame timer.
+                    const bool missingTexture = strstr(message, "Failed to find requested texture");
+                    if (level >= PROJECTM_LOG_LEVEL_WARN && !missingTexture)
                         qWarning("projectM: %s", message);
                     else
                         qCDebug(lcRender, "projectM: %s", message);
@@ -118,6 +123,7 @@ public:
             projectm_playlist_connect(m_playlist, m_pm);
 
             m_pendingPreset = true;
+            m_pendingTextures = true;
         }
 
         qCDebug(lcRender, "createFramebufferObject: requested %dx%d -> fbo %dx%d (scale %.2f)",
@@ -179,6 +185,12 @@ public:
             m_pendingLibrary = true;
         }
 
+        const QString wantedTextures = pmItem->texturesPath();
+        if (wantedTextures != m_texturesPath) {
+            m_texturesPath = wantedTextures;
+            m_pendingTextures = true;
+        }
+
         m_active = pmItem->active();
         m_selfDriven = pmItem->maxFps() <= 0;
         m_yieldToDesktop = pmItem->yieldToDesktop();
@@ -214,6 +226,11 @@ public:
         if (!m_pm) {
             update();
             return;
+        }
+
+        if (m_pendingTextures) {
+            m_pendingTextures = false;
+            applyTextureSearchPaths();
         }
 
         if (m_pendingLibrary) {
@@ -415,6 +432,26 @@ public:
     }
 
 private:
+
+    // Milkdrop presets can name an external texture - "PEcubesBW", "worms", "fw_clouds" - and
+    // projectM looks for it only in the directories it has been given. We never gave it any, so
+    // every one of those lookups failed on every machine: 2,237 of the 9,795 presets ask for at
+    // least one, across 89 distinct names. Neither the preset pack nor projectM ships the files,
+    // so this does not fix those presets by itself - it makes them fixable, by giving a
+    // directory the textures can be dropped into.
+    void applyTextureSearchPaths()
+    {
+        if (!m_pm)
+            return;
+        if (m_texturesPath.isEmpty()) {
+            projectm_set_texture_search_paths(m_pm, nullptr, 0);
+            return;
+        }
+        const QByteArray utf8 = m_texturesPath.toUtf8();
+        const char *paths[] = {utf8.constData()};
+        projectm_set_texture_search_paths(m_pm, paths, 1);
+        qInfo("texture library: %s", qPrintable(m_texturesPath));
+    }
 
     void loadLibrary()
     {
@@ -630,6 +667,7 @@ private:
     AudioRingBuffer *m_ring = nullptr;
     bool m_audioIsLive = false;
     QString m_presetsPath;
+    QString m_texturesPath;
     QString m_curatedList;
     QStringList m_explicitPaths;
     int m_pendingJumpIndex = -1;
@@ -658,6 +696,7 @@ private:
         QSet<GLenum> m_seenGlErrors;
     QString m_presetPath;
     bool m_pendingPreset = false;
+    bool m_pendingTextures = false;
     QElapsedTimer m_statsPosted;
     double m_lastFrameMs = 0.0;
     double m_fps = 0.0;
@@ -733,6 +772,15 @@ void ProjectMItem::setPresetsPath(const QString &path)
         return;
     m_presetsPath = path;
     emit presetsPathChanged();
+    update();
+}
+
+void ProjectMItem::setTexturesPath(const QString &path)
+{
+    if (path == m_texturesPath)
+        return;
+    m_texturesPath = path;
+    emit texturesPathChanged();
     update();
 }
 
