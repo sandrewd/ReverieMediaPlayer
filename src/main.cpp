@@ -277,6 +277,13 @@ int main(int argc, char *argv[])
     else
         qInfo("preset library: %s", qPrintable(presetsDir));
 
+        // Which windowing backend we actually ended up on. Resize and decoration behaviour differ
+        // sharply between them - GNOME draws no server-side decorations, so on wayland Qt draws its
+        // own title bar and the mini player resizes incorrectly on Qt 6.4 - and until now there was
+        // no way for a bug report to say which was in use. A Flatpak with fallback-x11 can land on
+        // either without the user choosing.
+        qInfo("platform: %s", qPrintable(QGuiApplication::platformName()));
+
     // Only meaningful when the library is larger than the curated selection. A package that ships
     // the curated set alone installs no list, and the menu item that switches between them hides
     // itself rather than appearing to do nothing.
