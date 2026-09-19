@@ -118,15 +118,16 @@ cmake --build build/player -j"$(nproc)"
 
 ### A note on textures
 
-Some Milkdrop presets name an external image — `worms`, `fw_clouds`, `PEcubesBW` — and load it as
-a texture. **Reverie ships none of them, in the curated set or the full download, and that is
-deliberate.**
+Some Milkdrop presets name an external image — `worms`, `clouds`, `lichen` — and load it as a
+texture. **Reverie ships none of them, in the curated set or the full download, and that is
+deliberate.** 61 of the curated 364 ask for one, and 1,866 of the full 9,795.
 
-Nothing breaks without them. projectM substitutes a 1×1 placeholder and the preset still renders;
-measured across every curated preset that asks for one, 68 of 78 were unaffected enough to look
-normal and exactly **one** turned out to depend on its texture completely. That one is not in the
-curated set — nor are three others that render nothing whatever you give them. What you lose is
-fidelity on part of the library, not the library.
+Nothing breaks without them. projectM substitutes a 1×1 placeholder and the preset still renders,
+missing whatever that image contributed. Every curated preset that asks for a texture was
+rendered and measured: almost all looked normal, and exactly **one** turned out to depend on its
+texture completely — blank without it, full frame with it. That one is no longer in the curated
+set, nor are three others that render nothing whatever you give them. So what a missing texture
+costs you is fidelity in part of the library, not the library itself.
 
 What you would gain is not worth what it costs. A texture is decoded by `stb_image`, which is not
 hardened against hostile input, and projectM's API accepts only a *search path* — there is no way
