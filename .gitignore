@@ -25,3 +25,8 @@ assets/test-video/
 *.webm
 *.avi
 *.mov
+
+# Scan output from tools/scan-presets.sh. Data about the preset corpus, not part of the project,
+# and large enough to be noise in a diff.
+preset-scan*.tsv
+scan.log
