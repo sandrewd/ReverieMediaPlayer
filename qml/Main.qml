@@ -924,7 +924,14 @@ ApplicationWindow {
             // stage reads as "this is what you are watching", which is the same misreading that
             // removed the idle animation in the first place. Nothing playing, nothing named.
             readonly property bool showing: visualizer.active && visualizer.presetName !== ""
-            text: showing ? visualizer.presetName : "—"
+            // Labelled, because an unlabelled name at the head of a menu reads as a title for
+            // the menu rather than as the thing currently on screen - the same misreading that
+            // retired the unlabelled preset-name box under the visualiser.
+            //
+            // "None" rather than the em dash used elsewhere for "nothing loaded": a dash works
+            // where it stands alone, as in the seek bar's -:--, but after a label it reads as a
+            // rendering fault rather than as an answer.
+            text: qsTr("Current: %1").arg(showing ? visualizer.presetName : qsTr("None"))
             enabled: false
             ToolTip.visible: hovered && showing
             ToolTip.text: visualizer.presetName
@@ -935,7 +942,9 @@ ApplicationWindow {
             readonly property bool marked:
                 (PresetHistory.favourites, PresetHistory.isFavourite(visualizer.presetFile))
             text: marked ? qsTr("Remove from favourites") : qsTr("Add to favourites")
-            enabled: visualizer.presetFile !== ""
+            // Same rule as the star and the header above it: a preset is loaded whether or not
+            // anything is playing, but there is nothing on screen to mark.
+            enabled: visualizer.active && visualizer.presetFile !== ""
             onTriggered: PresetHistory.toggleFavourite(visualizer.presetFile)
         }
 
@@ -990,15 +999,6 @@ ApplicationWindow {
             }
         }
 
-        MenuSeparator {}
-        MenuItem {
-            // What the eleven category submenus used to be. A cascading menu cannot present a
-            // corpus: it was already a measurable stall to build at 480 presets, and the full
-            // pack is 9,795 across 184 styles. One way in, not two - the same reason the old
-            // chrome toggle went when the playlist grew its own collapse control.
-            text: root.presetPanelVisible ? qsTr("Hide the browser") : qsTr("Browse all…")
-            onTriggered: root.presetPanelVisible = !root.presetPanelVisible
-        }
         MenuSeparator {}
         MenuItem {
             text: qsTr("Randomize")
@@ -2292,6 +2292,37 @@ ApplicationWindow {
         }
         ToolTip.visible: handleHover.hovered
         ToolTip.text: qsTr("Show playlist")
+    }
+
+    // The same idea on the other side: with the browser collapsed its own chevron is gone, so
+    // a handle sits on the edge it retracted into. Hidden in mini and fullscreen exactly as the
+    // playlist's is, and over video, where the panel cannot open at all - a handle that opens
+    // nothing is worse than no handle.
+    Rectangle {
+        id: presetHandle
+        visible: !root.mini && !root.fullscreen && root.roomForPlaylist
+                 && !AudioEngine.hasVideo && !root.presetPanelVisible
+        anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+        width: 22
+        height: 64
+        radius: Theme.radius
+        color: presetHandleHover.hovered ? Theme.surfaceHigh : Theme.surface
+        border.color: Theme.border
+        border.width: 1
+        Behavior on color { ColorAnimation { duration: 90 } }
+
+        HoverHandler { id: presetHandleHover }
+        TapHandler { onTapped: root.presetPanelVisible = true }
+
+        IconButton {
+            anchors.centerIn: parent
+            glyph: "chevronRight"
+            size: 20
+            enabled: false          // the whole tab is the target; this is just the glyph
+            opacity: 1.0
+        }
+        ToolTip.visible: presetHandleHover.hovered
+        ToolTip.text: qsTr("Show visualisations")
     }
 
     // Fullscreen removes the title bar, so say how to get back. Shown on entry and again
