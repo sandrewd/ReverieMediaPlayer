@@ -36,7 +36,16 @@ Rectangle {
     // The height the bar wants at its natural size. The window may give it more or less, and
     // everything inside scales with the ratio - a taller bar is a bigger bar, not the same
     // controls floating in space.
-    readonly property int baseHeight: compact ? 62 : 88
+    // Measured, not chosen. At uiScale 1 the compact layout's content is 66px - a 20px seek
+    // row, 2px of spacing and a 44px control row - and it sits inside 12px of margin, so the
+    // bar needs 78. It was declared 62, which is where the play button went: 22px of it was
+    // simply outside the bar, and in the mini player the window is pinned to this number so
+    // there was nowhere for the overflow to go.
+    //
+    // The control row is deliberately not shrunk to fit a smaller number. Large hit targets are
+    // a stated constraint of this project, and the mini player is the place someone is most
+    // likely to be stabbing at a button without looking.
+    readonly property int baseHeight: compact ? 78 : 88
     property real uiScale: Math.max(0.75, Math.min(2.2, height / baseHeight))
 
     color: overVideo ? "transparent" : Theme.surface
@@ -63,8 +72,9 @@ Rectangle {
     }
 
     ColumnLayout {
+        id: contentColumn
         anchors.fill: parent
-        anchors.margins: Theme.spacing * root.uiScale
+        anchors.margins: (compact ? 6 : Theme.spacing) * root.uiScale
         anchors.topMargin: (compact ? 6 : Theme.spacing) * root.uiScale
         spacing: (compact ? 2 : 6) * root.uiScale
 
