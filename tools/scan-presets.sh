@@ -24,6 +24,8 @@
 #   -j  parallel workers                 (default: 3)
 #   -s  seconds to render each preset    (default: 6)
 #   -b  the reverie binary to use        (default: build/player/reverie, else /usr/bin/reverie)
+#   -l  scan only the paths in this file (one per line, relative to the preset root)
+#   -t  supply these textures to every worker (a directory of images)
 #
 # Output is TSV: <non-black percent>  <relative path>
 # A value of NA means the run produced no reading at all, which is itself worth investigating.
@@ -43,13 +45,17 @@ ROOT=assets/presets
 JOBS=3
 SECS=6
 BIN=
-while getopts "o:p:j:s:b:h" opt; do
+LIST=
+TEXTURES=
+while getopts "o:p:j:s:b:l:t:h" opt; do
   case $opt in
     o) OUT=$OPTARG ;;
     p) ROOT=$OPTARG ;;
     j) JOBS=$OPTARG ;;
     s) SECS=$OPTARG ;;
     b) BIN=$OPTARG ;;
+    l) LIST=$OPTARG ;;
+    t) TEXTURES=$OPTARG ;;
     h) sed -n '2,40p' "$0"; exit 0 ;;
     *) exit 2 ;;
   esac
@@ -90,7 +96,14 @@ awk -F'\t' 'NF==2 && $2!="" && $1!="NA" {last[$2]=$1} END {for (k in last) print
     "$OUT" | LC_ALL=C sort -k2 > "$WORK/clean.tsv"
 mv "$WORK/clean.tsv" "$OUT"
 
-find "$ROOT" -name '*.milk' -printf '%P\n' | LC_ALL=C sort > "$WORK/all.txt"
+# A shortlist re-verifies a subset - typically the blank candidates, re-run one at a time where
+# a parallel reading is not trustworthy enough to condemn a preset on.
+if [ -n "$LIST" ]; then
+    [ -f "$LIST" ] || { echo "no such list: $LIST" >&2; exit 2; }
+    LC_ALL=C sort -u "$LIST" | sed '/^$/d' > "$WORK/all.txt"
+else
+    find "$ROOT" -name '*.milk' -printf '%P\n' | LC_ALL=C sort > "$WORK/all.txt"
+fi
 cut -f2 "$OUT" | LC_ALL=C sort -u > "$WORK/done.txt"
 LC_ALL=C comm -23 "$WORK/all.txt" "$WORK/done.txt" > "$WORK/todo.txt"
 
@@ -105,6 +118,13 @@ worker() {
   local part=$1 disp=$2
   local cfg=$WORK/cfg$disp data=$WORK/data$disp
   mkdir -p "$cfg" "$data"
+  # findResource() searches XDG_DATA_HOME first, so dropping images here is how a preset that
+  # wants an external texture gets one. It separates "renders nothing without its texture" from
+  # "renders nothing regardless", which is the only distinction worth acting on.
+  if [ -n "$TEXTURES" ]; then
+    mkdir -p "$data/reverie/textures"
+    cp "$TEXTURES"/* "$data/reverie/textures/" 2>/dev/null || true
+  fi
   Xvfb ":$disp" -screen 0 800x500x24 >/dev/null 2>&1 &
   local xpid=$!
   echo "$xpid" >> "$WORK/xpids"
