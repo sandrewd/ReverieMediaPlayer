@@ -114,8 +114,8 @@ Fractal/Core/Benjam - Dust on the Lens.milk
 Fractal/Core/LuxXx - Starfield A.milk
 Fractal/Core Mirror/va ultramix2 - 323.milk
 Fractal/Core Mirror/EVET - Daydreamer Vista Vortex.milk
-Fractal/Core Tunnel/Tripgnosis - Wormhole.milk
-Fractal/Core Tunnel/suksma - Rovastar - Sunflower Passion (Enlightment Mix)_Phat_edit - circumflex in character classes in regular expression.milk
+Fractal/Core Tunnel/suksma - Hexcollie - Julian Carnival - reuptake inhibition.milk
+Fractal/Core Tunnel/A Tribute to Martin - bombyx mori - Ft Flexi - AdamFX - StahlRegen - Krash - Rovastar -  Hd in Milk U.milk
 Fractal/Horizon Mirror/FX New Trendz - Anandamide - Hd In Milk City Ft AdamFX - Martin n Flexi A.milk
 Fractal/Horizon Mirror/suksma - my health fades and the universe laughs.milk
 Fractal/Lattice/Pithlit - Golden Rays.milk
@@ -241,8 +241,8 @@ Geometric/Wire Trace/EoS + Phat - CAT Scan.milk
 Geometric/Wire Trace/327.milk
 Geometric/Wire Trace Mirror/LuxXx - Universe Garbage Disposal 3a.milk
 Geometric/Wire Trace Mirror/Stahlregen & aderrasi + martin + rocke + rovastar - Charmed Spun Sugar.milk
-Hypnotic/Illusion/amandio c, flexi, martin - Op illusions - curved1.milk
-Hypnotic/Illusion/amandio c, flexi, martin - Op illusions - poggendo.milk
+Hypnotic/Illusion/amandio c, flexi, martin - Op illusions - curved4a.milk
+Hypnotic/Illusion/amandio c, flexi, martin - Planet escher - losang1.milk
 Hypnotic/Illusion Radiate/i made hexcollies day!.milk
 Hypnotic/Illusion Radiate/accruing simon genitoll boothf.milk
 Hypnotic/Polar Closeup/shifter - liquid circuitry - model without work.milk
@@ -342,7 +342,7 @@ Supernova/Lasers/$$$ Royal - Mashup (83).milk
 Supernova/Orbits/yin - 252 - Artificial poles of the continuum (remix #2).milk
 Supernova/Orbits/EoS - Apocalypse C.milk
 Supernova/Radiate/Hexcollie n EoS - sunburst baboon.milk
-Supernova/Radiate/corsage digit.milk
+Supernova/Radiate/Benjam and Zylot - Tie-Dye Supernova - prophecies - subconscious feednowhere applets roam.milk
 Supernova/Shimmer/EoS - starburst 05 phasing.milk
 Supernova/Shimmer/EoS - starburst 07 tracing points.milk
 Supernova/Stars/138.milk

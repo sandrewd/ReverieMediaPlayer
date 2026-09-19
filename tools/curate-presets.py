@@ -51,6 +51,29 @@ print(f"  using blur passes:                     {blur} ({100*blur/n:.0f}%)   br
 # Cost is kept, demoted to the tiebreaker inside each style, so the default still leans on the
 # cheaper presets where there is a choice. It is only a proxy and is known to misclassify, so it
 # decides which of two Rorschachs ships - never whether Rorschach ships at all.
+# Presets that render essentially nothing on this machine, measured with PLAYER_PROBE over a
+# six-second run with audio playing. They are excluded before selection rather than deleted
+# afterwards, so the style they belong to still gets two working presets.
+#
+# Two separate faults, kept apart because they need different evidence:
+#
+#   * entirely dependent on an external texture - blank without it, fine with it. Reverie ships
+#     no textures by design (see the README), so these can never work in a default install.
+#   * blank whatever you do - supplying the texture they ask for changes nothing, so something
+#     else is wrong with them. They fail the "should this be in the default set" test anyway.
+#
+# Verified individually by rendering each with and without a stand-in texture. Do not add to this
+# list from reading a preset: the one that prompted the whole investigation, "Planet escher -
+# cubesBW", looks texture-dependent and is black with the texture as well as without.
+BLANK_PRESETS = {
+    # texture-dependent: 0% non-black without, 100% with
+    "Fractal/Core Tunnel/Tripgnosis - Wormhole.milk",
+    # blank regardless of textures
+    "Hypnotic/Illusion/amandio c, flexi, martin - Op illusions - curved1.milk",
+    "Hypnotic/Illusion/amandio c, flexi, martin - Op illusions - poggendo.milk",
+    "Supernova/Radiate/corsage digit.milk",
+}
+
 # Two per style: the cheapest, and the median.
 #
 # Taking the two cheapest was the first attempt and skewed the default badly - 45% with pixel
@@ -62,8 +85,14 @@ print(f"  using blur passes:                     {blur} ({100*blur/n:.0f}%)   br
 # The cheapest guarantees every style has something that runs on a software renderer; the median
 # is what that style actually looks like. 66% shaders, median cost 65.
 by_style = collections.defaultdict(list)
+excluded = 0
 for r in rows:
+    if os.path.relpath(r["path"], root) in BLANK_PRESETS:
+        excluded += 1
+        continue
     by_style[(r["category"], r["style"])].append(r)
+if excluded:
+    print(f"  excluded {excluded} preset(s) that render nothing")
 
 picked = []
 for key in sorted(by_style):

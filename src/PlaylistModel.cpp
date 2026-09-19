@@ -270,6 +270,20 @@ void PlaylistModel::addStream(const QString &url, const QString &name)
     if (!parsed.isValid() || parsed.scheme().isEmpty() || parsed.host().isEmpty())
         return;
 
+    // An allow-list rather than "any scheme with a host". playbin3 autoplugs a source element
+    // from the URI scheme, so without this a playlist file could name smb://, rtsp:// or
+    // anything else GStreamer happens to support and have Reverie contact it. Internet radio is
+    // http and https; nothing else has ever been the feature.
+    //
+    // One rule for typed URLs and for playlist entries alike. Two paths would drift, and the
+    // one that drifts is always the one nobody is looking at.
+    static const QStringList allowed{QStringLiteral("http"), QStringLiteral("https")};
+    if (!allowed.contains(parsed.scheme().toLower())) {
+        qWarning("playlist: refused a %s:// stream - only http and https are accepted",
+                 qPrintable(parsed.scheme().toLower()));
+        return;
+    }
+
     Track track;
     track.path = parsed.toString();
     track.isStream = true;
@@ -407,13 +421,32 @@ bool PlaylistModel::loadM3U(const QUrl &source)
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
         return false;
 
+    // A playlist is a list of paths. None of these bounds can be reached by a real one, and
+    // without them a hostile or corrupt file is read into memory whole - readLine() on a file
+    // with no newlines will happily allocate all of it.
+    constexpr qint64 kMaxPlaylistBytes = 8 * 1024 * 1024;
+    constexpr int kMaxLineChars = 4096;
+    constexpr int kMaxEntries = 20000;
+    if (file.size() > kMaxPlaylistBytes) {
+        qWarning("playlist: %s is %lld bytes, which is not a playlist; refused",
+                 qPrintable(QFileInfo(path).fileName()), static_cast<long long>(file.size()));
+        return false;
+    }
+
     const QDir base = QFileInfo(path).dir();
     QStringList paths;
     QString pendingTitle;
+    int entries = 0;
+    bool truncated = false;
     QTextStream in(&file);
     in.setEncoding(QStringConverter::Utf8);
     while (!in.atEnd()) {
-        const QString line = in.readLine().trimmed();
+        if (entries >= kMaxEntries) {
+            truncated = true;
+            break;
+        }
+        const QString rawLine = in.readLine(kMaxLineChars);
+        const QString line = rawLine.trimmed();
         if (line.isEmpty())
             continue;
         if (line.startsWith(QLatin1Char('#'))) {
@@ -424,6 +457,7 @@ bool PlaylistModel::loadM3U(const QUrl &source)
             }
             continue;
         }
+        ++entries;
         if (line.contains(QStringLiteral("://"))) {
             addStream(line, pendingTitle);
         } else {
@@ -431,6 +465,8 @@ bool PlaylistModel::loadM3U(const QUrl &source)
         }
         pendingTitle.clear();
     }
+    if (truncated)
+        qWarning("playlist: stopped after %d entries", kMaxEntries);
     appendPaths(paths);
     return true;
 }

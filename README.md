@@ -11,7 +11,7 @@ try to organise your music collection.
 ![Reverie playing a track with the visualiser running](docs/screenshot.png)
 
 <p align="center">
-  <img src="docs/screenshot-presets.png" width="49%" alt="Choosing a visualisation by category">
+  <img src="docs/screenshot-presets.png" width="49%" alt="Searching the visualisation browser">
   <img src="docs/screenshot-equaliser.png" width="49%" alt="The ten-band equaliser">
 </p>
 
@@ -20,10 +20,13 @@ try to organise your music collection.
 - **Transport** — play, pause, stop, next, previous, seek, volume, shuffle, repeat that cycles
   off / playlist / one track, and a subtitles toggle
 - **Visualisations** — projectM (Milkdrop) presets, embedded or fullscreen, driven by the decoded
-  audio. Right-click the visualiser to browse and search them, or leave it to rotate. The
-  packages carry a curated 364 — two from each of the pack's 183 visual styles — and the full
-  collection of **9,795** is an optional 2.7 MB download. Right-click the visualiser and choose
-  *Browse all…* to search the library by name, kind or style.
+  audio. The packages carry a curated **364**, two from each of the pack's 183 visual styles, and
+  the full collection of **9,795** is an optional 2.7 MB download.
+- **A browser for them**, in a panel beside the stage: search by name, filter by kind or by the
+  pack's own visual style, and click to watch. Star the one you are looking at, and the
+  right-click menu keeps your favourites and the last ten you saw — which matters more than it
+  sounds, because the visualiser rotates on its own and that list is the only way back to the one
+  that just went past.
 - **Equaliser** — twelve preset curves and a ten-band custom mixer, with boosts compensated
   automatically so a loud curve cannot clip
 - **One playlist** — drag to reorder, multi-select, remove, save and load M3U. Not tabbed
@@ -112,6 +115,30 @@ cmake --install build/projectm-master
 cmake -S . -B build/player -DCMAKE_BUILD_TYPE=Release
 cmake --build build/player -j"$(nproc)"
 ```
+
+### A note on textures
+
+Some Milkdrop presets name an external image — `worms`, `fw_clouds`, `PEcubesBW` — and load it as
+a texture. **Reverie ships none of them, in the curated set or the full download, and that is
+deliberate.**
+
+Nothing breaks without them. projectM substitutes a 1×1 placeholder and the preset still renders;
+measured across every curated preset that asks for one, 68 of 78 were unaffected enough to look
+normal and exactly **one** turned out to depend on its texture completely. That one is not in the
+curated set — nor are three others that render nothing whatever you give them. What you lose is
+fidelity on part of the library, not the library.
+
+What you would gain is not worth what it costs. A texture is decoded by `stb_image`, which is not
+hardened against hostile input, and projectM's API accepts only a *search path* — there is no way
+to hand it pixels decoded by something better. More to the point, the trust model is wrong: an
+audio or video file is something you chose and opened, one at a time, whereas a texture pack
+arrives from upstream and every user gets the same bytes without ever looking at them. Swapping
+one image in a pack is trivial for whoever controls it, and reaches everybody at once. That is a
+much easier thing to attack than a file a person deliberately went and played.
+
+If you want them anyway, the path is open and always has been: put images in
+`~/.local/share/reverie/textures` and they will be found. That is your decision about your own
+machine, which is exactly where it belongs.
 
 ### Presets
 
