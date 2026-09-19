@@ -3,6 +3,7 @@
 #include <QAbstractListModel>
 #include <QHash>
 #include <QMap>
+#include <QSet>
 #include <QStringList>
 #include <QVariantList>
 #include <QtQml/qqmlregistration.h>
@@ -26,6 +27,12 @@ class PresetLibrary : public QAbstractListModel
 
     Q_PROPERTY(QString rootPath READ rootPath WRITE setRootPath NOTIFY libraryChanged)
     Q_PROPERTY(QString curatedList READ curatedList WRITE setCuratedList NOTIFY libraryChanged)
+    // The shipped list of visualisations measured to render nothing, and the switch that lets
+    // someone look at them anyway. Hiding them is the default because a black stage reads as the
+    // application having failed, not as the preset being at fault.
+    Q_PROPERTY(QStringList blocklists READ blocklists WRITE setBlocklists NOTIFY libraryChanged)
+    Q_PROPERTY(bool showBroken READ showBroken WRITE setShowBroken NOTIFY libraryChanged)
+    Q_PROPERTY(int brokenCount READ brokenCount NOTIFY libraryChanged)
     Q_PROPERTY(QStringList categories READ categories NOTIFY libraryChanged)
     Q_PROPERTY(int count READ count NOTIFY libraryChanged)
 
@@ -51,6 +58,13 @@ public:
     void setRootPath(const QString &path);
     QString curatedList() const { return m_curatedList; }
     void setCuratedList(const QString &path);
+    QStringList blocklists() const { return m_blocklists; }
+    void setBlocklists(const QStringList &paths);
+    bool showBroken() const { return m_showBroken; }
+    void setShowBroken(bool show);
+    // How many of the installed presets are on the blocklist, so the menu can say so rather than
+    // offering a switch whose effect is invisible.
+    int brokenCount() const { return m_brokenCount; }
 
     QStringList categories() const { return m_categories; }
     int count() const { return int(m_all.size()); }
@@ -101,8 +115,15 @@ private:
     void rescan();
     void rebuildFilter();
 
+    // Relative paths, as they appear in the blocklist file. Comparing relative keeps one set
+    // usable against the curated install and the full pack, which sit at different roots.
+    QSet<QString> readBlocklist() const;
+
     QString m_rootPath;
     QString m_curatedList;
+    QStringList m_blocklists;
+    bool m_showBroken = false;
+    int m_brokenCount = 0;
     QString m_searchText;
     QString m_filterCategory;
     QString m_filterStyle;

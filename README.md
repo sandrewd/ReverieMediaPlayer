@@ -20,8 +20,14 @@ try to organise your music collection.
 - **Transport** — play, pause, stop, next, previous, seek, volume, shuffle, repeat that cycles
   off / playlist / one track, and a subtitles toggle
 - **Visualisations** — projectM (Milkdrop) presets, embedded or fullscreen, driven by the decoded
-  audio. The packages carry a curated **364** — two from each of the pack's 183 visual styles,
-  where it has two — and the full collection of **9,795** is an optional 2.7 MB download.
+  audio. The packages carry a curated **363** — two from each of the pack's 183 visual styles,
+  where it has two that work — and the full collection of **9,795** is an optional 2.7 MB
+  download.
+- **Visualisations that render nothing are hidden.** Every preset in the pack was rendered and
+  measured; 274 of the 9,795 draw an empty frame. They are left out of the curated set and kept out
+  of the browser and the rotation, because a black stage reads as the application having failed
+  rather than as one preset being at fault. *Options ▸ Visualisation ▸ Show broken visualisations*
+  puts them back if you want to look.
 - **A browser for them**, in a panel beside the stage: search by name, filter by kind or by the
   pack's own visual style, and click to watch. Star the one you are looking at, and the
   right-click menu keeps your favourites and the last ten you saw — which matters more than it
@@ -132,7 +138,12 @@ cmake --build build/player -j"$(nproc)"
 
 Some Milkdrop presets name an external image — `worms`, `clouds`, `lichen` — and load it as a
 texture. **Reverie ships none of them, in the curated set or the full download, and that is
-deliberate.** 61 of the curated 364 ask for one, and 1,866 of the full 9,795.
+deliberate.** 1,866 of the full 9,795 ask for one.
+
+Thirty-nine of those render *nothing at all* without their texture, so in a stock install they are
+hidden along with the rest — but that list is applied only when no texture directory is found.
+Install a texture pack into `~/.local/share/reverie/textures` and all thirty-nine come back on
+their own, because for you they are not broken.
 
 Nothing breaks without them. projectM substitutes a 1×1 placeholder and the preset still renders,
 missing whatever that image contributed. Every curated preset that asks for a texture was
@@ -166,8 +177,12 @@ git clone --depth 1 \
 The build installs the presets listed in `assets/presets-curated.txt`: two from each of the
 pack's 183 sub-folders, so every visual style it curates is represented. Within a style the
 cheapest by static cost proxy is taken, which guarantees something a software renderer can
-manage, and the median, which is what the style actually looks like. Point `--presets` at any
-directory to use a different set.
+manage, and the median, which is what the style actually looks like. Presets named in
+`assets/presets-blocklist.txt` and `assets/presets-blocklist-textures.txt` are excluded before
+selection, so a style still gets two that work — `Hypnotic/Illusion` has a single working preset
+out of seventeen and contributes one, which is why the total is 363 rather than 364.
+
+Point `--presets` at any directory to use a different set.
 
 Users of a built package do not need any of the above: *Options > Visualisation > Get more
 visualisations…* downloads the complete collection, which is

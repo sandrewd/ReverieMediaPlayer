@@ -289,6 +289,13 @@ int main(int argc, char *argv[])
     // itself rather than appearing to do nothing.
     const QString curatedList = findResource(QStringLiteral("presets-curated.txt"));
 
+    // The presets measured to render nothing. Unlike the curated list this ships with *both*
+    // libraries - the curated set is generated so as not to contain any, but the optional full
+    // pack is the whole corpus and carries every one.
+    const QString blocklist = findResource(QStringLiteral("presets-blocklist.txt"));
+    if (blocklist.isEmpty())
+        qWarning("preset blocklist: not found; visualisations that render nothing will be listed");
+
     QQmlApplicationEngine engine;
 
     // The QML module is compiled into the binary. Qt 6.4's default resource prefix is "/", not
@@ -316,9 +323,26 @@ int main(int argc, char *argv[])
     if (!texturesDir.isEmpty())
         qInfo("texture library: %s", qPrintable(texturesDir));
 
+    // The second list is the presets that are blank only because they name a texture we do not
+    // ship. It is applied *only* when no texture directory was found: for someone who has
+    // installed a texture pack those presets work perfectly, and hiding them would be wrong.
+    // Measured individually - 0% with no textures, and back to life with a stand-in in place.
+    QStringList blocklists;
+    if (!blocklist.isEmpty())
+        blocklists << blocklist;
+    if (texturesDir.isEmpty()) {
+        const QString textureBlocklist =
+            findResource(QStringLiteral("presets-blocklist-textures.txt"));
+        if (!textureBlocklist.isEmpty())
+            blocklists << textureBlocklist;
+    } else {
+        qInfo("preset blocklist: textures are installed, so texture-dependent presets are shown");
+    }
+
     engine.rootContext()->setContextProperty("initialTexturesPath", texturesDir);
     engine.rootContext()->setContextProperty("initialPresetsPath", presetsDir);
     engine.rootContext()->setContextProperty("initialCuratedList", curatedList);
+    engine.rootContext()->setContextProperty("initialBlocklists", blocklists);
     engine.rootContext()->setContextProperty("initialMaxFps", parser.value(fpsCapOption).toInt());
 
     // Qt 6.4 puts QML module resources under qrc:/<URI>/; 6.5 and later use qrc:/qt/qml/<URI>/.

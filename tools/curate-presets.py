@@ -51,28 +51,28 @@ print(f"  using blur passes:                     {blur} ({100*blur/n:.0f}%)   br
 # Cost is kept, demoted to the tiebreaker inside each style, so the default still leans on the
 # cheaper presets where there is a choice. It is only a proxy and is known to misclassify, so it
 # decides which of two Rorschachs ships - never whether Rorschach ships at all.
-# Presets that render essentially nothing on this machine, measured with PLAYER_PROBE over a
-# six-second run with audio playing. They are excluded before selection rather than deleted
+# Visualisations measured to render nothing are excluded before selection rather than deleted
 # afterwards, so the style they belong to still gets two working presets.
 #
-# Two separate faults, kept apart because they need different evidence:
-#
-#   * entirely dependent on an external texture - blank without it, fine with it. Reverie ships
-#     no textures by design (see the README), so these can never work in a default install.
-#   * blank whatever you do - supplying the texture they ask for changes nothing, so something
-#     else is wrong with them. They fail the "should this be in the default set" test anyway.
-#
-# Verified individually by rendering each with and without a stand-in texture. Do not add to this
-# list from reading a preset: the one that prompted the whole investigation, "Planet escher -
-# cubesBW", looks texture-dependent and is black with the texture as well as without.
-BLANK_PRESETS = {
-    # texture-dependent: 0% non-black without, 100% with
-    "Fractal/Core Tunnel/Tripgnosis - Wormhole.milk",
-    # blank regardless of textures
-    "Hypnotic/Illusion/amandio c, flexi, martin - Op illusions - curved1.milk",
-    "Hypnotic/Illusion/amandio c, flexi, martin - Op illusions - poggendo.milk",
-    "Supernova/Radiate/corsage digit.milk",
-}
+# The list lives in assets/presets-blocklist.txt, which is also what ships and what the browser
+# and the rotation read at runtime. One source of truth: a curated set generated from a different
+# list than the one the application filters by would drift silently, and the drift would look
+# exactly like a rendering bug.
+# BOTH lists are excluded here, including the texture-dependent one, because the curated set is
+# what a stock install ships and a stock install has no textures. The runtime applies the second
+# list conditionally - someone who installs a texture pack sees those presets again - but the
+# default selection cannot depend on something the user may never have.
+BLOCKLISTS = ["assets/presets-blocklist.txt", "assets/presets-blocklist-textures.txt"]
+BLANK_PRESETS = set()
+for _bl in BLOCKLISTS:
+    if not os.path.exists(_bl):
+        print(f"  WARNING: no {_bl}; the curated set may contain presets that render nothing")
+        continue
+    with open(_bl, encoding="utf-8") as f:
+        _entries = {ln.strip() for ln in f
+                    if ln.strip() and not ln.lstrip().startswith("#")}
+    print(f"  {os.path.basename(_bl)}: {len(_entries)} preset(s)")
+    BLANK_PRESETS |= _entries
 
 # Two per style: the cheapest, and the median.
 #

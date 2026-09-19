@@ -27,6 +27,46 @@ void PresetLibrary::setCuratedList(const QString &path)
     rescan();
 }
 
+void PresetLibrary::setBlocklists(const QStringList &paths)
+{
+    if (paths == m_blocklists)
+        return;
+    m_blocklists = paths;
+    rescan();
+}
+
+void PresetLibrary::setShowBroken(bool show)
+{
+    if (show == m_showBroken)
+        return;
+    m_showBroken = show;
+    rescan();
+}
+
+QSet<QString> PresetLibrary::readBlocklist() const
+{
+    QSet<QString> blocked;
+    for (const QString &path : m_blocklists) {
+        if (path.isEmpty())
+            continue;
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            // Worth saying out loud: without it the library silently gains a couple of hundred
+            // presets that draw nothing, which reads as a rendering fault rather than a missing
+            // file.
+            qWarning("preset library: cannot read blocklist %s", qPrintable(path));
+            continue;
+        }
+        QTextStream in(&file);
+        while (!in.atEnd()) {
+            const QString line = in.readLine().trimmed();
+            if (!line.isEmpty() && !line.startsWith(QLatin1Char('#')))
+                blocked.insert(line);
+        }
+    }
+    return blocked;
+}
+
 void PresetLibrary::setSearchText(const QString &text)
 {
     if (m_searchText == text)
@@ -175,6 +215,9 @@ void PresetLibrary::rescan()
             relativePaths.append(root.relativeFilePath(it.next()));
     }
 
+    const QSet<QString> blocked = readBlocklist();
+    m_brokenCount = 0;
+
     m_all.clear();
     for (const QString &relative : std::as_const(relativePaths)) {
         const int slash = relative.indexOf(QLatin1Char('/'));
@@ -184,6 +227,13 @@ void PresetLibrary::rescan()
         // Transition effects are not standalone visuals and should not appear in a picker.
         if (category.startsWith(QLatin1Char('!')))
             continue;
+        // Measured to render nothing. Counted whether or not they are shown, because the menu
+        // item that reveals them needs to say how many there are.
+        if (blocked.contains(relative)) {
+            ++m_brokenCount;
+            if (!m_showBroken)
+                continue;
+        }
         const QString name = QFileInfo(relative).completeBaseName();
         const QString absolute = root.absoluteFilePath(relative);
         // Everything between the category and the file is the pack's own finer grouping. It is

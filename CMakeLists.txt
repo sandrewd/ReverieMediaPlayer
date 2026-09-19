@@ -156,12 +156,37 @@ if(EXISTS "${PLAYER_PRESET_SOURCE}" AND EXISTS "${PLAYER_CURATED_LIST}")
             math(EXPR _missing "${_missing} + 1")
         endif()
     endforeach()
+    if(_missing GREATER 0)
+        # Loud, because the failure is silent otherwise and ships a thinner package that works.
+        # The curated list is regenerated from the corpus, while a package build stages from the
+        # published curated archive - so the moment the list is regenerated without republishing
+        # that archive, every entry added by the regeneration is simply absent. That is the same
+        # structural drift the Flatpak manifest pin had, and it deserves the same visibility.
+        message(WARNING "Reverie: ${_missing} curated preset(s) are not in the corpus at "
+                        "${PLAYER_PRESET_SOURCE} - the package will ship ${_staged} instead of "
+                        "${_staged}+${_missing}. If this is a package build, the published "
+                        "curated archive is older than assets/presets-curated.txt.")
+    endif()
     message(STATUS "Reverie: staged ${_staged} curated presets for install (${_missing} missing)")
     install(DIRECTORY "${PLAYER_PRESET_STAGE}/"
             DESTINATION ${CMAKE_INSTALL_DATADIR}/reverie/presets)
 else()
     message(WARNING "Reverie: no preset corpus at ${PLAYER_PRESET_SOURCE}; "
                     "the installed application will have no visualisations")
+endif()
+
+# The blocklist of visualisations measured to render nothing, installed with both libraries. The
+# curated set is generated so as not to contain any of them, but the optional full pack is the
+# whole corpus and carries every one, so this has to be present either way.
+set(PLAYER_BLOCKLIST "${CMAKE_SOURCE_DIR}/assets/presets-blocklist.txt")
+set(PLAYER_BLOCKLIST_TEX "${CMAKE_SOURCE_DIR}/assets/presets-blocklist-textures.txt")
+if(EXISTS "${PLAYER_BLOCKLIST}")
+    install(FILES "${PLAYER_BLOCKLIST}" DESTINATION ${CMAKE_INSTALL_DATADIR}/reverie)
+    if(EXISTS "${PLAYER_BLOCKLIST_TEX}")
+        install(FILES "${PLAYER_BLOCKLIST_TEX}" DESTINATION ${CMAKE_INSTALL_DATADIR}/reverie)
+    endif()
+else()
+    message(WARNING "Reverie: no preset blocklist; visualisations that render nothing will be listed")
 endif()
 
 # projectM is vendored and built alongside us, so it is not on the system loader path. Install

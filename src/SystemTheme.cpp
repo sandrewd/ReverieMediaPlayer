@@ -50,6 +50,7 @@ SystemTheme::SystemTheme(QObject *parent)
         settings.value(QStringLiteral("visualisation/enabled"), true).toBool();
     m_flashNoticeSeen = settings.value(QStringLiteral("visualisation/flashNoticeSeen"), false).toBool();
     m_markBounce = settings.value(QStringLiteral("visualisation/markBounce"), true).toBool();
+    m_showBrokenPresets = settings.value(QStringLiteral("visualisation/showBroken"), false).toBool();
     m_presetPanelWidth = qBound(kMinPlaylistWidth,
                                 settings.value(QStringLiteral("layout/presetPanelWidth"), 320).toInt(),
                                 2000);
@@ -280,6 +281,15 @@ void SystemTheme::setMarkBounce(bool on)
     m_markBounce = on;
     QSettings().setValue(QStringLiteral("visualisation/markBounce"), on);
     emit markBounceChanged();
+}
+
+void SystemTheme::setShowBrokenPresets(bool on)
+{
+    if (on == m_showBrokenPresets)
+        return;
+    m_showBrokenPresets = on;
+    QSettings().setValue(QStringLiteral("visualisation/showBroken"), on);
+    emit showBrokenPresetsChanged();
 }
 
 void SystemTheme::setPresetPanelWidth(int width)

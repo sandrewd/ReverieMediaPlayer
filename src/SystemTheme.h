@@ -62,6 +62,9 @@ class SystemTheme : public QObject
     // mark, which is a screensaver with nothing to save. Drifting it about the way a DVD player
     // used to is the cheapest thing that makes that state worth looking at.
     Q_PROPERTY(bool markBounce READ markBounce WRITE setMarkBounce NOTIFY markBounceChanged)
+    // Whether the preset list and the rotation include the visualisations measured to render
+    // nothing. Off by default: a black stage reads as the application having failed.
+    Q_PROPERTY(bool showBrokenPresets READ showBrokenPresets WRITE setShowBrokenPresets NOTIFY showBrokenPresetsChanged)
     Q_PROPERTY(int transportHeight READ transportHeight WRITE setTransportHeight NOTIFY layoutChanged)
     Q_PROPERTY(QStringList recentColours READ recentColours NOTIFY recentColoursChanged)
     Q_PROPERTY(int recentColoursLimit READ recentColoursLimit CONSTANT)
@@ -100,6 +103,8 @@ public:
     bool flashNoticeSeen() const { return m_flashNoticeSeen; }
     void setFlashNoticeSeen(bool seen);
     bool markBounce() const { return m_markBounce; }
+    bool showBrokenPresets() const { return m_showBrokenPresets; }
+    void setShowBrokenPresets(bool on);
     void setMarkBounce(bool on);
     void setPresetPanelWidth(int width);
     void setPlaylistWidth(int width);
@@ -153,6 +158,7 @@ signals:
     void visualisationsEnabledChanged();
     void flashNoticeSeenChanged();
     void markBounceChanged();
+    void showBrokenPresetsChanged();
     void recentColoursChanged();
     void savedPalettesChanged();
     void softwareRenderingChanged();
@@ -204,6 +210,7 @@ private:
     bool m_visualisationsEnabled = true;
     bool m_flashNoticeSeen = false;
     bool m_markBounce = true;
+    bool m_showBrokenPresets = false;
     int m_transportHeight = 88;
     static constexpr int kRecentLimit = 5;
     static constexpr int kPaletteNameLimit = 24;

@@ -32,6 +32,11 @@ class ProjectMItem : public QQuickFramebufferObject
     // asks for one by name and projectM has no idea where to look unless it is told.
     Q_PROPERTY(QString texturesPath READ texturesPath WRITE setTexturesPath NOTIFY texturesPathChanged)
     Q_PROPERTY(QString curatedList READ curatedList WRITE setCuratedList NOTIFY curatedListChanged)
+    // The rotation needs the blocklist as much as the browser does - arguably more. Hiding a
+    // preset from the list while leaving it in the rotation still lands the user on a black stage,
+    // and they would have no name to go and look up.
+    Q_PROPERTY(QStringList blocklists READ blocklists WRITE setBlocklists NOTIFY blocklistChanged)
+    Q_PROPERTY(bool showBroken READ showBroken WRITE setShowBroken NOTIFY blocklistChanged)
     Q_PROPERTY(QString presetName READ presetName NOTIFY presetChanged)
     // The file behind presetName. Favourites and recents address presets by path, because two
     // packs can hold presets of the same name and a name cannot be reopened.
@@ -88,6 +93,10 @@ public:
     void setPresetsPath(const QString &path);
     QString curatedList() const { return m_curatedList; }
     void setCuratedList(const QString &path);
+    QStringList blocklists() const { return m_blocklists; }
+    void setBlocklists(const QStringList &paths);
+    bool showBroken() const { return m_showBroken; }
+    void setShowBroken(bool show);
     QString presetName() const { return m_presetName; }
     QString presetFile() const { return m_presetFile; }
     int presetIndex() const { return m_presetIndex; }
@@ -152,6 +161,7 @@ signals:
     void presetsPathChanged();
     void texturesPathChanged();
     void curatedListChanged();
+    void blocklistChanged();
     void presetChanged();
     void presetLockedChanged();
     void shuffleChanged();
@@ -182,6 +192,8 @@ private:
     QTimer m_sizeSettleTimer;
     QString m_texturesPath;
     QString m_curatedList;
+    QStringList m_blocklists;
+    bool m_showBroken = false;
     QString m_presetName;
     QString m_presetFile;
     int m_presetIndex = 0;

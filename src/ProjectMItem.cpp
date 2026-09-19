@@ -9,6 +9,7 @@
 #include <QOpenGLFramebufferObject>
 #include <QOpenGLFunctions>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QTextStream>
@@ -184,9 +185,14 @@ public:
 
         const QString wantedLibrary = pmItem->presetsPath();
         const QString wantedCurated = pmItem->curatedList();
-        if (wantedLibrary != m_presetsPath || wantedCurated != m_curatedList) {
+        const QStringList wantedBlocklist = pmItem->blocklists();
+        const bool wantedShowBroken = pmItem->showBroken();
+        if (wantedLibrary != m_presetsPath || wantedCurated != m_curatedList
+            || wantedBlocklist != m_blocklists || wantedShowBroken != m_showBroken) {
             m_presetsPath = wantedLibrary;
             m_curatedList = wantedCurated;
+            m_blocklists = wantedBlocklist;
+            m_showBroken = wantedShowBroken;
             m_pendingLibrary = true;
         }
 
@@ -484,6 +490,29 @@ private:
 
         projectm_playlist_clear(m_playlist);
 
+        // Presets measured to render nothing. The browser hides them too, but the rotation is
+        // where it matters most: a hidden preset that still comes round leaves the user watching
+        // a black stage with no name to look up and nothing to click.
+        QSet<QString> blocked;
+        if (!m_showBroken) {
+            for (const QString &listPath : std::as_const(m_blocklists)) {
+                if (listPath.isEmpty())
+                    continue;
+                QFile blockFile(listPath);
+                if (!blockFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                    qWarning("preset library: cannot read blocklist %s", qPrintable(listPath));
+                    continue;
+                }
+                QTextStream in(&blockFile);
+                while (!in.atEnd()) {
+                    const QString line = in.readLine().trimmed();
+                    if (!line.isEmpty() && !line.startsWith(QLatin1Char('#')))
+                        blocked.insert(line);
+                }
+            }
+        }
+        const QDir libraryRoot(m_presetsPath);
+
         uint32_t added = 0;
         // An explicit list wins: this is how the category picker narrows the rotation.
         if (!m_explicitPaths.isEmpty()) {
@@ -505,6 +534,8 @@ private:
                     const QString line = in.readLine().trimmed();
                     if (line.isEmpty() || line.startsWith(QLatin1Char('#')))
                         continue;
+                    if (blocked.contains(line))
+                        continue;
                     const QString full = base.absoluteFilePath(line);
                     if (projectm_playlist_add_preset(m_playlist, full.toUtf8().constData(), false))
                         ++added;
@@ -516,9 +547,28 @@ private:
         }
 
         if (added == 0) {
-            added = projectm_playlist_add_path(
-                m_playlist, m_presetsPath.toUtf8().constData(), true, false);
-            qInfo("preset library: %u presets from %s", added, qPrintable(m_presetsPath));
+            // Walked here rather than handed to projectm_playlist_add_path, which takes a whole
+            // directory tree and offers no way to leave anything out. Two things have to be left
+            // out: the blocklist, and the "!" categories - transitions to black that the browser
+            // has always excluded by name while the rotation, on this path, played them.
+            uint32_t skipped = 0;
+            QDirIterator it(m_presetsPath, {QStringLiteral("*.milk")}, QDir::Files,
+                            QDirIterator::Subdirectories);
+            QStringList found;
+            while (it.hasNext())
+                found.append(it.next());
+            found.sort();
+            for (const QString &full : std::as_const(found)) {
+                const QString relative = libraryRoot.relativeFilePath(full);
+                if (relative.startsWith(QLatin1Char('!')) || blocked.contains(relative)) {
+                    ++skipped;
+                    continue;
+                }
+                if (projectm_playlist_add_preset(m_playlist, full.toUtf8().constData(), false))
+                    ++added;
+            }
+            qInfo("preset library: %u presets from %s (%u not shown)", added,
+                  qPrintable(m_presetsPath), skipped);
         }
 
         if (added > 0) {
@@ -718,6 +768,8 @@ private:
     QString m_presetsPath;
     QString m_texturesPath;
     QString m_curatedList;
+    QStringList m_blocklists;
+    bool m_showBroken = false;
     QStringList m_explicitPaths;
     int m_pendingJumpIndex = -1;
     bool m_active = true;
@@ -872,6 +924,24 @@ void ProjectMItem::setCuratedList(const QString &path)
         return;
     m_curatedList = path;
     emit curatedListChanged();
+    update();
+}
+
+void ProjectMItem::setBlocklists(const QStringList &paths)
+{
+    if (paths == m_blocklists)
+        return;
+    m_blocklists = paths;
+    emit blocklistChanged();
+    update();
+}
+
+void ProjectMItem::setShowBroken(bool show)
+{
+    if (show == m_showBroken)
+        return;
+    m_showBroken = show;
+    emit blocklistChanged();
     update();
 }
 

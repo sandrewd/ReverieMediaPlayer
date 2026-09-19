@@ -1,0 +1,68 @@
+# Visualisations that render nothing WITHOUT AN EXTERNAL TEXTURE.
+#
+# 39 presets, each verified to render at 0% with no texture directory and to come
+# back with a stand-in image in place. Reverie deliberately ships no textures - see the
+# README for why a texture is a far easier thing for a hostile upstream to alter than a
+# media file - so in a stock install these are black and are hidden.
+#
+# This list is applied ONLY when no texture directory was found. Someone who installs a
+# texture pack into ~/.local/share/reverie/textures gets all 39 back automatically,
+# because for them the presets are not broken at all.
+#
+# Measured, not read. Every preset in the pack was rendered for six seconds with audio playing and
+# its highest non-black fraction recorded. Anything at or below 2% was re-rendered ONE AT A TIME on
+# an idle machine, because a reading taken while several workers compete is depressed by contention
+# - that second pass exonerated 67 of 345 candidates, one in five, so a single parallel reading is
+# not evidence. Survivors were then rendered a third time with stand-in textures supplied, which is
+# what splits this list from its companion.
+#
+# DO NOT ADD BY READING A PRESET. "Planet escher - cubesBW", whose missing-texture warning started
+# the whole investigation, looks texture-dependent and renders black with its texture as well as
+# without. Measure both ways:
+#
+#   tools/scan-presets.sh -l <shortlist> -o out.tsv -j 1
+#   tools/scan-presets.sh -l <shortlist> -o out.tsv -j 1 -t <dir of stand-in images>
+#
+# The four presets in "! Transition" are left out of both lists. They are transitions *to black*
+# doing exactly what they say, and every place a preset is offered already excludes that category.
+#
+# Paths are relative to the preset root and match the curated install and the full pack alike.
+Drawing/Trails/amandio c - the green machine 2 skin lard bone beacon nz+ flashcards for immunity, no good.milk
+Drawing/Trails/suksma + flexi geiss rovastar roosta demonld shifter - dr horicon willn't ignore - flx chr roam.milk
+Drawing/Trails/suksma - factories center deserve.milk
+Fractal/Core Mirror/Cope - domains (this apparatus must be unearthed).milk
+Fractal/Core Tunnel/Tripgnosis - Wormhole.milk
+Fractal/Core/Rovastar & Zylot - Crystal Ball (Too Many Visions Mix) nz+.milk
+Fractal/Core/suksma - conflating neediness with eunucharistocracy - filling all dimensions with plague.milk
+Fractal/Core/suksma - conflating neediness with eunucharistocracy.milk
+Fractal/Nested Circle/AdamFX Enterz Tha Mash With Martin + stahlregen - AdamFX - In Tha Mash Effectz F.milk
+Geometric/Stripes Circle/suksma - Roosta  - Bursting Egg - mash0000 - tree rings of life - nuclear stratovarian wood nz+ puke slo --- Isosceles edit2.milk
+Hypnotic/Illusion/EVET - Aikea Galaxy.milk
+Hypnotic/Illusion/amandio c, flexi - Op illusions - random1.milk
+Hypnotic/Illusion/amandio c, flexi - Op illusions - random2.milk
+Hypnotic/Illusion/amandio c, flexi - Planet escher - random2 nz love grace hope charity.milk
+Hypnotic/Illusion/amandio c, flexi, martin - Planet escher - sticks2.milk
+Hypnotic/Polar Mirror/flexi - shelter in infinity nz- ass.milk
+Hypnotic/Polar Rolling/flexi + goody - the prayerwheel - misplaced prayers.milk
+Reaction/Cloudy/Cope - Inferno.milk
+Reaction/Cloudy/cope - inferno-x.milk
+Reaction/Feedback/Adam Fx 2 Zylot - Age of Science Fierceness viynal - mash0000 - wheel of misanthropic misfortune.milk
+Reaction/Feedback/Redi Jedi - Flexi - Krash - Phat - Geiss - Rovastar - 12029422544(170) - mash0000 - i can't go shopping  --- Isosceles edit.milk
+Reaction/Feedback/beta106i - Ashes of Clouds (Gas Giant) - mash0000 - temp --- Isosceles edit.milk
+Reaction/Feedback/hexcollie, Eos, Goody n Flexi - Puff adder wlky.milk
+Reaction/Feedback/suksma - if i was cool, i might die - meds new wave and motion (kill me painfully).milk
+Reaction/Liquid Blobby/BrainStain-radioactive - this doesn't look good --- Isosceles edit.milk
+Reaction/Liquid Blobby/Rovastar & Zylot - Crystal Ball (Too Many Visions Mix) nz+ chef's table too good for you.milk
+Reaction/Liquid Closeup/suksma - insane horror perfection manifest in unmitigated normalcy - lonliness only ends with continuity (death).milk
+Reaction/Rorschach/Stahlregen & Geiss + Illusion + Krash + Rovastar - Crystal Brain Elderly_3 - effluvia.milk
+Reaction/Rorschach/i will not save this.milk
+Reaction/Rorschach/when i first mixed this, i loved it, now, because of your existence, i fucking hate it - kobong, nyia, neuma, antigama nz --- Isosceles edit.milk
+Reaction/Windy/you are now leaving the materialistic sector - chloral reef, er --- Isosceles edit.milk
+Reaction/Windy/you are now leaving the materialistic sector --- Isosceles edit.milk
+Sparkle/Explosions/undulant safe preyre --- Isosceles edit.milk
+Waveform/Spectrum/suksma - demonizer - lazyful.milk
+Waveform/Spectrum/suksma - n13.milk
+Waveform/Spectrum/suksma - negative infinity for not flinching - liq2(1).milk
+Waveform/Spectrum/suksma - negative infinity for not flinching - liq2.milk
+Waveform/Wire Flat Double/Waltra - Codex Machine 2.milk
+Waveform/Wire Flower/suksma - norm abrams hosts this weeks this old shader.milk

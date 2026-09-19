@@ -352,6 +352,16 @@ ApplicationWindow {
         function onUseFullPackChanged() { root.applyPresetLibrary() }
     }
 
+    // The blocklist reaches the browser and the rotation as bindings rather than as assignments
+    // in applyPresetLibrary(). Both have to hold at startup and on every later change, and a
+    // Binding does both without a handler that can be forgotten - which is the fault the comment
+    // above this function records. It also survives a library swap, where the blocklist is the
+    // one thing that does not change.
+    Binding { target: PresetLibrary; property: "blocklists"; value: initialBlocklists }
+    Binding { target: PresetLibrary; property: "showBroken"; value: SystemTheme.showBrokenPresets }
+    Binding { target: visualizer; property: "blocklists"; value: initialBlocklists }
+    Binding { target: visualizer; property: "showBroken"; value: SystemTheme.showBrokenPresets }
+
     // One invariant, enforced in one place: if no row is current, nothing should be playing.
     // Clearing the playlist and removing the playing track both land here, and both used to
     // leave audio running with nothing in the list to show for it.
@@ -1281,6 +1291,22 @@ ApplicationWindow {
                 checkable: true
                 checked: visualizer.shuffle
                 onTriggered: visualizer.shuffle = checked
+            }
+            MenuItem {
+                // A couple of hundred presets in the full pack render nothing at all - measured,
+                // one at a time, not read off the file. They are hidden because a black stage
+                // reads as the application having failed rather than as the preset being at
+                // fault, but they are still installed and someone may want to look.
+                //
+                // Hidden entirely when the installed library contains none of them, which is the
+                // case for the curated set: an option whose effect is invisible is worse than no
+                // option, the same reason "Use the curated selection" hides itself in a package.
+                text: qsTr("Show broken visualisations (%1)").arg(PresetLibrary.brokenCount)
+                visible: PresetLibrary.brokenCount > 0 || SystemTheme.showBrokenPresets
+                height: visible ? implicitHeight : 0
+                checkable: true
+                checked: SystemTheme.showBrokenPresets
+                onTriggered: SystemTheme.showBrokenPresets = checked
             }
 
             MenuSeparator {
