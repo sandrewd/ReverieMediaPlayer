@@ -20,8 +20,8 @@ try to organise your music collection.
 - **Transport** — play, pause, stop, next, previous, seek, volume, shuffle, repeat that cycles
   off / playlist / one track, and a subtitles toggle
 - **Visualisations** — projectM (Milkdrop) presets, embedded or fullscreen, driven by the decoded
-  audio. The packages carry a curated **364**, two from each of the pack's 183 visual styles, and
-  the full collection of **9,795** is an optional 2.7 MB download.
+  audio. The packages carry a curated **364** — two from each of the pack's 183 visual styles,
+  where it has two — and the full collection of **9,795** is an optional 2.7 MB download.
 - **A browser for them**, in a panel beside the stage: search by name, filter by kind or by the
   pack's own visual style, and click to watch. Star the one you are looking at, and the
   right-click menu keeps your favourites and the last ten you saw — which matters more than it
