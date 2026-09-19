@@ -109,6 +109,10 @@ jobs:
   manifest-pin:
     name: Flatpak manifest tracks the latest tag
     runs-on: ubuntu-24.04
+    # Never on a tag. The manifest names the tag it will be built from, so the commit a tag
+    # points at cannot possibly name that tag - a commit cannot contain its own hash, and the
+    # bump necessarily lands afterwards. Running here failed every release by construction.
+    if: "!startsWith(github.ref, 'refs/tags/')"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -132,14 +136,21 @@ jobs:
           GOT_COMMIT="$(awk '/^[[:space:]]+commit:/ {v=$2} END {print v}' "$MANIFEST" | tr -d "\"'")"
           echo "newest tag     : $TAG ($WANT_COMMIT)"
           echo "manifest names : $GOT_TAG ($GOT_COMMIT)"
-          fail=0
+          if [ "$GOT_TAG" = "$TAG" ] && [ "$GOT_COMMIT" = "$WANT_COMMIT" ]; then
+            echo "manifest is current"
+            exit 0
+          fi
+          # The one legitimate window: HEAD *is* the commit the newest tag points at, so the
+          # bump cannot have happened yet. It is due in the very next commit, and any commit
+          # after this one that still names the old tag is real drift and fails below.
+          if [ "$(git rev-parse HEAD)" = "$WANT_COMMIT" ]; then
+            echo "::notice::$TAG was just created; the manifest bump is due in the next commit"
+            exit 0
+          fi
           if [ "$GOT_TAG" != "$TAG" ]; then
             echo "::error file=$MANIFEST::manifest tag is $GOT_TAG but the newest tag is $TAG - the Flatpak would be built from the wrong release"
-            fail=1
           fi
           if [ "$GOT_COMMIT" != "$WANT_COMMIT" ]; then
             echo "::error file=$MANIFEST::manifest commit is $GOT_COMMIT but $TAG is $WANT_COMMIT"
-            fail=1
           fi
-          [ $fail -eq 0 ] && echo "manifest is current"
-          exit $fail
+          exit 1
