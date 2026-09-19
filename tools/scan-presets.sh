@@ -83,7 +83,10 @@ touch "$OUT"
 # Self-healing: a run interrupted mid-flight can leave a half-written line, and workers that
 # outlive the parent by a moment can append a path that was already recorded. Keep the last
 # reading for each path and drop anything malformed, so the checkpoint never rots.
-awk -F'\t' 'NF==2 && $2!="" {last[$2]=$1} END {for (k in last) printf "%s\t%s\n", last[k], k}' \
+# NA is not a result, it is a run that produced nothing - usually because the process was
+# interrupted. Dropping those rows means the next resume scans them again rather than carrying a
+# hole forward as though it were data.
+awk -F'\t' 'NF==2 && $2!="" && $1!="NA" {last[$2]=$1} END {for (k in last) printf "%s\t%s\n", last[k], k}' \
     "$OUT" | LC_ALL=C sort -k2 > "$WORK/clean.tsv"
 mv "$WORK/clean.tsv" "$OUT"
 

@@ -39,6 +39,12 @@
       Deliberately not included: library management, lyrics, social features and third-party
       service integration.
     </p>
+    <p>
+      Please note: the visualisations flash and change quickly, as Milkdrop presets are built
+      to. If you are sensitive to flashing lights they can be turned off entirely, and
+      everything else works exactly the same. Reverie asks once, on first run, before anything
+      has played.
+    </p>
   </description>
 
   <launchable type="desktop-id">io.github.sandrewd.ReverieMediaPlayer.desktop</launchable>

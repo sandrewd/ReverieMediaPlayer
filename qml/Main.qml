@@ -103,6 +103,7 @@ ApplicationWindow {
     // the stage would be squeezed out. It also cannot open over video, which has no presets.
     readonly property bool showPresetPanel: !mini && !fullscreen && presetPanelVisible
                                             && roomForPlaylist && !AudioEngine.hasVideo
+                                            && SystemTheme.visualisationsEnabled
 
     // What the window was before it went fullscreen, so leaving restores that rather than
     // always dropping to Windowed - which silently un-maximised a maximised window.
@@ -261,6 +262,17 @@ ApplicationWindow {
         // is in use and publishes the answer as activePresetsPath.
         PresetPack.bundledPresetsPath = initialPresetsPath
         applyPresetLibrary()
+        if (!SystemTheme.flashNoticeSeen)
+            flashNoticeTimer.start()
+    }
+
+    // A beat after the window is up, so the dialog has something to centre on and the person
+    // sees the application behind it rather than a notice floating on nothing.
+    Timer {
+        id: flashNoticeTimer
+        interval: 400
+        repeat: false
+        onTriggered: flashNotice.open()
     }
 
     // Swapping the library has to reach four things at once, and applying it at startup is as
@@ -436,7 +448,12 @@ ApplicationWindow {
                     // Idle whenever video is on screen: rendering presets behind an opaque
                     // video surface is pure waste, and on a software renderer it is waste the
                     // video decode needs.
+                    // Switched off, the renderer parks at about a tenth of a percent of one
+                    // core and the stage shows its own colour - the same state as nothing
+                    // playing. Turning visualisations off therefore costs nothing rather than
+                    // hiding something that is still being drawn.
                     active: AudioEngine.state === AudioEngine.Playing && !AudioEngine.hasVideo
+                            && SystemTheme.visualisationsEnabled
                     // Video shares this render thread and has presentation deadlines and A/V
                     // sync to hold, so it must not be scheduled as a batch workload. The
                     // visualiser has neither and should keep yielding. See the brief, 9c.
@@ -1088,6 +1105,16 @@ ApplicationWindow {
             id: visualisationMenu
             title: qsTr("Visualisation")
             onAboutToShow: root.fitMenuWidth(visualisationMenu, 220, 420)
+            MenuItem {
+                // First, because it governs everything below it. Milkdrop visualisations flash
+                // by design; anyone who needs to avoid that needs one obvious switch rather
+                // than a colour slider that happens to cover the stage.
+                text: qsTr("Show visualisations")
+                checkable: true
+                checked: SystemTheme.visualisationsEnabled
+                onTriggered: SystemTheme.visualisationsEnabled = checked
+            }
+            MenuSeparator {}
             MenuItem {
                 text: qsTr("Use the curated selection")
                 // A package that ships only the curated presets installs no list, and then this
@@ -1878,8 +1905,9 @@ ApplicationWindow {
                 // Said plainly because it is the honest trade: more to look at, and a slower
                 // tail. Measured - the curated set is chosen to avoid the most expensive
                 // presets, not to be prettier.
-                text: qsTr("A %1 download. More variety, and some of them are slower to draw. "
-                           + "You can switch back at any time.").arg(PresetPack.downloadSize)
+                text: qsTr("A %1 download. More variety, some of them slower to draw, and some "
+                           + "that flash harder than the ones Reverie ships with. You can switch "
+                           + "back at any time.").arg(PresetPack.downloadSize)
             }
 
             ProgressBar {
@@ -2103,6 +2131,68 @@ ApplicationWindow {
         })
     }
 
+    // Shown once, on first run, before anything has played and therefore before any flashing.
+    // That timing is the whole point: a notice that arrives during or after exposure does not
+    // help the person it exists for.
+    //
+    // It carries the remedy rather than only the warning. A notice that says "this may harm
+    // you" and leaves you to find the setting yourself is a disclaimer; one with the switch in
+    // it is a choice, and it is the difference between intruding usefully and intruding.
+    Dialog {
+        id: flashNotice
+        title: qsTr("Before you start")
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(420, root.width - 60)
+        closePolicy: Popup.NoAutoClose
+        standardButtons: Dialog.NoButton
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 12
+
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                color: Theme.text
+                text: qsTr("Reverie's visualisations flash and change quickly. If you are "
+                           + "sensitive to flashing lights, you may want to turn them off — "
+                           + "everything else works exactly the same.")
+            }
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                color: Theme.textDim
+                font.pixelSize: 11
+                text: qsTr("You can change this at any time in Options ▸ Visualisation.")
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                spacing: 8
+                Item { Layout.fillWidth: true }
+                Button {
+                    text: qsTr("Turn them off")
+                    onClicked: {
+                        SystemTheme.visualisationsEnabled = false
+                        SystemTheme.flashNoticeSeen = true
+                        flashNotice.close()
+                    }
+                }
+                Button {
+                    text: qsTr("Keep them on")
+                    highlighted: true
+                    onClicked: {
+                        SystemTheme.visualisationsEnabled = true
+                        SystemTheme.flashNoticeSeen = true
+                        flashNotice.close()
+                    }
+                }
+            }
+        }
+    }
+
     Dialog {
         id: aboutDialog
         title: qsTr("About Reverie")
@@ -2172,6 +2262,16 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
                 text: qsTr("Reverie is released under the %1 licence.").arg(AppInfo.license)
+                color: Theme.textDim
+                font.pixelSize: 11
+            }
+
+            // The notice is shown once at first run; this is the copy that stays findable.
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("The visualisations flash and change quickly. They can be turned off "
+                           + "in Options ▸ Visualisation.")
                 color: Theme.textDim
                 font.pixelSize: 11
             }
@@ -2330,6 +2430,7 @@ ApplicationWindow {
         id: presetHandle
         visible: !root.mini && !root.fullscreen && root.roomForPlaylist
                  && !AudioEngine.hasVideo && !root.presetPanelVisible
+                 && SystemTheme.visualisationsEnabled
         anchors { left: parent.left; verticalCenter: parent.verticalCenter }
         width: 22
         height: 64

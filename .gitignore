@@ -30,3 +30,4 @@ assets/test-video/
 # and large enough to be noise in a diff.
 preset-scan*.tsv
 scan.log
+nohup.out

@@ -48,6 +48,16 @@ class SystemTheme : public QObject
     // opened it to look at, and because a second top-level window inherits every Wayland
     // decoration problem the brief records.
     Q_PROPERTY(int presetPanelWidth READ presetPanelWidth WRITE setPresetPanelWidth NOTIFY layoutChanged)
+    // Milkdrop visualisations flash, by design and sometimes hard. Anyone who needs to avoid
+    // that needs a way to switch them off that is not buried in a colour picker, and turning
+    // them off should cost nothing - the renderer already parks when it has nothing to draw.
+    Q_PROPERTY(bool visualisationsEnabled READ visualisationsEnabled WRITE setVisualisationsEnabled
+                   NOTIFY visualisationsEnabledChanged)
+    // Whether the flashing notice has been shown and answered. Shown once, before anything has
+    // played and therefore before any flashing, which is the only moment at which a warning of
+    // this kind does any good.
+    Q_PROPERTY(bool flashNoticeSeen READ flashNoticeSeen WRITE setFlashNoticeSeen
+                   NOTIFY flashNoticeSeenChanged)
     Q_PROPERTY(int transportHeight READ transportHeight WRITE setTransportHeight NOTIFY layoutChanged)
     Q_PROPERTY(QStringList recentColours READ recentColours NOTIFY recentColoursChanged)
     Q_PROPERTY(int recentColoursLimit READ recentColoursLimit CONSTANT)
@@ -81,6 +91,10 @@ public:
     void setStageTint(int percent);
     int playlistWidth() const { return m_playlistWidth; }
     int presetPanelWidth() const { return m_presetPanelWidth; }
+    bool visualisationsEnabled() const { return m_visualisationsEnabled; }
+    void setVisualisationsEnabled(bool on);
+    bool flashNoticeSeen() const { return m_flashNoticeSeen; }
+    void setFlashNoticeSeen(bool seen);
     void setPresetPanelWidth(int width);
     void setPlaylistWidth(int width);
     int transportHeight() const { return m_transportHeight; }
@@ -130,6 +144,8 @@ signals:
     void preferenceChanged();
     void customChanged();
     void layoutChanged();
+    void visualisationsEnabledChanged();
+    void flashNoticeSeenChanged();
     void recentColoursChanged();
     void savedPalettesChanged();
     void softwareRenderingChanged();
@@ -178,6 +194,8 @@ private:
     int m_stageTint = 0;
     int m_playlistWidth = 340;
     int m_presetPanelWidth = 320;
+    bool m_visualisationsEnabled = true;
+    bool m_flashNoticeSeen = false;
     int m_transportHeight = 88;
     static constexpr int kRecentLimit = 5;
     static constexpr int kPaletteNameLimit = 24;

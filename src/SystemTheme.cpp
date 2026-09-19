@@ -46,6 +46,9 @@ SystemTheme::SystemTheme(QObject *parent)
     m_playlistWidth = qBound(kMinPlaylistWidth,
                              settings.value(QStringLiteral("layout/playlistWidth"), 340).toInt(),
                              2000);
+    m_visualisationsEnabled =
+        settings.value(QStringLiteral("visualisation/enabled"), true).toBool();
+    m_flashNoticeSeen = settings.value(QStringLiteral("visualisation/flashNoticeSeen"), false).toBool();
     m_presetPanelWidth = qBound(kMinPlaylistWidth,
                                 settings.value(QStringLiteral("layout/presetPanelWidth"), 320).toInt(),
                                 2000);
@@ -249,6 +252,24 @@ void SystemTheme::setPlaylistWidth(int width)
     m_playlistWidth = width;
     QSettings().setValue(QStringLiteral("layout/playlistWidth"), width);
     emit layoutChanged();
+}
+
+void SystemTheme::setVisualisationsEnabled(bool on)
+{
+    if (on == m_visualisationsEnabled)
+        return;
+    m_visualisationsEnabled = on;
+    QSettings().setValue(QStringLiteral("visualisation/enabled"), on);
+    emit visualisationsEnabledChanged();
+}
+
+void SystemTheme::setFlashNoticeSeen(bool seen)
+{
+    if (seen == m_flashNoticeSeen)
+        return;
+    m_flashNoticeSeen = seen;
+    QSettings().setValue(QStringLiteral("visualisation/flashNoticeSeen"), seen);
+    emit flashNoticeSeenChanged();
 }
 
 void SystemTheme::setPresetPanelWidth(int width)

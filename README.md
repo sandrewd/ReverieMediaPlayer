@@ -50,6 +50,12 @@ try to organise your music collection.
 **Deliberately not included:** library management, lyrics, social features, third-party service
 integration.
 
+> [!IMPORTANT]
+> **The visualisations flash and change quickly.** Milkdrop presets are built to, and some of
+> them do it hard. If you are sensitive to flashing lights, turn them off — *Options ▸
+> Visualisation ▸ Show visualisations* — and everything else works exactly the same. Reverie
+> asks once, on first run, before anything has played.
+
 ## Adaptive visual quality
 
 The visualiser renders to an offscreen buffer and upscales. On software rendering (llvmpipe) that
