@@ -9,7 +9,12 @@
 // thread, so it has to cross threads. A small mutex-guarded ring is enough: the critical
 // section is a memcpy of a few hundred floats, and the render thread never blocks long.
 //
-// projectM only ever wants "the most recent N samples", so old data is simply overwritten.
+// The consumer reads *continuously* rather than sampling the newest N frames. That distinction
+// turned out to matter a great deal: taking "the latest 512" once per rendered frame drops the
+// audio in between - 5.1 ms of every 16.7 ms at 60fps - and splices the remainder together. The
+// step across each splice measured 6.9x a normal sample-to-sample step on real music, sixty
+// times a second, which is a click train, which is broadband energy in every frame's spectrum,
+// which is exactly what a beat detector fires on. Beat-triggered presets went off constantly.
 class AudioRingBuffer
 {
 public:
@@ -36,22 +41,38 @@ public:
             m_writePos = (m_writePos + 1) % kCapacityFrames;
         }
         m_written += frames;
+        m_available += frames;
+        // A consumer that has fallen more than the whole buffer behind can only be given what
+        // is still here; anything older has already been overwritten.
+        if (m_available > kCapacityFrames)
+            m_available = kCapacityFrames;
     }
 
-    // Copies the newest `frames` frames. Returns false when nothing has arrived recently,
-    // which is the cue to fall back to silence rather than replay stale audio.
-    bool readLatest(float *out, int frames)
+    // Copies every frame written since the last call, up to `maxFrames`, and returns how many.
+    // Zero means nothing new has arrived - the cue to feed projectM nothing at all rather than
+    // replay stale audio, which would be another discontinuity.
+    //
+    // Continuity is the whole point: consecutive calls return consecutive samples, so what
+    // projectM sees is the waveform rather than a strobe of it.
+    int readContinuous(float *out, int maxFrames)
     {
         QMutexLocker lock(&m_mutex);
-        if (m_written < frames)
-            return false;
-        int pos = (m_writePos - frames + kCapacityFrames) % kCapacityFrames;
+        // Behind by more than one read? Drop the oldest and stay current. This is the only
+        // place a discontinuity can now occur, and it happens when the renderer has genuinely
+        // stalled - not on every single frame, which was the bug.
+        if (m_available > maxFrames)
+            m_available = maxFrames;
+        const int frames = m_available;
+        if (frames <= 0)
+            return 0;
+        int pos = (m_writePos - m_available + kCapacityFrames * 2) % kCapacityFrames;
         for (int i = 0; i < frames; ++i) {
             out[i * kChannels] = m_data[pos * kChannels];
             out[i * kChannels + 1] = m_data[pos * kChannels + 1];
             pos = (pos + 1) % kCapacityFrames;
         }
-        return true;
+        m_available -= frames;
+        return frames;
     }
 
     void reset()
@@ -60,6 +81,7 @@ public:
         std::memset(m_data.data(), 0, m_data.size() * sizeof(float));
         m_writePos = 0;
         m_written = 0;
+        m_available = 0;
     }
 
 private:
@@ -67,4 +89,6 @@ private:
     std::vector<float> m_data = std::vector<float>(kCapacityFrames * kChannels, 0.0f);
     int m_writePos = 0;
     qint64 m_written = 0;
+    // Frames written but not yet handed to the consumer.
+    int m_available = 0;
 };

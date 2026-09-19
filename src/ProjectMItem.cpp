@@ -38,7 +38,11 @@ namespace {
 
 // Phase 0 has no audio pipeline yet, so the visualizer is driven by a synthetic tone:
 // a slow sweep with a couple of harmonics, enough to make presets react visibly.
-constexpr int kSamplesPerFrame = 512;
+// The most audio handed to projectM in one frame. It is a ceiling, not a quota: one frame at
+// 60fps is ~735 samples at 44.1kHz and ~1225 at 36fps, so 512 - the old fixed read size - would
+// have left the consumer permanently behind and spliced the audio right back together. 4096
+// covers everything down to about 11fps.
+constexpr int kMaxFeedFrames = 4096;
 constexpr double kSampleRate = 44100.0;
 
 class ProjectMRenderer : public QQuickFramebufferObject::Renderer
@@ -366,6 +370,25 @@ public:
         }
         m_intervalTimer.restart();
 
+        // Tell projectM the rate we are actually achieving, not a constant.
+        //
+        // Milkdrop presets normalise their own animation by the `fps` variable - "t = t + .001/fps"
+        // and "pow(0.96, 30/fps)" are the standard idioms, and 69 of the 304 presets in one
+        // category alone use them. projectM passes this value straight through to the preset, so
+        // reporting a fixed 60 while rendering at something else makes every such preset run at
+        // real_fps/60 of the speed its author tuned: three times too slow at 20fps, and too fast
+        // on anything that beats the cap.
+        //
+        // A threshold rather than every frame, because the value is already smoothed and a
+        // preset integrating 1/fps does not want it jittering underneath it.
+        if (m_pm && m_fps > 0.0) {
+            const int rounded = qBound(5, int(std::lround(m_fps)), 240);
+            if (std::abs(rounded - m_reportedFps) >= 2) {
+                m_reportedFps = rounded;
+                projectm_set_fps(m_pm, m_reportedFps);
+            }
+        }
+
         // Push stats straight to the GUI thread a few times a second. A queued invocation is
         // safe across threads; doing it every frame would just flood the event loop.
         adaptQuality();
@@ -637,28 +660,44 @@ private:
 
     void feedAudio()
     {
-        float samples[kSamplesPerFrame * 2];
+        float samples[kMaxFeedFrames * 2];
 
         // Only ever real audio. If the pipeline has not delivered any yet, feed silence
         // rather than inventing a signal.
-        if (m_ring && m_ring->readLatest(samples, kSamplesPerFrame)) {
+        // Everything that has arrived since the last frame, so projectM sees a continuous
+        // waveform. Bounded: after a stall, catching up on more than this is pointless and the
+        // older audio no longer corresponds to anything on screen.
+        const int got = m_ring ? m_ring->readContinuous(samples, kMaxFeedFrames) : 0;
+        if (got > 0) {
             m_audioIsLive = true;
+            m_emptyFeeds = 0;
             if (qEnvironmentVariableIsSet("PLAYER_PROBE") && m_frameCount % 60 == 0) {
                 double sum = 0.0, peak = 0.0;
-                for (int i = 0; i < kSamplesPerFrame * 2; ++i) {
+                for (int i = 0; i < got * 2; ++i) {
                     sum += double(samples[i]) * samples[i];
                     peak = qMax(peak, qAbs(double(samples[i])));
                 }
-                qInfo("  audio: LIVE  rms %.4f  peak %.4f", std::sqrt(sum / (kSamplesPerFrame * 2)), peak);
+                qInfo("  audio: LIVE  %d frames  rms %.4f  peak %.4f", got,
+                      std::sqrt(sum / (got * 2)), peak);
             }
-            projectm_pcm_add_float(m_pm, samples, kSamplesPerFrame, PROJECTM_STEREO);
+            projectm_pcm_add_float(m_pm, samples, got, PROJECTM_STEREO);
             return;
         }
+        // Nothing new this frame. That is normal while playing - the renderer can easily run
+        // faster than audio arrives - and feeding silence here would punch a hole in the
+        // waveform, which is the exact fault this read model exists to remove. Feed nothing and
+        // let projectM keep the buffer it has.
+        if (++m_emptyFeeds < 15)
+            return;
+
+        // Genuinely quiet for a quarter of a second or so: now silence is the truth, and
+        // feeding it lets the visualiser settle instead of freezing on its last buffer.
         m_audioIsLive = false;
-        std::memset(samples, 0, sizeof(samples));
         m_phase = 0.0;
         m_sweepPhase = 0.0;
-        projectm_pcm_add_float(m_pm, samples, kSamplesPerFrame, PROJECTM_STEREO);
+        constexpr int kSilence = 512;
+        std::memset(samples, 0, sizeof(float) * kSilence * 2);
+        projectm_pcm_add_float(m_pm, samples, kSilence, PROJECTM_STEREO);
     }
 
     projectm_handle m_pm = nullptr;
@@ -700,6 +739,10 @@ private:
     QElapsedTimer m_statsPosted;
     double m_lastFrameMs = 0.0;
     double m_fps = 0.0;
+    // What projectM was last told; presets read it and scale their animation by it.
+    int m_reportedFps = 60;
+    // Consecutive frames with no new audio; see feedAudio().
+    int m_emptyFeeds = 0;
     double m_phase = 0.0;
     double m_sweepPhase = 0.0;
     int m_frameCount = 0;
