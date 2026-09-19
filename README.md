@@ -40,11 +40,17 @@ try to organise your music collection.
   between, and a *preferred language* for each decides which is picked when a file offers a choice
 - **Internet radio** — streams are entries in the same playlist, with station metadata in the
   now-playing line
-- **Mini-player** — a compact always-on-top layout
+- **Mini-player** — a compact layout, as tall as its controls and no taller, always on top where
+  the desktop allows it
 - **A resizable window** — drag the divider to rebalance the playlist against the visualiser, and
   the top of the transport to make it taller; the controls scale with it
 - **Themes** — follows the desktop's light/dark setting, with ten ready-made palettes and a
   five-colour custom editor, including the visualiser background and how strongly it tints
+- **Visualisations can be switched off entirely** — *Options ▸ Visualisation* — and everything
+  else works exactly as before. Off means off: the renderer stops rather than being covered up,
+  which takes the player from around 260% of a CPU core to under 20%. Reverie's mark sits on the
+  stage instead, and in fullscreen it drifts slowly around it, so the player still makes a decent
+  screensaver without any flashing. Right-click the stage to turn the drift off.
 - **MPRIS** — media keys and desktop integration
 
 **Deliberately not included:** library management, lyrics, social features, third-party service
