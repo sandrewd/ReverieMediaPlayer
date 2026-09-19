@@ -357,7 +357,8 @@ ApplicationWindow {
     // Binding does both without a handler that can be forgotten - which is the fault the comment
     // above this function records. It also survives a library swap, where the blocklist is the
     // one thing that does not change.
-    Binding { target: PresetLibrary; property: "blocklists"; value: initialBlocklists }
+    Binding { target: PresetLibrary; property: "blocklist"; value: initialBlocklist }
+    Binding { target: PresetLibrary; property: "textureBlocklist"; value: initialTextureBlocklist }
     Binding { target: PresetLibrary; property: "showBroken"; value: SystemTheme.showBrokenPresets }
     Binding { target: visualizer; property: "blocklists"; value: initialBlocklists }
     Binding { target: visualizer; property: "showBroken"; value: SystemTheme.showBrokenPresets }

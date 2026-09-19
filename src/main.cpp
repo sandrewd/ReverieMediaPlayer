@@ -327,22 +327,24 @@ int main(int argc, char *argv[])
     // ship. It is applied *only* when no texture directory was found: for someone who has
     // installed a texture pack those presets work perfectly, and hiding them would be wrong.
     // Measured individually - 0% with no textures, and back to life with a stand-in in place.
+    QString textureBlocklist;
+    if (texturesDir.isEmpty())
+        textureBlocklist = findResource(QStringLiteral("presets-blocklist-textures.txt"));
+    else
+        qInfo("preset blocklist: textures are installed, so texture-dependent presets are shown");
+
     QStringList blocklists;
     if (!blocklist.isEmpty())
         blocklists << blocklist;
-    if (texturesDir.isEmpty()) {
-        const QString textureBlocklist =
-            findResource(QStringLiteral("presets-blocklist-textures.txt"));
-        if (!textureBlocklist.isEmpty())
-            blocklists << textureBlocklist;
-    } else {
-        qInfo("preset blocklist: textures are installed, so texture-dependent presets are shown");
-    }
+    if (!textureBlocklist.isEmpty())
+        blocklists << textureBlocklist;
 
     engine.rootContext()->setContextProperty("initialTexturesPath", texturesDir);
     engine.rootContext()->setContextProperty("initialPresetsPath", presetsDir);
     engine.rootContext()->setContextProperty("initialCuratedList", curatedList);
     engine.rootContext()->setContextProperty("initialBlocklists", blocklists);
+    engine.rootContext()->setContextProperty("initialBlocklist", blocklist);
+    engine.rootContext()->setContextProperty("initialTextureBlocklist", textureBlocklist);
     engine.rootContext()->setContextProperty("initialMaxFps", parser.value(fpsCapOption).toInt());
 
     // Qt 6.4 puts QML module resources under qrc:/<URI>/; 6.5 and later use qrc:/qt/qml/<URI>/.

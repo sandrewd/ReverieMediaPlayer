@@ -3,6 +3,8 @@
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
+#include <QRegularExpression>
+#include <QStandardPaths>
 #include <QFileInfo>
 #include <QTextStream>
 
@@ -27,12 +29,86 @@ void PresetLibrary::setCuratedList(const QString &path)
     rescan();
 }
 
-void PresetLibrary::setBlocklists(const QStringList &paths)
+void PresetLibrary::setBlocklist(const QString &path)
 {
-    if (paths == m_blocklists)
+    if (path == m_blocklist)
         return;
-    m_blocklists = paths;
+    m_blocklist = path;
     rescan();
+}
+
+void PresetLibrary::setTextureBlocklist(const QString &path)
+{
+    if (path == m_textureBlocklist)
+        return;
+    m_textureBlocklist = path;
+    rescan();
+}
+
+QString PresetLibrary::textureDropPath() const
+{
+    // The writable one, whatever else is on the search path: this is where a person is being
+    // told to put a file, so naming a read-only /usr/share would be worse than saying nothing.
+    const QString path = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
+                         + QStringLiteral("/reverie/textures");
+    // Abbreviated for display, which is all this is for. An unbroken absolute path is also a
+    // single very long word, and a tooltip sizes itself to its longest one - it covered the list
+    // it was describing before this.
+    const QString home = QDir::homePath();
+    if (!home.isEmpty() && path.startsWith(home))
+        return QStringLiteral("~") + path.mid(home.length());
+    return path;
+}
+
+// Milkdrop names a texture through sampler_<name>, where the name may carry a sampling-mode
+// prefix (fw_, fc_, pw_, pc_ and their reversed spellings) or a rand_NN_ prefix that means "pick
+// any". Those are not part of the filename, and counting them as external textures is exactly the
+// mistake that once put the built-in noise textures on this list - see the brief.
+QStringList PresetLibrary::texturesWantedBy(const QString &path) const
+{
+    static const QSet<QString> builtin = {
+        QStringLiteral("noise_hq"),     QStringLiteral("noise_lq"),
+        QStringLiteral("noise_lq_lite"), QStringLiteral("noise_mq"),
+        QStringLiteral("noisevol_hq"),  QStringLiteral("noisevol_lq"),
+        QStringLiteral("main"),         QStringLiteral("blur1"),
+        QStringLiteral("blur2"),        QStringLiteral("blur3"),
+        QStringLiteral("fc_main"),      QStringLiteral("pc_main")};
+    static const QRegularExpression sampler(QStringLiteral("sampler_([A-Za-z0-9_]+)"));
+    static const QRegularExpression prefix(QStringLiteral("^(fc_|fw_|pc_|pw_|cf_|cp_|wf_|wp_)+"));
+    // projectM reads "randNN" and "randNN_prefix" as "pick a random image from the pool" and
+    // "pick a random one whose filename begins with prefix" - see TextureManager::GetRandomTexture.
+    // The tail is NOT a filename, so reporting it as one would send someone looking for a file
+    // that was never meant to exist.
+    static const QRegularExpression randomName(QStringLiteral("^rand\\d+(?:_(.+))?$"));
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return {};
+    const QString text = QString::fromUtf8(file.readAll());
+
+    QStringList names;
+    auto it = sampler.globalMatch(text);
+    while (it.hasNext()) {
+        QString name = it.next().captured(1).toLower();
+        name.remove(prefix);
+        if (name.isEmpty() || builtin.contains(name))
+            continue;
+
+        QString described;
+        const QRegularExpressionMatch random = randomName.match(name);
+        if (random.hasMatch()) {
+            const QString wanted = random.captured(1);
+            described = wanted.isEmpty()
+                            ? tr("any image")
+                            : tr("any image whose name starts with \u201c%1\u201d").arg(wanted);
+        } else {
+            described = name;
+        }
+        if (!names.contains(described))
+            names.append(described);
+    }
+    names.sort();
+    return names;
 }
 
 void PresetLibrary::setShowBroken(bool show)
@@ -43,28 +119,25 @@ void PresetLibrary::setShowBroken(bool show)
     rescan();
 }
 
-QSet<QString> PresetLibrary::readBlocklist() const
+QSet<QString> PresetLibrary::readList(const QString &path)
 {
-    QSet<QString> blocked;
-    for (const QString &path : m_blocklists) {
-        if (path.isEmpty())
-            continue;
-        QFile file(path);
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            // Worth saying out loud: without it the library silently gains a couple of hundred
-            // presets that draw nothing, which reads as a rendering fault rather than a missing
-            // file.
-            qWarning("preset library: cannot read blocklist %s", qPrintable(path));
-            continue;
-        }
-        QTextStream in(&file);
-        while (!in.atEnd()) {
-            const QString line = in.readLine().trimmed();
-            if (!line.isEmpty() && !line.startsWith(QLatin1Char('#')))
-                blocked.insert(line);
-        }
+    QSet<QString> entries;
+    if (path.isEmpty())
+        return entries;
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        // Worth saying out loud: without it the library silently gains a couple of hundred
+        // presets that draw nothing, which reads as a rendering fault rather than a missing file.
+        qWarning("preset library: cannot read blocklist %s", qPrintable(path));
+        return entries;
     }
-    return blocked;
+    QTextStream in(&file);
+    while (!in.atEnd()) {
+        const QString line = in.readLine().trimmed();
+        if (!line.isEmpty() && !line.startsWith(QLatin1Char('#')))
+            entries.insert(line);
+    }
+    return entries;
 }
 
 void PresetLibrary::setSearchText(const QString &text)
@@ -118,6 +191,8 @@ QVariant PresetLibrary::data(const QModelIndex &index, int role) const
     case CategoryRole: return e.category;
     case StyleRole:    return e.style;
     case PathRole:     return e.path;
+    case BrokenRole:        return e.broken;
+    case NeedsTextureRole:  return e.needsTexture;
     default:           return {};
     }
 }
@@ -129,7 +204,9 @@ QHash<int, QByteArray> PresetLibrary::roleNames() const
             {AuthorRole, "author"},
             {CategoryRole, "category"},
             {StyleRole, "style"},
-            {PathRole, "path"}};
+            {PathRole, "path"},
+            {BrokenRole, "broken"},
+            {NeedsTextureRole, "needsTexture"}};
 }
 
 QStringList PresetLibrary::styles(const QString &category) const
@@ -215,7 +292,8 @@ void PresetLibrary::rescan()
             relativePaths.append(root.relativeFilePath(it.next()));
     }
 
-    const QSet<QString> blocked = readBlocklist();
+    const QSet<QString> broken = readList(m_blocklist);
+    const QSet<QString> needsTexture = readList(m_textureBlocklist);
     m_brokenCount = 0;
 
     m_all.clear();
@@ -229,7 +307,9 @@ void PresetLibrary::rescan()
             continue;
         // Measured to render nothing. Counted whether or not they are shown, because the menu
         // item that reveals them needs to say how many there are.
-        if (blocked.contains(relative)) {
+        const bool isBroken = broken.contains(relative);
+        const bool isTextureless = needsTexture.contains(relative);
+        if (isBroken || isTextureless) {
             ++m_brokenCount;
             if (!m_showBroken)
                 continue;
@@ -241,7 +321,8 @@ void PresetLibrary::rescan()
         // if that ever changes.
         const QString dir = QFileInfo(relative).path();
         const QString style = dir.mid(slash + 1);
-        m_all.append({name, absolute, category, style == QLatin1String(".") ? QString() : style});
+        m_all.append({name, absolute, category, style == QLatin1String(".") ? QString() : style,
+                      isBroken, isTextureless});
         m_byCategory[category].append({name, absolute});
     }
 

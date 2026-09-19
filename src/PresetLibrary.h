@@ -30,7 +30,14 @@ class PresetLibrary : public QAbstractListModel
     // The shipped list of visualisations measured to render nothing, and the switch that lets
     // someone look at them anyway. Hiding them is the default because a black stage reads as the
     // application having failed, not as the preset being at fault.
-    Q_PROPERTY(QStringList blocklists READ blocklists WRITE setBlocklists NOTIFY libraryChanged)
+    // Two properties rather than one list, unlike ProjectMItem: the rotation only needs to know
+    // whether a preset is excluded, but the browser shows the excluded ones on request and has to
+    // say *why* - "nothing will fix this" and "drop a texture in and it works" are different
+    // answers and deserve different marks.
+    Q_PROPERTY(QString blocklist READ blocklist WRITE setBlocklist NOTIFY libraryChanged)
+    Q_PROPERTY(QString textureBlocklist READ textureBlocklist WRITE setTextureBlocklist NOTIFY libraryChanged)
+    // Where a texture should be dropped to fix one, named in full so the tooltip can say it.
+    Q_PROPERTY(QString textureDropPath READ textureDropPath CONSTANT)
     Q_PROPERTY(bool showBroken READ showBroken WRITE setShowBroken NOTIFY libraryChanged)
     Q_PROPERTY(int brokenCount READ brokenCount NOTIFY libraryChanged)
     Q_PROPERTY(QStringList categories READ categories NOTIFY libraryChanged)
@@ -50,6 +57,8 @@ public:
         CategoryRole,
         StyleRole,                    // the sub-folder, "" when the preset sits loose
         PathRole,
+        BrokenRole,                   // renders nothing, and a texture does not help
+        NeedsTextureRole,             // renders nothing only because a texture is missing
     };
 
     explicit PresetLibrary(QObject *parent = nullptr);
@@ -58,8 +67,16 @@ public:
     void setRootPath(const QString &path);
     QString curatedList() const { return m_curatedList; }
     void setCuratedList(const QString &path);
-    QStringList blocklists() const { return m_blocklists; }
-    void setBlocklists(const QStringList &paths);
+    QString blocklist() const { return m_blocklist; }
+    void setBlocklist(const QString &path);
+    QString textureBlocklist() const { return m_textureBlocklist; }
+    void setTextureBlocklist(const QString &path);
+    QString textureDropPath() const;
+
+    // The external textures a preset asks for, parsed on demand rather than at index time:
+    // reading 9,795 files to build the list would cost far more than the 115ms indexing takes,
+    // and a tooltip needs it for one row at a time.
+    Q_INVOKABLE QStringList texturesWantedBy(const QString &path) const;
     bool showBroken() const { return m_showBroken; }
     void setShowBroken(bool show);
     // How many of the installed presets are on the blocklist, so the menu can say so rather than
@@ -110,6 +127,8 @@ private:
         QString path;
         QString category;
         QString style;
+        bool broken = false;
+        bool needsTexture = false;
     };
 
     void rescan();
@@ -117,11 +136,12 @@ private:
 
     // Relative paths, as they appear in the blocklist file. Comparing relative keeps one set
     // usable against the curated install and the full pack, which sit at different roots.
-    QSet<QString> readBlocklist() const;
+    static QSet<QString> readList(const QString &path);
 
     QString m_rootPath;
     QString m_curatedList;
-    QStringList m_blocklists;
+    QString m_blocklist;
+    QString m_textureBlocklist;
     bool m_showBroken = false;
     int m_brokenCount = 0;
     QString m_searchText;

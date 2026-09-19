@@ -43,6 +43,13 @@ QtObject {
     // covering the picture. This one contrasts with the bar, so the boundary reads in both.
     readonly property color stageEdge: dark ? Qt.rgba(1, 1, 1, 0.26) : border
 
+    // The one warning colour, for the mark against a visualisation that renders nothing. Chosen
+    // by the derived `dark` flag rather than fixed, so it stays legible whichever way the user's
+    // background goes - the same shape as stageEdge above. It is deliberately the only such
+    // token: the brief records that a hand-picked error colour was rejected once already,
+    // because every other colour here is derived and so cannot be made invisible.
+    readonly property color alert: dark ? "#ff7a70" : "#c0392b"
+
     readonly property color overlayText: "#f0f2f4"
     readonly property color overlayTextDim: "#a8b0b8"
     readonly property color overlayBackground: "#b0000000"

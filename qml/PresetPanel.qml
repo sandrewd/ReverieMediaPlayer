@@ -140,11 +140,87 @@ Rectangle {
                 readonly property bool isFavourite:
                     (PresetHistory.favourites, PresetHistory.isFavourite(model.path))
                 onClicked: root.apply(model.index)
-                ToolTip.visible: hovered
-                ToolTip.text: model.name
+
+                // Its own ToolTip rather than the shared attached one, because this text is
+                // several lines and the shared tooltip cannot be given a width. A Text with
+                // wrapMode set reports an implicitWidth for the whole string *unwrapped* -
+                // explicit newlines do not reduce it - so the stock tooltip came out 1086px wide
+                // for 300px of text and covered the list it was describing. Measured, not
+                // guessed: shortening the lines does nothing, only bounding the width does.
+                //
+                // Styled from the tokens directly, which is the rule for anything that has to
+                // survive a theme change at runtime.
+                ToolTip {
+                    id: rowTip
+                    parent: row
+                    visible: row.hovered
+                    delay: 400
+                    text: row.explain()
+                    padding: 8
+                    // The width goes on the popup, not on the Text. A Popup sizes itself to its
+                    // contentItem's *implicitWidth*, and constraining the Text's width leaves
+                    // that untouched - the box stayed 1086px wide with the text drawn 288px wide
+                    // inside it. Measured both ways.
+                    width: 304
+                    contentItem: Text {
+                        text: rowTip.text
+                        font: rowTip.font
+                        color: Theme.text
+                        wrapMode: Text.WordWrap
+                        width: rowTip.availableWidth
+                    }
+                    background: Rectangle {
+                        color: Theme.surfaceHigh
+                        border.color: Theme.border
+                        border.width: 1
+                        radius: 3
+                    }
+                }
+
+                // Parsed from the preset only when someone hovers it. Reading all 9,795 files at
+                // index time would cost far more than the whole index does.
+                function explain() {
+                    if (model.broken)
+                        return qsTr("%1\n\nX  This visualisation renders nothing.\n"
+                                    + "Measured over a six-second run \u2014 and supplying\n"
+                                    + "the image it asks for does not help, so something\n"
+                                    + "else is wrong with it.").arg(model.name)
+                    const wanted = PresetLibrary.texturesWantedBy(model.path)
+                    if (model.needsTexture) {
+                        return qsTr("%1\n\n!  Renders nothing without an external image\n"
+                                    + "that Reverie does not ship.\n\nIt wants: %2\n\nPut a "
+                                    + "matching .png or .jpg in\n%3")
+                               .arg(model.name)
+                               .arg(wanted.join(", "))
+                               .arg(PresetLibrary.textureDropPath)
+                    }
+                    if (wanted.length > 0) {
+                        // No mark for these: they draw perfectly well, projectM stands a 1x1
+                        // placeholder in for the missing image and the preset simply loses that
+                        // layer. 1,783 of the pack are in this state and marking them all would
+                        // teach people to ignore the mark. The information is still here for
+                        // anyone assembling a texture pack.
+                        return qsTr("%1\n\nUses images Reverie does not ship:\n%2\n"
+                                    + "It renders without them, just with less in it.")
+                               .arg(model.name).arg(wanted.join(", "))
+                    }
+                    return model.name
+                }
 
                 contentItem: RowLayout {
                     spacing: 4
+                    Text {
+                        // Plain ASCII rather than a drawn glyph or a symbol character: the icons
+                        // here are Canvas-drawn because a system font may not carry a given
+                        // glyph, but "X" and "!" are in every font there is.
+                        visible: model.broken || model.needsTexture
+                        text: model.broken ? "X" : "!"
+                        color: Theme.alert
+                        font.pixelSize: 12
+                        font.bold: true
+                        Layout.alignment: Qt.AlignVCenter
+                        Layout.leftMargin: 2
+                    }
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 1
