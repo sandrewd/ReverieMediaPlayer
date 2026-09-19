@@ -9,12 +9,12 @@
 // thread, so it has to cross threads. A small mutex-guarded ring is enough: the critical
 // section is a memcpy of a few hundred floats, and the render thread never blocks long.
 //
-// The consumer reads *continuously* rather than sampling the newest N frames. That distinction
-// turned out to matter a great deal: taking "the latest 512" once per rendered frame drops the
-// audio in between - 5.1 ms of every 16.7 ms at 60fps - and splices the remainder together. The
-// step across each splice measured 6.9x a normal sample-to-sample step on real music, sixty
-// times a second, which is a click train, which is broadband energy in every frame's spectrum,
-// which is exactly what a beat detector fires on. Beat-triggered presets went off constantly.
+// The consumer reads *continuously* rather than taking the newest N frames each time. That
+// distinction turned out to matter: reading "the latest 512" once per rendered frame discards
+// the audio in between - 5.1 ms of every 16.7 ms at 60fps - and joins what remains. Measured on
+// real music, the step across each join is 6.9 times a normal sample-to-sample step, sixty times
+// a second. A discontinuity at that rate is broadband energy in every frame's spectrum, which is
+// what a beat detector responds to, so beat-triggered presets retriggered constantly.
 class AudioRingBuffer
 {
 public:
@@ -52,8 +52,8 @@ public:
     // Zero means nothing new has arrived - the cue to feed projectM nothing at all rather than
     // replay stale audio, which would be another discontinuity.
     //
-    // Continuity is the whole point: consecutive calls return consecutive samples, so what
-    // projectM sees is the waveform rather than a strobe of it.
+    // Continuity is the whole point: consecutive calls return consecutive samples, so the
+    // waveform projectM analyses is the one that was played.
     int readContinuous(float *out, int maxFrames)
     {
         QMutexLocker lock(&m_mutex);

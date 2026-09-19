@@ -79,6 +79,10 @@ public:
     void setAudioEngine(AudioEngine *engine);
 
     QString presetsPath() const { return m_presetsPath; }
+    // The item size the renderer should build a buffer for: the current one once it has stopped
+    // changing. Collapsing a side panel animates the stage's width for 160ms, and following that
+    // frame by frame rebuilt the offscreen buffer roughly ten times in a row.
+    QSizeF settledSize() const { return m_settledSize; }
     QString texturesPath() const { return m_texturesPath; }
     void setTexturesPath(const QString &path);
     void setPresetsPath(const QString &path);
@@ -159,6 +163,12 @@ signals:
     void yieldToDesktopChanged();
     void statsChanged();
 
+protected:
+    // The stage is resized every frame while a side panel animates open or closed. Following
+    // that directly rebuilt the offscreen buffer on each of those frames, and projectM starts
+    // its accumulation afresh every time it is given a new one.
+    void geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry) override;
+
 private:
     qreal m_renderScale = 0.5;
     QString m_presetPath;
@@ -168,6 +178,8 @@ private:
     QSize m_renderSize;
 
     QString m_presetsPath;
+    QSizeF m_settledSize;
+    QTimer m_sizeSettleTimer;
     QString m_texturesPath;
     QString m_curatedList;
     QString m_presetName;

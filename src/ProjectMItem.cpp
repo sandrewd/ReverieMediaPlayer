@@ -164,7 +164,8 @@ public:
         // On a 1x display the two are equal, which is why this survived every test until one
         // ran on a high-DPI machine.
         const qreal dpr = pmItem->window() ? pmItem->window()->effectiveDevicePixelRatio() : 1.0;
-        const QSize itemSize(qRound(pmItem->width() * dpr), qRound(pmItem->height() * dpr));
+        const QSizeF settled = pmItem->settledSize();
+        const QSize itemSize(qRound(settled.width() * dpr), qRound(settled.height() * dpr));
         if (!qFuzzyCompare(wantedScale, m_renderScale) || scaledSize(itemSize) != m_fboSize) {
             qCDebug(lcRender, "invalidating fbo: scale %.2f -> %.2f, item %dx%d, current fbo %dx%d",
                   m_renderScale, wantedScale, itemSize.width(), itemSize.height(),
@@ -654,8 +655,17 @@ private:
 
     QSize scaledSize(const QSize &itemSize) const
     {
-        return QSize(qMax(16, qRound(itemSize.width() * m_renderScale)),
-                     qMax(16, qRound(itemSize.height() * m_renderScale)));
+        // Width is quantised so that a pixel or two of drift - a splitter nudge, a rounding
+        // difference - does not rebuild the buffer for no visible gain. Height is derived from
+        // the item's own aspect rather than quantised too: rounding both axes independently
+        // would change the aspect ratio by up to a step and visibly stretch the picture.
+        constexpr int kStep = 16;
+        const int raw = qRound(itemSize.width() * m_renderScale);
+        const int w = qMax(kStep, (raw + kStep / 2) / kStep * kStep);
+        const int h = itemSize.width() > 0
+                          ? qMax(16, qRound(double(w) * itemSize.height() / itemSize.width()))
+                          : qMax(16, qRound(itemSize.height() * m_renderScale));
+        return QSize(w, h);
     }
 
     void feedAudio()
@@ -761,6 +771,20 @@ ProjectMItem::ProjectMItem(QQuickItem *parent)
     m_renderScale = qBound(0.1, settings.value(QStringLiteral("visual/renderScale"), 0.5).toDouble(), 1.0);
     m_targetFps = qBound(15.0, settings.value(QStringLiteral("visual/targetFps"), 30.0).toDouble(), 60.0);
 
+    // Slightly longer than the 160ms panel animation, so one rebuild happens at the end of a
+    // collapse rather than one per animated frame.
+    m_sizeSettleTimer.setSingleShot(true);
+    m_sizeSettleTimer.setInterval(200);
+    connect(&m_sizeSettleTimer, &QTimer::timeout, this, [this]() {
+        const QSizeF now(width(), height());
+        if (now == m_settledSize)
+            return;
+        m_settledSize = now;
+        // synchronize() only runs when the item is marked dirty, so without this the settled
+        // size would sit there unread until something else happened to dirty the item.
+        update();
+    });
+
     m_frameTimer.setTimerType(Qt::PreciseTimer);
     m_frameTimer.setInterval(m_maxFps > 0 ? qMax(1, 1000 / m_maxFps) : 16);
     connect(&m_frameTimer, &QTimer::timeout, this, [this]() { update(); });
@@ -770,6 +794,21 @@ ProjectMItem::ProjectMItem(QQuickItem *parent)
     setTextureFollowsItemSize(false);
     // projectM draws with an OpenGL bottom-left origin; Qt expects top-left.
     setMirrorVertically(true);
+}
+
+void ProjectMItem::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
+{
+    QQuickFramebufferObject::geometryChange(newGeometry, oldGeometry);
+    if (newGeometry.size() == oldGeometry.size())
+        return;
+    // The very first sizing is adopted at once; there is nothing on screen to protect yet and
+    // waiting would just show a 16x16 buffer stretched across the stage.
+    if (m_settledSize.isEmpty()) {
+        m_settledSize = newGeometry.size();
+        update();
+        return;
+    }
+    m_sizeSettleTimer.start();
 }
 
 QQuickFramebufferObject::Renderer *ProjectMItem::createRenderer() const
