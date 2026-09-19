@@ -84,9 +84,9 @@ modules:
     sources:
       - type: git
         url: https://github.com/sandrewd/ReverieMediaPlayer.git
-        tag: v0.9.1
+        tag: v0.9.2
         # Pinned alongside the tag: a tag can be moved, a commit cannot.
-        commit: 0481dd274e5bb3e2acac22c8e62deb81b64bd944
+        commit: 7aa04f27b4c79a008b320dddf30eea0c637633ea
       # The curated default, extracted where the build expects the corpus, and pinned by digest.
       # It must match what the .deb stages from presets-curated.txt or the two packages ship
       # different visualisations - so this moves whenever that list is regenerated.
