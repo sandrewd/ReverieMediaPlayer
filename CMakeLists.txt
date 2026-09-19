@@ -259,7 +259,25 @@ target_link_libraries(player PRIVATE
 # told where it is or it reports our own libraries as unresolved dependencies.
 set(CPACK_PACKAGE_NAME "reverie")
 set(CPACK_PACKAGE_VENDOR "Reverie")
-set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+# A package built from an untagged commit carries that commit in its version, so two builds of
+# the same release number are never confusable. Three separate 0.9.2 packages existed at one
+# point and dpkg treated the newest as already installed, so a test ran against an older binary
+# for an hour before the mismatch was spotted. Tagged builds keep the bare version, because a
+# release artefact should be named after its release.
+set(PLAYER_PACKAGE_VERSION "${PROJECT_VERSION}")
+if(GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
+    execute_process(COMMAND "${GIT_EXECUTABLE}" describe --exact-match --tags HEAD
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        OUTPUT_VARIABLE PLAYER_EXACT_TAG
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE PLAYER_TAG_RESULT
+        ERROR_QUIET)
+    if(NOT PLAYER_TAG_RESULT EQUAL 0)
+        set(PLAYER_PACKAGE_VERSION "${PROJECT_VERSION}+git${PLAYER_GIT_COMMIT}")
+    endif()
+endif()
+message(STATUS "Reverie: package version ${PLAYER_PACKAGE_VERSION}")
+set(CPACK_PACKAGE_VERSION "${PLAYER_PACKAGE_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Media player with built-in Milkdrop-style visualisations")
 set(CPACK_PACKAGE_HOMEPAGE_URL "${PLAYER_HOMEPAGE}")
 set(CPACK_PACKAGE_CONTACT "Reverie Media Player <sandrewd@users.noreply.github.com>")

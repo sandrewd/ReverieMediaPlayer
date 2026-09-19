@@ -54,7 +54,41 @@ ApplicationWindow {
     property bool heightLocked: false
     minimumWidth: mini ? 320 : Theme.minWindowWidth
     minimumHeight: heightLocked ? miniHeight : Theme.minWindowHeight
-    maximumHeight: heightLocked ? miniHeight : 16777215
+    // No ceiling, deliberately. Pinning minimum == maximum makes this a fixed-height window,
+    // and GNOME's compositor answers a side-edge drag on one of those by walking the window
+    // down the screen until it leaves the display - measured on the affected machine, where
+    // Reverie changes only its width and is never even told its own position, so nothing here
+    // could be moving it and nothing here can stop it either.
+    //
+    // Being an ordinary resizable window avoids the case entirely, and the height is restored
+    // afterwards instead. X11 would also have avoided it, but that is coding towards a platform
+    // the ecosystem is actively removing.
+    maximumHeight: 16777215
+
+    // Restore the mini player's height once the size has settled, rather than forbidding it.
+    // The same shape as the offscreen buffer's settle timer: react when the thing stops
+    // changing, never on every event, because a correction applied mid-drag is a correction
+    // fighting the person doing the dragging.
+    property int snapAttempts: 0
+    Timer {
+        id: miniHeightSnap
+        interval: 250
+        repeat: false
+        onTriggered: {
+            if (!root.mini || root.height === root.miniHeight)
+                return
+            // A compositor may answer a resize request with a different size than asked for.
+            // Ask a couple of times, then let it be: arguing with a window manager forever is
+            // worse than a mini player that is briefly the wrong height.
+            if (root.snapAttempts >= 3) {
+                AppInfo.logLayout("snap gave up", root.x, root.y, root.width, root.height,
+                                  root.minimumHeight, root.maximumHeight, transportBar.uiScale)
+                return
+            }
+            root.snapAttempts++
+            root.height = root.miniHeight
+        }
+    }
 
     // Reports every window and transport geometry change when asked for. The mini player's
     // resize behaviour differs by compositor and could not be reproduced on three window
@@ -64,7 +98,13 @@ ApplicationWindow {
                           minimumHeight, maximumHeight, transportBar.uiScale)
     }
     onWidthChanged:  reportLayout("width")
-    onHeightChanged: reportLayout("height")
+    onHeightChanged: {
+        reportLayout("height")
+        if (mini && height !== miniHeight)
+            miniHeightSnap.restart()
+        else
+            snapAttempts = 0
+    }
     onXChanged:      reportLayout("x")
     onYChanged:      reportLayout("y")
 
