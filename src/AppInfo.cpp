@@ -64,7 +64,11 @@ QString AppInfo::taglibVersion() const
         .arg(TAGLIB_MINOR_VERSION).arg(TAGLIB_PATCH_VERSION);
 }
 
-void AppInfo::logLayout(const QString &what, int w, int h, qreal scale) const
+void AppInfo::logLayout(const QString &what, int x, int y, int w, int h,
+                        int minH, int maxH, qreal scale) const
 {
-    qCDebug(lcLayout, "%s %dx%d uiScale %.3f", qPrintable(what), w, h, scale);
+    // Position as well as size. A window that slides during a resize is reporting something
+    // about where it thinks it is, and logging only the size cannot show that.
+    qCDebug(lcLayout, "%s pos %d,%d size %dx%d  heightLimits %d..%d  uiScale %.3f",
+            qPrintable(what), x, y, w, h, minH, maxH, scale);
 }

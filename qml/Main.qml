@@ -59,8 +59,14 @@ ApplicationWindow {
     // Reports every window and transport geometry change when asked for. The mini player's
     // resize behaviour differs by compositor and could not be reproduced on three window
     // managers here, so the machine that shows it has to be the one that describes it.
-    onWidthChanged: AppInfo.logLayout("window", width, height, transportBar.uiScale)
-    onHeightChanged: AppInfo.logLayout("window", width, height, transportBar.uiScale)
+    function reportLayout(what) {
+        AppInfo.logLayout(what, x, y, width, height,
+                          minimumHeight, maximumHeight, transportBar.uiScale)
+    }
+    onWidthChanged:  reportLayout("width")
+    onHeightChanged: reportLayout("height")
+    onXChanged:      reportLayout("x")
+    onYChanged:      reportLayout("y")
 
     property bool mini: false
     property bool fullscreen: false
