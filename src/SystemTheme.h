@@ -58,6 +58,10 @@ class SystemTheme : public QObject
     // this kind does any good.
     Q_PROPERTY(bool flashNoticeSeen READ flashNoticeSeen WRITE setFlashNoticeSeen
                    NOTIFY flashNoticeSeenChanged)
+    // With visualisations off and the window fullscreen there is nothing on the stage but the
+    // mark, which is a screensaver with nothing to save. Drifting it about the way a DVD player
+    // used to is the cheapest thing that makes that state worth looking at.
+    Q_PROPERTY(bool markBounce READ markBounce WRITE setMarkBounce NOTIFY markBounceChanged)
     Q_PROPERTY(int transportHeight READ transportHeight WRITE setTransportHeight NOTIFY layoutChanged)
     Q_PROPERTY(QStringList recentColours READ recentColours NOTIFY recentColoursChanged)
     Q_PROPERTY(int recentColoursLimit READ recentColoursLimit CONSTANT)
@@ -95,6 +99,8 @@ public:
     void setVisualisationsEnabled(bool on);
     bool flashNoticeSeen() const { return m_flashNoticeSeen; }
     void setFlashNoticeSeen(bool seen);
+    bool markBounce() const { return m_markBounce; }
+    void setMarkBounce(bool on);
     void setPresetPanelWidth(int width);
     void setPlaylistWidth(int width);
     int transportHeight() const { return m_transportHeight; }
@@ -146,6 +152,7 @@ signals:
     void layoutChanged();
     void visualisationsEnabledChanged();
     void flashNoticeSeenChanged();
+    void markBounceChanged();
     void recentColoursChanged();
     void savedPalettesChanged();
     void softwareRenderingChanged();
@@ -196,6 +203,7 @@ private:
     int m_presetPanelWidth = 320;
     bool m_visualisationsEnabled = true;
     bool m_flashNoticeSeen = false;
+    bool m_markBounce = true;
     int m_transportHeight = 88;
     static constexpr int kRecentLimit = 5;
     static constexpr int kPaletteNameLimit = 24;

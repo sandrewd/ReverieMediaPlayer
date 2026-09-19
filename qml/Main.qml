@@ -576,7 +576,7 @@ ApplicationWindow {
                 // It defers to the empty-playlist block below, which already shows the mark
                 // along with its prompt; two marks on one stage would be one too many.
                 ReverieMark {
-                    anchors.centerIn: parent
+                    id: idleMark
                     width: 96
                     height: 96
                     visible: !AudioEngine.hasVideo
@@ -585,6 +585,50 @@ ApplicationWindow {
                     // Quiet rather than absent. The mark is never recoloured (it is identity,
                     // not decoration), so this dims it without touching the artwork.
                     opacity: 0.38
+
+                    // Drifting only in fullscreen, and only when the mark is all there is. Going
+                    // fullscreen with no visualisations is a deliberate "leave this on screen"
+                    // act, which is the one place movement is wanted; someone using the player
+                    // normally turned visualisations off to stop things moving and should not be
+                    // given a wandering logo for their trouble.
+                    readonly property bool drifting:
+                        visible && root.fullscreen && SystemTheme.markBounce
+
+                    // Slow on purpose - about forty pixels a second, so it reads as drift rather
+                    // than as something being animated at you. No flashing, no fading, no easing:
+                    // constant velocity and a clean reflection off each edge, like the DVD logo
+                    // this is stealing from.
+                    property real vx: 42
+                    property real vy: 31
+
+                    x: (parent.width - width) / 2
+                    y: (parent.height - height) / 2
+
+                    onDriftingChanged: if (!drifting) {
+                        x = (parent.width - width) / 2
+                        y = (parent.height - height) / 2
+                    }
+
+                    Timer {
+                        // 30fps is plenty for something moving this slowly, and on a software
+                        // renderer every frame of a full-stage repaint is real work.
+                        interval: 33
+                        repeat: true
+                        running: idleMark.drifting
+                        onTriggered: {
+                            const dt = interval / 1000
+                            let nx = idleMark.x + idleMark.vx * dt
+                            let ny = idleMark.y + idleMark.vy * dt
+                            const maxX = idleMark.parent.width - idleMark.width
+                            const maxY = idleMark.parent.height - idleMark.height
+                            if (nx <= 0) { nx = 0; idleMark.vx = Math.abs(idleMark.vx) }
+                            else if (nx >= maxX) { nx = maxX; idleMark.vx = -Math.abs(idleMark.vx) }
+                            if (ny <= 0) { ny = 0; idleMark.vy = Math.abs(idleMark.vy) }
+                            else if (ny >= maxY) { ny = maxY; idleMark.vy = -Math.abs(idleMark.vy) }
+                            idleMark.x = nx
+                            idleMark.y = ny
+                        }
+                    }
                 }
 
                 ColumnLayout {
@@ -869,8 +913,33 @@ ApplicationWindow {
     function popupStageMenu() {
         if (AudioEngine.hasVideo)
             videoMenu.popup()
+        else if (!SystemTheme.visualisationsEnabled)
+            logoMenu.popup()
         else
             presetMenu.popup()
+    }
+
+    // With visualisations off there is no preset to randomise, lock or step through, so the
+    // preset picker would be a menu of things that cannot happen. This is what that stage can
+    // actually offer: turn them back on, or decide whether the mark drifts.
+    Menu {
+        id: logoMenu
+        onAboutToShow: root.fitMenuWidth(logoMenu, 220, 420)
+        MenuItem {
+            text: qsTr("Show visualisations")
+            checkable: true
+            checked: SystemTheme.visualisationsEnabled
+            onTriggered: SystemTheme.visualisationsEnabled = checked
+        }
+        MenuSeparator {}
+        MenuItem {
+            // Named for where it applies. It does nothing windowed, and a checkbox that appears
+            // to do nothing is worse than one that says when it will.
+            text: qsTr("Drift the logo in fullscreen")
+            checkable: true
+            checked: SystemTheme.markBounce
+            onTriggered: SystemTheme.markBounce = checked
+        }
     }
 
     Menu {
