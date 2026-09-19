@@ -17,3 +17,7 @@
 // bug report, and there are only a handful of them per run.
 Q_DECLARE_LOGGING_CATEGORY(lcRender)
 Q_DECLARE_LOGGING_CATEGORY(lcPreset)
+// Which concrete sink autoaudiosink chose. Worth having - it is what identified a silent
+// machine once - but it is emitted on every track change as the sink re-probes, so it is not
+// the once-per-run line it first looked like.
+Q_DECLARE_LOGGING_CATEGORY(lcAudio)

@@ -5,3 +5,4 @@
 // Declaring the minimum level as Info leaves qCDebug() silent until QT_LOGGING_RULES asks for it.
 Q_LOGGING_CATEGORY(lcRender, "reverie.render", QtInfoMsg)
 Q_LOGGING_CATEGORY(lcPreset, "reverie.preset", QtInfoMsg)
+Q_LOGGING_CATEGORY(lcAudio, "reverie.audio", QtInfoMsg)

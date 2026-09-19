@@ -1,4 +1,6 @@
 #include "AudioEngine.h"
+
+#include "Logging.h"
 #include <cmath>
 #include <cstring>
 #include <QSettings>
@@ -89,6 +91,11 @@ AudioEngine::AudioEngine(QObject *parent)
 
     // Polling the bus avoids assuming a GLib main loop is driving Qt's event loop.
     m_busTimer.setInterval(50);
+    // Long enough for autoaudiosink to finish re-probing after a track change, short enough
+    // that a machine with genuinely no output is told promptly.
+    m_sinkCheckTimer.setSingleShot(true);
+    m_sinkCheckTimer.setInterval(2000);
+    connect(&m_sinkCheckTimer, &QTimer::timeout, this, &AudioEngine::verifyAudioSink);
     connect(&m_busTimer, &QTimer::timeout, this, &AudioEngine::pollBus);
     m_busTimer.start();
 
@@ -102,6 +109,64 @@ AudioEngine::~AudioEngine()
         gst_element_set_state(m_pipeline, GST_STATE_NULL);
         gst_object_unref(m_pipeline);
     }
+}
+
+bool AudioEngine::audioSinkIsFake() const
+{
+    if (!m_audioSink || !GST_IS_BIN(m_audioSink))
+        return false;
+
+    bool sawAny = false;
+    bool allFake = true;
+    GstIterator *it = gst_bin_iterate_elements(GST_BIN(m_audioSink));
+    GValue item = G_VALUE_INIT;
+    bool done = false;
+    while (!done) {
+        switch (gst_iterator_next(it, &item)) {
+        case GST_ITERATOR_OK: {
+            auto *child = static_cast<GstElement *>(g_value_get_object(&item));
+            if (gchar *n = gst_element_get_name(child)) {
+                sawAny = true;
+                if (!strstr(n, "fake"))
+                    allFake = false;
+                g_free(n);
+            }
+            g_value_reset(&item);
+            break;
+        }
+        case GST_ITERATOR_RESYNC:
+            // The bin changed under us, which is exactly what it does while probing. Start again
+            // rather than report a half-read answer.
+            sawAny = false;
+            allFake = true;
+            gst_iterator_resync(it);
+            break;
+        default:
+            done = true;
+            break;
+        }
+    }
+    g_value_unset(&item);
+    gst_iterator_free(it);
+    return sawAny && allFake;
+}
+
+void AudioEngine::verifyAudioSink()
+{
+    // Only meaningful while we believe sound should be coming out.
+    if (m_state != Playing && m_state != Buffering)
+        return;
+    if (!audioSinkIsFake())
+        return;
+    // Once per run. The condition is a property of the machine, not of the track, so repeating
+    // it on every change would be noise on top of a fault the user can already see.
+    if (m_reportedFakeSink)
+        return;
+    m_reportedFakeSink = true;
+    qWarning("audio: no real output device could be opened - autoaudiosink settled on a fake "
+             "sink, so there will be no sound");
+    emit errorOccurred(tr("No audio output could be opened, so there is no "
+                          "sound. Check the system's sound settings."));
 }
 
 void AudioEngine::buildPipeline()
@@ -225,29 +290,25 @@ void AudioEngine::buildPipeline()
     // visualiser runs - while no audio reaches the sound server at all. That is the worst failure
     // a media player can have, and it is exactly what one machine was doing.
     if (sink && GST_IS_BIN(sink)) {
+        m_audioSink = sink;
         g_signal_connect(sink, "element-added",
                          G_CALLBACK(+[](GstBin *, GstElement *element, gpointer data) {
                              auto *self = static_cast<AudioEngine *>(data);
-                             const gchar *name = gst_element_get_name(element);
-                             qInfo("audio: output sink is %s", name);
-                             if (!name || !strstr(name, "fake"))
+                             gchar *name = gst_element_get_name(element);
+                             qCDebug(lcAudio, "audio: output sink is %s", name ? name : "?");
+                             const bool fake = name && strstr(name, "fake");
+                             g_free(name);
+                             if (!fake)
                                  return;
-                             // Decided on the GUI thread, where the playback state can be read
-                             // safely - and where it means something. autoaudiosink also swaps
-                             // its fake sink in while the pipeline is torn down at the end of a
-                             // track, which raised the banner every time a track finished. It is
-                             // only a real failure if we still believe we are playing.
+                             // A fake element appearing is a question, not an answer.
+                             // autoaudiosink re-probes whenever the bin is restarted - which
+                             // happens on every track change, not only at teardown - and a fake
+                             // sink is what it holds in the meantime. Asking immediately
+                             // therefore raised the banner on each track change even though the
+                             // real device opened a moment later. Ask again once it settles.
                              QMetaObject::invokeMethod(
-                                 self, [self]() {
-                                     if (self->m_state != Playing && self->m_state != Buffering)
-                                         return;
-                                     qWarning("audio: no real output device could be opened - "
-                                              "autoaudiosink fell back to a fake sink, so there "
-                                              "will be no sound");
-                                     emit self->errorOccurred(
-                                         tr("No audio output could be opened, so there is no "
-                                            "sound. Check the system's sound settings."));
-                                 }, Qt::QueuedConnection);
+                                 self, [self]() { self->m_sinkCheckTimer.start(); },
+                                 Qt::QueuedConnection);
                          }), this);
     }
 

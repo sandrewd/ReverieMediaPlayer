@@ -213,6 +213,11 @@ signals:
     void errorOccurred(const QString &message);
 
 private:
+    // True only when the sink bin currently holds nothing but a fake sink - i.e. autoaudiosink
+    // looked for a device, found none, and settled on silence.
+    bool audioSinkIsFake() const;
+    void verifyAudioSink();
+
     void buildPipeline();
     void buildVideoSink();
     void pollBus();
@@ -279,6 +284,12 @@ private:
     std::unique_ptr<AudioRingBuffer> m_ring;
     QTimer m_busTimer;
     QTimer m_positionTimer;
+    // autoaudiosink swaps a fake sink in and out while it re-probes, which happens on every
+    // track change as well as at teardown. The verdict is therefore taken on a delay, once it
+    // has settled, rather than the moment a fake element appears.
+    QTimer m_sinkCheckTimer;
+    GstElement *m_audioSink = nullptr;
+    bool m_reportedFakeSink = false;
 
     State m_state = Stopped;
     qint64 m_position = 0;
