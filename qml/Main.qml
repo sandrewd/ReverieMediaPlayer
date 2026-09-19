@@ -565,6 +565,28 @@ ApplicationWindow {
                     }
                 }
 
+                // With visualisations switched off the stage would otherwise be a flat colour,
+                // which reads as something failing rather than as a setting being honoured. The
+                // mark says the application is fine and this is deliberate.
+                //
+                // Deliberately still: no fade, no pulse, no animation of any kind. Someone who
+                // turned visualisations off did so to stop things moving, and giving them a
+                // breathing logo instead would miss the point entirely.
+                //
+                // It defers to the empty-playlist block below, which already shows the mark
+                // along with its prompt; two marks on one stage would be one too many.
+                ReverieMark {
+                    anchors.centerIn: parent
+                    width: 96
+                    height: 96
+                    visible: !AudioEngine.hasVideo
+                             && !SystemTheme.visualisationsEnabled
+                             && PlaylistModel.count > 0
+                    // Quiet rather than absent. The mark is never recoloured (it is identity,
+                    // not decoration), so this dims it without touching the artwork.
+                    opacity: 0.38
+                }
+
                 ColumnLayout {
                     anchors.centerIn: parent
                     visible: PlaylistModel.count === 0
