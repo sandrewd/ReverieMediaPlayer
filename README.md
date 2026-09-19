@@ -203,9 +203,13 @@ Reverie is usable and in active development. Known gaps, stated plainly:
 - **On Wayland, double-clicking the title bar may not maximise the window** — with the Debian
   package, which builds against Qt 6.4. GNOME does not implement the xdg-decoration protocol, so
   Qt draws its own title bar, and 6.4's decoration handles the buttons but not that gesture; the
-  maximise button beside it works normally. **The Flatpak is unaffected**, since it builds against
-  a much newer Qt. For the `.deb`, `QT_QPA_PLATFORM=xcb` uses XWayland and the window manager's
-  own decorations, where double-click behaves as expected.
+  maximise button beside it works normally. `QT_QPA_PLATFORM=xcb` uses XWayland and the window
+  manager's own decorations, where double-click behaves as expected.
+
+  The Flatpak appeared unaffected, but that was never established: it is granted both a Wayland
+  and an X11 socket and can run on either without saying which, so "it works in the Flatpak" and
+  "it works on Wayland" are different claims. Reverie now prints the backend it is using on
+  startup (`platform: wayland` or `platform: xcb`), which is the way to tell.
 - **The performance figures above assume software rendering.** On a machine with a working GPU
   everything is considerably faster than they suggest.
 
