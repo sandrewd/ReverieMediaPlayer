@@ -1,5 +1,7 @@
 #include "AppInfo.h"
 
+#include "Logging.h"
+
 #include <QtGlobal>
 
 #include <gst/gst.h>
@@ -60,4 +62,9 @@ QString AppInfo::taglibVersion() const
 {
     return QStringLiteral("%1.%2.%3").arg(TAGLIB_MAJOR_VERSION)
         .arg(TAGLIB_MINOR_VERSION).arg(TAGLIB_PATCH_VERSION);
+}
+
+void AppInfo::logLayout(const QString &what, int w, int h, qreal scale) const
+{
+    qCDebug(lcLayout, "%s %dx%d uiScale %.3f", qPrintable(what), w, h, scale);
 }

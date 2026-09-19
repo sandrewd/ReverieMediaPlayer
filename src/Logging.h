@@ -21,3 +21,6 @@ Q_DECLARE_LOGGING_CATEGORY(lcPreset)
 // machine once - but it is emitted on every track change as the sink re-probes, so it is not
 // the once-per-run line it first looked like.
 Q_DECLARE_LOGGING_CATEGORY(lcAudio)
+// Window and transport geometry, for chasing resize behaviour that only appears on somebody
+// else's compositor. Silent unless asked for: QT_LOGGING_RULES='reverie.layout.debug=true'
+Q_DECLARE_LOGGING_CATEGORY(lcLayout)

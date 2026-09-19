@@ -46,7 +46,14 @@ Rectangle {
     // a stated constraint of this project, and the mini player is the place someone is most
     // likely to be stabbing at a button without looking.
     readonly property int baseHeight: compact ? 78 : 88
-    property real uiScale: Math.max(0.75, Math.min(2.2, height / baseHeight))
+    // Pinned in compact, derived otherwise. The mini player sits at exactly its natural height,
+    // so there is nothing for a scale factor to do there - and deriving one anyway would turn
+    // any wobble in the window's height into a wobble in every control inside it, which is what
+    // a compositor negotiating a resize can produce. Nothing in this file feeds back into the
+    // window's height, so that could only ever be cosmetic, but a scale factor that cannot move
+    // cannot be part of an argument with the window manager either.
+    property real uiScale: compact ? 1.0
+                                   : Math.max(0.75, Math.min(2.2, height / baseHeight))
 
     color: overVideo ? "transparent" : Theme.surface
     implicitHeight: baseHeight

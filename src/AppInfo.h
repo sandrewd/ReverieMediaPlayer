@@ -24,6 +24,10 @@ class AppInfo : public QObject
     Q_PROPERTY(QString license READ license CONSTANT)
 
 public:
+    // One line per geometry change, for chasing resize behaviour that only shows up on someone
+    // else's compositor. Off unless QT_LOGGING_RULES asks for reverie.layout.debug.
+    Q_INVOKABLE void logLayout(const QString &what, int w, int h, qreal scale) const;
+
     explicit AppInfo(QObject *parent = nullptr) : QObject(parent) {}
 
     QString version() const;
