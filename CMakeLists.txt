@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(player VERSION 0.9.0 LANGUAGES CXX)
+project(player VERSION 0.9.1 LANGUAGES CXX)
 
 # Shown in About. Real since 2026-09-16; it was deliberately an obvious placeholder until the
 # project had a remote, because a plausible-looking URL that goes nowhere is worse than one that
