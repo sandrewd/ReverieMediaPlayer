@@ -9,3 +9,19 @@ assets/presets/
 # Local test media, never published.
 assets/test-audio/
 assets/test-video/
+
+# No media in the tree, wherever it lands. A file dropped in the project root to test with was
+# swept up by `git add -A` and published; the ignore rules only covered assets/test-audio.
+*.mp3
+*.m4a
+*.flac
+*.ogg
+*.opus
+*.wav
+*.aac
+*.wma
+*.mp4
+*.mkv
+*.webm
+*.avi
+*.mov
