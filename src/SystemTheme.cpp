@@ -6,6 +6,11 @@
 #include <QProcess>
 #include <QHash>
 #include <QStandardPaths>
+
+#ifdef Q_OS_LINUX
+#include <csignal>
+#include <sys/prctl.h>
+#endif
 #include <QDBusConnection>
 #include <QDBusError>
 #include <QDBusReply>
@@ -143,6 +148,23 @@ bool SystemTheme::haveExecutable(const QString &program)
 
 void SystemTheme::startMonitor()
 {
+    // Ask the kernel to signal these children when we die, instead of relying on the destructor.
+    //
+    // The destructor below does terminate them, and that is enough for an orderly shutdown - but
+    // no destructor runs when a process dies from a signal, and Qt installs no SIGTERM handler.
+    // So a session logout, a crash, or any kill left the monitors running, reparented to init,
+    // at about 6 MB each. Measured on the development machine: 241 of them, 1.4 GB, the oldest
+    // three days old - one per launch, never reclaimed. Reproduced on three different desktops.
+    //
+    // PR_SET_PDEATHSIG covers every one of those paths including SIGKILL, which nothing in user
+    // space can intercept. The modifier runs in the child between fork and exec, so it must be
+    // async-signal-safe; prctl is.
+#ifdef Q_OS_LINUX
+    const auto dieWithParent = []() { ::prctl(PR_SET_PDEATHSIG, SIGTERM); };
+    m_monitor.setChildProcessModifier(dieWithParent);
+    m_xfconfMonitor.setChildProcessModifier(dieWithParent);
+#endif
+
     // `gsettings monitor` prints a line per change and costs one idle process. If gsettings
     // is not present the process simply fails to start and the timer carries the load.
     connect(&m_monitor, &QProcess::readyReadStandardOutput, this, [this]() {
