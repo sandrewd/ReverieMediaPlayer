@@ -4,65 +4,65 @@
 # guarantees something that runs on a software renderer, and the median, which
 # is what the style actually looks like. Regenerate with tools/curate-presets.py.
 Dancer/Aurora/shifter - urchin mod.milk
-Dancer/Aurora/Jc - Crystal Shards.milk
+Dancer/Aurora/shifter - urchin kali mod.milk
 Dancer/Blobby/Waltra - Pair of Balls.milk
-Dancer/Blobby/suksma - burning men.milk
+Dancer/Blobby/LuxXx - active dark matter magma surface i.milk
 Dancer/Blobby Mirror/ORB - Radiation.milk
-Dancer/Blobby Mirror/LuxXx - kristy's beautiful balls ii.milk
+Dancer/Blobby Mirror/suksma - flaring squamoid mode placement nz.milk
 Dancer/Comet/EoS + Phat - chasers 09 sentinel.milk
 Dancer/Comet/Mig_036_version3.milk
 Dancer/Comet Mirror/EoS - ramus daemon.milk
-Dancer/Comet Mirror/EoS_Phat_PeterP_Sentinel_Aware_6 EoS edit C correction malalol mashup.milk
+Dancer/Comet Mirror/beta106S + Phat - sentinel linearity b nz+ stick shelves to their head.milk
 Dancer/Glowsticks/EoS - glowsticks v2 05 and proton lights (+Krash's beat code) _Phat_remix01.milk
-Dancer/Glowsticks/EoS - glowsticks v2 03 music shifter edit b (Stahl's Reactive RMX V2g feat flexi) - doubt.milk
+Dancer/Glowsticks/LuxXx - Godgrinders 3+.milk
 Dancer/Glowsticks Fast/211.milk
-Dancer/Glowsticks Fast/suksma - lexicographic wedge gen2.milk
+Dancer/Glowsticks Fast/Mig_004.milk
 Dancer/Glowsticks Mirror/EoS + Redi Jedi - frequency analysis + glowsticks -  glow - o - scope male (Milkdrop beta ver).milk
-Dancer/Glowsticks Mirror/263.milk
+Dancer/Glowsticks Mirror/229.milk
 Dancer/Hatches/suksma - biotoxins on strings - quantizied bacteria line alien bioluminescent intestine xfr.milk
-Dancer/Hatches/suksma - biotoxins on strings - papa smurf kingpin.milk
+Dancer/Hatches/suksma - biotoxins on strings - chrystalmouthze plumputate rodeo drive.milk
 Dancer/Hatches Mirror/suksma - biotoxins on strings - busy highway ignores.milk
-Dancer/Hatches Mirror/suksma - klimaxing as the burning barn collapses.milk
-Dancer/Infect/suksma - flexi 27goats digital-artorg - scathing review2 slobbering hot vessel cadavar G0N.milk
-Dancer/Infect/drugsincombat - liquidtrip grower rem ix.milk
+Dancer/Hatches Mirror/suksma - biotoxins on strings - thyghmaster oilstrip lifedecay.milk
+Dancer/Infect/amandio c - iterative - orbits 2 i am ingrate.milk
+Dancer/Infect/LuxXx - Pink C-chasers II.milk
 Dancer/Infect Mirror/fiShbRaiN - toffee cream and icing sugar.milk
-Dancer/Infect Mirror/Stahlregen & fiShbRaiN + Geiss + Optics - Alien Gods (Hue Shader Relief)_1.milk
+Dancer/Infect Mirror/LuxXx - Subtle HipHopFlake.milk
 Dancer/Jello Mirror/EVET - Circling Girlfreeze Julia 1.milk
 Dancer/Jello Mirror/EVET - Circling Meta-freeze 1.milk
 Dancer/Lasers/EoS + Phat - vacuum deification.milk
-Dancer/Lasers/suksma - tetraxectsual aeliaen kkuhltz --- Isosceles edit02.milk
+Dancer/Lasers/Flexi, suksma + Martin - the object of the game is also known as eristics and rabulistics.milk
 Dancer/Murky/mrt ei cynical engineers working for a backward system unite in circle jerk.milk
 Dancer/Murky/Martin - Diabolo.milk
 Dancer/Murky Mirror/martin - elusive impressions mix2 - flacc.milk
 Dancer/Murky Mirror/martin - elusive impressions mix2 - flacc mess roams.milk
 Dancer/Nexus Mirror/EoS - ascopic f.milk
-Dancer/Nexus Mirror/phat_IndoleCarbonRingsV5 EoS remix.milk
+Dancer/Nexus Mirror/EoS - ascopic h ethereum.milk
 Dancer/Orbit/EoS - glowsticks v2 04 music minimal - swim.milk
-Dancer/Orbit/EoS - glowsticks v2 04 music minimal - ghosts nz+7.milk
+Dancer/Orbit/EoS - glowsticks v2 04 music minimal - swim  - logitistic logostrum.milk
 Dancer/Orbit Mirror/shifter - glassworms skip_phat_edit.milk
 Dancer/Orbit Mirror/EoS - glowsticks v2 04 music minimal - ghosts nz+.milk
 Dancer/Petals/Hexcollie - one more Lotus plumage .milk
 Dancer/Petals/$$$ Royal - Mashup (220).milk
-Dancer/Serpent/Halfbreak + Cope + GreatWho - Mandalla Flow (triangular happy).milk
-Dancer/Serpent/suksma - foghorn leggo my edgart.milk
+Dancer/Serpent/suksma - flexi - lorenz chaser - heretical tribal necklace - lofted guts - 1-ret.milk
+Dancer/Serpent/shifter - bronchiole (EoS+Phat edit) tethered web nz+ industortionry.milk
 Dancer/Shapes/va ultramix2 - 310_1.milk
-Dancer/Shapes/suksma - hogs - dog one - m$2 nz+ bia sla.milk
+Dancer/Shapes/Stahlregen - Dots (Psychedelic Flower V2 - Corrupt) x Anomaly (Plastic).milk
 Dancer/Spinner/$$$ Royal - Mashup (181).milk
 Dancer/Spinner/$$$ Royal - Mashup (180).milk
 Dancer/Spinner Mirror/ORB - Solar Radiation.milk
-Dancer/Spinner Mirror/ORB - Solar Fire.milk
+Dancer/Spinner Mirror/$$$ Royal - Mashup (286).milk
 Dancer/Streamers/EoS - nematodes C.milk
 Dancer/Streamers/EoS - nematodes C xfr+.milk
 Dancer/Swarm/martin - sphery tales slow version.milk
 Dancer/Swarm/martin - sphery tales slow version nz.milk
 Dancer/Tree Branch/shifter - digi.milk
-Dancer/Tree Branch/shifter - dark tides bdrv mix.milk
+Dancer/Tree Branch/shifter - dark tides bdrv mix (BCCNJ4).milk
 Dancer/Wake/EoS - chasers.milk
-Dancer/Wake/Isosceles mashup14.milk
+Dancer/Wake/widest swing zero-sum.milk
 Dancer/Wake Mirror/EVET - chasers 29 Portal.milk
-Dancer/Wake Mirror/266.milk
+Dancer/Wake Mirror/417.milk
 Dancer/Whirl/ORB - Blowtorch chill.milk
-Dancer/Whirl/ORB - Smoke and Fire (Jelly).milk
+Dancer/Whirl/Stahlregen & Benski + Flexi + Geiss + ORB - Beacon of Fires (Hue Mix).milk
 Dancer/Whirl Mirror/ORB - Fire Poi.milk
 Dancer/Whirl Mirror/Liquid Glowsticks - ATwisted Pre Set Mix By AdamFX 2 martin - disco mix Ft Hexocollie 4.milk
 Dancer/Wire/EoS - more waveforms 7_phat_edit.milk
@@ -72,92 +72,85 @@ Drawing/Dunes/shifter + Flexi - liquid circuitry from the oblivion hive nz+.milk
 Drawing/Dunes Mirror/shifter + Flexi - liquid circuitry from the neon grafitti hive nz+ agony lovesickle` slobbre' croxle'.milk
 Drawing/Dunes Mirror/shifter + Flexi - liquid circuitry from the neon grafitti hive nz+ agony lovesickle` invalid swizzle zeta muffin correlate.milk
 Drawing/Explosions/EVET - Brainsplolz.milk
-Drawing/Explosions/mboanaphithe.milk
+Drawing/Explosions/suksma - coal drapes - mrt fsh behooval roam3- nz+ gene blanded qualquloiy.milk
 Drawing/Explosions Mirror/fiShbRaiN - witchcraft (metropolish remix) - test - tillex  - bob boyce' 'the cell', pulstar, singh grooves.milk
-Drawing/Explosions Mirror/suksma - flexi coheres vacuum energy - sound advice meow meow meow.milk
-Drawing/Feedback/suksma - satanic teleprompter - meds.milk
-Drawing/Feedback/suksma - coal drapes - mrt fsh smelter.milk
+Drawing/Explosions Mirror/gaping h nz+4.milk
+Drawing/Feedback/suksma - satanic teleprompter - tillexion - threx.milk
+Drawing/Feedback/suksma - phairess weale + mrt,flx - weakness of recollection fingre.milk
 Drawing/Fractal/Xpand, FiShbRraiN and suksma  - DRAFT Illusions (1-4)  .milk
 Drawing/Fractal/suksma - dreaming and dmt is the plant foreman observes and troubleshoots major employee and mechanical problems.milk
 Drawing/Fractal Mirror/ShadowHarlequin - Fitting Butterfly - v4 - [Loadus & Geiss - FractalDrop 22] v2v2v2v2newcolorsv2v2-22v2-NEWv222.milk
 Drawing/Fractal Mirror/suksma - fiShbRaiN - witchcraft (metropolish remix) - vieg.milk
-Drawing/Glimmer Mirror/Stahlregen & Flexi + Geiss + ORB - Spotted Blob_2 - usheriah colobot.milk
-Drawing/Glimmer Mirror/Serge + martin - crystal palace line011.milk
-Drawing/Growth/suksma - waxen shawls of ominknow - quail lewd --- Isosceles edit1.milk
-Drawing/Growth/shifter + Flexi - liquid circuitry from the neon grafitti hive nz+ agony lovesickle` 't'snotkgnoztck kids hit back hard.milk
+Drawing/Growth/Flexi - emergencey 2 --- Isosceles edit7a drawing.milk
+Drawing/Growth/amandio c - prime forms 2 nz+ adam kreighble' youtube user-allseeingeye93#p-u-1-Ew6_tqnPYoU 2.milk
 Drawing/Growth Mirror/fiShbRaiN - witchcraft (metropolish remix) - test - tillex  - wei kun.milk
-Drawing/Growth Mirror/suksma - flexi coheres vacuum energy - galaga (choke).milk
-Drawing/Lasers/suksma - probate judge spawn beast.milk
-Drawing/Lasers/suksma - if the booty ain't clappin', it ain't happ'nin'.milk
-Drawing/Liquid/suksma - satanic teleprompter - grease hog salad.milk
-Drawing/Liquid/suksma - flexi coheres vacuum energy - shf fab in miatas.milk
+Drawing/Growth Mirror/suksma - flexi coheres vacuum energy - brujchump - kunwei.milk
+Drawing/Lasers/suksma - government bail outs of greedy mortgage w.milk
+Drawing/Lasers/suksma - god, most comp shaders look pretty nice with this - pitkanen spher.milk
+Drawing/Liquid/Flexi, fishbrain, Geiss + Martin - tokamak witchery.milk
+Drawing/Liquid/suksma - ed geining hateops - doris' hell wheel.milk
 Drawing/Liquid Mirror/Pithlit - Psychotrip (Spinning colours mix) - orthorotate recursive helicities2.milk
-Drawing/Liquid Mirror/suksma - satanic teleprompter - tillexion - sth flx gun metal pink roam nz+.milk
+Drawing/Liquid Mirror/suksma - flexi coheres vacuum energy.milk
 Drawing/Maze/shell robot nz+ thoroughbred mint baseless.milk
 Drawing/Rorschach/repressed americans - more martin movement4 - bizzare japanese electrogasm yummy bubble gum m.milk
-Drawing/Rorschach/do not fear me, but eat me braqre briq awakened to infinite disappointment my believers follow me to a land.milk
 Drawing/Rorschach Mirror/Hexcollie - Julian Shader Wars3 - spug ett.milk
 Drawing/Rorschach Mirror/Hexcollie - Julian Shader Wars3 - spug ett nz+ validating phantoms.milk
 Drawing/Trails/fiShbRaiN - witchcraft (DMT remix).milk
-Drawing/Trails/Tripgnosis - Astral Calculations 5.milk
+Drawing/Trails/loading doctor.milk
 Drawing/Trails Mirror/fiShbRaiN - witchcraft (necromancer remix) - busy.milk
-Drawing/Trails Mirror/414 bowel rebranding pr skinned to the teeth loadus.milk
-Drawing/Viscera/red and white2 blowhorde ws2 imbplausible undeniabowel.milk
-Drawing/Viscera/suksma - coal drapes - mrt fsh it wasn't enough that i was your slave, now you want my pacemaker.milk
+Drawing/Trails Mirror/suksma - twist fiber wrap cut circulation.milk
 Drawing/Whirlpools/suksma - fiShbRaiN - witchcraft (phugly shame on remix) - darning kneedless - satanopize.milk
 Drawing/Whirlpools/suksma - fiShbRaiN - witchcraft (phugly shame on remix) - darning kneedless - satanopize roam3 nz+.milk
 Drawing/Whirlpools Mirror/Stahlregen & Flexi + Geiss + ORB - Spotted Blob_2 - usheriah colobot - should-scape.milk
 Drawing/Whirlpools Mirror/gaping h nz+3.milk
 Fractal/Blobby/va ultramix2 - 71_1.milk
-Fractal/Blobby/cleave and cleave to thine w administrator access to unreality.milk
+Fractal/Blobby/va ultramix2 - 28.milk
 Fractal/Core/beta106i - Airhandler (Last Breath - Clam).milk
-Fractal/Core/suksma - international political bargaining chips --- Isosceles edit.milk
+Fractal/Core/suksma - this pain was saved for you - maggot filigree --- Isosceles edit.milk
 Fractal/Core Mirror/va ultramix2 - 323.milk
-Fractal/Core Mirror/EVET - Tri-Eye.milk
+Fractal/Core Mirror/AdamFX 2 Geiss - Mash-Up - Angelic  Staine Glass Chapters 3_1.milk
 Fractal/Core Tunnel/suksma - Hexcollie - Julian Carnival - reuptake inhibition.milk
-Fractal/Core Tunnel/A Tribute to Martin - bombyx mori - Ft Flexi - AdamFX - StahlRegen - Krash - Rovastar -  Hd in Milk U.milk
+Fractal/Core Tunnel/suksma - nothing to remember you by - inv.milk
 Fractal/Horizon Mirror/FX New Trendz - Anandamide - Hd In Milk City Ft AdamFX - Martin n Flexi A.milk
-Fractal/Horizon Mirror/suksma - my health fades and the universe laughs.milk
+Fractal/Horizon Mirror/AdamFX Edit 2 martin - disco mix Ft Hexocollie Remixed Again.milk
 Fractal/Lattice/Pithlit - Golden Rays.milk
-Fractal/Lattice/EoS - skylight a1 [music warp switch].milk
+Fractal/Lattice/beta106S - Phat - randombox - mantra 4.milk
 Fractal/Lattice Mirror/Rovastar & StudioMusic - Spider In the Mind --- Isosceles edit2.milk
-Fractal/Lattice Mirror/Hexcollie, Flexi, Bdrv, Telec n Aderrasi - Hypnoscope.milk
+Fractal/Lattice Mirror/Hexcollie - Personal Mashup5.milk
 Fractal/Loops/phat_RippleNebula99h-EoS mod_mod6.milk
-Fractal/Loops/Halfbreak + Martin - Holo-Generic.milk
+Fractal/Loops/Shifter & EoS+Phat - Fractical dancer (shattered mind).milk
 Fractal/Mandelbox/martin - X Portal.milk
 Fractal/Mandelbox/martin - mandelbox explorer v1 nz+laser dome.milk
 Fractal/Nested Circle/Stahlregen - Spiral (Oh god my eyes, it burns!).milk
-Fractal/Nested Circle/Stahlregen - Spiral (Hundertwasser of the Future).milk
+Fractal/Nested Circle/Hexcollie - Personal Mashup3 [Flexi's portal mix].milk
 Fractal/Nested Dancer/Chemlock - Lily Hallucinogen (Geiss - Feedback).milk
-Fractal/Nested Dancer/Stahlregen & Bmelgren + Geiss + Krash + PieturP + TEcHno + Zylot - MashUp 4.milk
+Fractal/Nested Dancer/EoS + Phat - recursion frustum 02_Ananda_Flash_Remix zion G seizure 5 fractal e.milk
 Fractal/Nested Ellipse/shifter - bronchiole (EoS+Phat edit) tethered.milk
-Fractal/Nested Ellipse/suksma - aaron funcking god and his mod file savvy2.milk
+Fractal/Nested Ellipse/suksma - no, i don't know what the hell it is, but i'm eating it for mind lunch - + demonlard - axed me to say some mc rhymes.milk
 Fractal/Nested Hexagon/EoS + Phat - chasers 14 sentinel 617_beta5_v2_Flowering --- Isosceles edit.milk
 Fractal/Nested Hexagon/Stahlregen + martin - Spiral Beats (Happy Octopus).milk
 Fractal/Nested Pyramid/Rovastar & Krash - Hallucinogenic Pyramids (Extra Beat Time Mix).milk
-Fractal/Nested Pyramid/Rarian Rakista - Pyraid Power 2.milk
+Fractal/Nested Pyramid/shifter - liquidity --- Isosceles edit.milk
 Fractal/Nested Spiral/Stahlregen - Spiral Beats (Bigger)_2.milk
-Fractal/Nested Spiral/Hexcollie, Krash, Inventive software, Geiss n Pithlit - Hate me but love the jelly spiral.milk
+Fractal/Nested Spiral/Flexi - ianus portal.milk
 Fractal/Nested Spiral Multiple/EoS+Phat - I_v2 gradients.milk
 Fractal/Nested Spiral Multiple/flexi + geiss - bipolar vs reaction diffusion [mirror scoped] (+phat's reflecto).milk
 Fractal/Nested Square/Hexcollie - Ultra blackhole sun.milk
-Fractal/Nested Square/ORB - Big Colourfull Bang.milk
+Fractal/Nested Square/NeW ADAM MASTER MASHUPFX 2 REMIX 2 EoS and PieturP + Flexi FSaa Full Tilt+Telek ft Cubes Again.milk
 Fractal/Nested Triangle/amandio c - future engines.milk
-Fractal/Nested Triangle/bdrv + al shifter - phasm mx.milk
+Fractal/Nested Triangle/NiGHtHawK - Eye of Gawd_Phat_Spiral_edit.milk
 Fractal/Pointy/Pinbi7&fvese-hypnoticflower.milk
-Fractal/Pointy/Bdrv Aderrasi - Contortion Sphere bdrv etAL - tipsy flucksea.milk
+Fractal/Pointy/Bdrv Aderrasi - Inhuman Emotion bw5.milk
 Fractal/Radial/fed + Rovastar + Unchained - Voodoo Chess Magnet (mashup Mix).milk
-Fractal/Radial/NeW Adam Master Mashup FX 2 Geiss - Reaction Diffusion 34 + Swelling Spiral  + Liquid Fire  + Geiss and3.milk
+Fractal/Radial/suksma - Fvese - MV Fun 3 - completely juiced by presses - deft leper.milk
 Fractal/Shine/Shifter-yak(yetanotherkaleidoscope)01.milk
 Fractal/Shine/Shifter-yak(yetanotherkaleidoscope)02.milk
 Fractal/Sierpinski/amandio c - IFS 01.milk
-Fractal/Sierpinski/Flexi - explore space not drugs - like there's a fucking difference.milk
+Fractal/Sierpinski/Flexi - wolfram's rule 90 [rise of the log attack].milk
 Fractal/Trees/Stahlregen & Boz + EoS + Phat + Rovastar + Zylot - Machine Code (01010010 01000001 01010111)_2.milk
 Fractal/Trees/TonyMilkdrop - Go To Heaven --- Isosceles edit.milk
 Fractal/Wave Interference/amandio c - interference pattern 2.milk
 Fractal/Wave Interference/amandio c - interference pattern 5.milk
-Fractal/Wings/cope - soar (v2-0).milk
-Fractal/Wings/cope - soar (v2-0) - who-r.milk
 Fractal/Womb/amandio c - new life b.milk
 Fractal/Womb/amandio c - new life.milk
 Geometric/Cathedral/Martin - underwater cathedral(1).milk
@@ -167,7 +160,7 @@ Geometric/Circles Nested/amandio c - ecllipse 2.milk
 Geometric/City/martin - city lights v2(1).milk
 Geometric/City/martin - city lights.milk
 Geometric/Cube/shifter - tumbling cubes (ripples) EoS remix1.milk
-Geometric/Cube/suksma - plagues or isms.milk
+Geometric/Cube/amandio c - dynacube (shifter wave) - flx.milk
 Geometric/Cube Array/amandio c - living boxes 2.milk
 Geometric/Cube Array/amandio c - living boxes 6.milk
 Geometric/Cube Fly/EVET + Esotic & Krash - Rolly Poly.milk
@@ -179,190 +172,186 @@ Geometric/Honeycomb/yin - 365 - Organic circuits (functioning).milk
 Geometric/Honeycomb/suksma - yin - 360 - Organic circuits - each elongated verticle split of my body twists.milk
 Geometric/Landscape/martin - on silent paths.milk
 Geometric/Landscape/martin - on silent paths roam3-.milk
-Geometric/Monster/martin + flexi - attack of the beast [alien composite].milk
-Geometric/Monster/martin - attack of the beast [flexi's plasma + glass lens mix].milk
 Geometric/Pyramids/amandio c - embrace 07.milk
 Geometric/Pyramids/amandio c - embrace 08 hog rot nz+.milk
 Geometric/Snowflakes/shifter - blueshift (slush).milk
-Geometric/Snowflakes/shifter - blueshift_1 - death shit.milk
 Geometric/Sphere Array/amandio c - odd twins.milk
-Geometric/Sphere Array/midezel.milk
+Geometric/Sphere Array/amandio c - typhoon season (inside) - fuckingdelic.milk
 Geometric/Sphere Particles/EoS+ Phat - magnetosphere 13 - pulsar.milk
 Geometric/Sphere Particles/ORB - Supernova Meltdown.milk
 Geometric/Sphere Wild/suksma - gee zeus ov gaellilee.milk
-Geometric/Sphere Wild/Zylot - True Visionary (Final Mix) false auralary nz+ faster puppy mbarjurinalicst.milk
+Geometric/Sphere Wild/Zylot - True Visionary (Final Mix) false auralary nz+ k your boss.milk
 Geometric/Spiral Bounce/amandio c - iterative - tendrils.milk
 Geometric/Spiral Bounce/amandio c - the green machine 4 - radial nature sludge ngastraiq tendwrill miraqle pig diaptre.milk
 Geometric/Squares/suksma - pus on my cat - energy drink.milk
 Geometric/Squares/suksma - pus on my cat - to droolon myself.milk
 Geometric/Squares Glass/Goody - Ego Decontructor.milk
-Geometric/Squares Glass/Redi Jedi - Damn that shape_Phat_spaz_edit gdy neck problem solution (tense for hours).milk
+Geometric/Squares Glass/fed _ [WHO] - chasers in the sky3 [slipped] fingre.milk
 Geometric/Stripes/Dbleja - Horizontology (Blue Mix).milk
 Geometric/Stripes/$$$ Royal - Mashup (520).milk
 Geometric/Stripes Circle/BDRV Aderrasi - Potion of Resurrection BDRV et  AL  rmx2 [flexis quasi-psychose mix].milk
-Geometric/Stripes Circle/suksma - inverting your soul until you are quivering spirit meat.milk
+Geometric/Stripes Circle/fed's stroboscopix.milk
 Geometric/Stripes Dance/Martin - beamer code 06h.milk
 Geometric/Stripes Dance/Martin - beamer code 09h.milk
 Geometric/Stripes Liquid/amandio c - fume (NV).milk
 Geometric/Stripes Liquid/amandio c - fume.milk
 Geometric/Symbols/amandio c - codex 4 - plot wag nz+ necrophors gadget lard.milk
-Geometric/Symbols/amandio c - codex 4 - cabasal dandelioness nz+wp3.milk
+Geometric/Symbols/amandio c - codex 4 - cabasal dandelioness nz+wp2.milk
 Geometric/Triangles Solo/suksma - mundane side of eden.milk
-Geometric/Triangles Solo/suksma - jerry kludging the dimswitch.milk
+Geometric/Triangles Solo/RetroTrilogy(Final).milk
 Geometric/Tunnel Fans/amandio c - feeling well 5.milk
 Geometric/Tunnel Fans/amandio c - feeling well 3.milk
 Geometric/Tunnel Morph/fishbrain and flexi - box of tricks 14 polar borders [logarithmic inverse] --- Isosceles edit.milk
 Geometric/Tunnel Morph/fishbrain and flexi - box of tricks 15 polar borders [logarithmic inverse][iterative definition] --- Isosceles edit.milk
 Geometric/Tunnel Spheres/martin - hardcore mix 1.milk
-Geometric/Tunnel Spheres/Martin - journey into space.milk
+Geometric/Tunnel Spheres/martin - hardcore mix 1 [meta mash].milk
 Geometric/Wire Circles/EoS - sarc f.milk
-Geometric/Wire Circles/Hexcollie - Hedgehog dreams3.milk
+Geometric/Wire Circles/EoS + Geiss - sarc c_Phats Zoom Mix Reflecto.milk
 Geometric/Wire Cube Trace/EoS - cubetrace demon_Phat_edit.milk
 Geometric/Wire Cube Trace/suksma - diploautomatic autoimmunity vs passivematic aggpressive - antlantis, saturn.milk
 Geometric/Wire Flower/EoS planetfunk-09 - tracers D.milk
-Geometric/Wire Flower/EVET - Fractronica.milk
+Geometric/Wire Flower/phat + EoS - single cel angel birthpoints.milk
 Geometric/Wire Grid/EoS - matrix cube C.milk
-Geometric/Wire Grid/suksma - green lantern destroys your hot pocket.milk
+Geometric/Wire Grid/suksma - yin - 100 - Through the ether - Bitcore Tweak - mash0000 - dmt eye rub spher.milk
 Geometric/Wire Morph/EVET - Superstrings 2.milk
-Geometric/Wire Morph/shifter - lazerspecs_phat_edit.milk
+Geometric/Wire Morph/amandio c - iterative - squares 2.milk
 Geometric/Wire Orbits/Krash & yin - Electric universe (nuclear secrets) (Phat_nuleus_mix).milk
 Geometric/Wire Orbits/Krash & yin + Phat - Electric universe (uncertainty principle)_remix.milk
 Geometric/Wire Parallel/Zylot and idiot - Force Feild Generator v2-0.milk
 Geometric/Wire Parallel/beta106i - Quantum Variants (Mystery).milk
 Geometric/Wire Sphere/EoS - magnetosphere 05.milk
-Geometric/Wire Sphere/EoS - magnetosphere 03.milk
+Geometric/Wire Sphere/EoS - magnetosphere 04.milk
 Geometric/Wire Spiral/Zylot - Spiral (Hypnotic)_Phat_Fourish_Spiral_Mix_Beta6 EoS warp edit 3_Grapix_mix.milk
-Geometric/Wire Spiral/suksma - exploit, with me, the fishies - consignment.milk
+Geometric/Wire Spiral/suksma - exploit, with me, the fishies - spell it r o h l a e d z.milk
 Geometric/Wire Spiral Flower/shifter - sinkhole web.milk
 Geometric/Wire Spiral Flower/Stahlregen - funky Blur (lotus mix) thee brutal my ice cream cone.milk
 Geometric/Wire Torus/EoS - heater core C_Phat's_class_mix.milk
 Geometric/Wire Torus/EoS - heater core C_on route.milk
 Geometric/Wire Trace/EoS + Phat - CAT Scan.milk
-Geometric/Wire Trace/327.milk
+Geometric/Wire Trace/Waltra - Precious Painting.milk
 Geometric/Wire Trace Mirror/LuxXx - Universe Garbage Disposal 3a.milk
 Geometric/Wire Trace Mirror/Stahlregen & aderrasi + martin + rocke + rovastar - Charmed Spun Sugar.milk
-Hypnotic/Illusion/New Creation Sensation -  AdamFx,Flexi,Amandio c n Martin - Star to Another World ft Hexocollie,ShadowH,Geiss n Fishbrain A.milk
 Hypnotic/Illusion Radiate/channelizing emotions you're not able to show your family and nearest friends.milk
-Hypnotic/Illusion Radiate/accruing simon genitoll boothf.milk
-Hypnotic/Polar Closeup/shifter - liquid circuitry - model without work.milk
-Hypnotic/Polar Closeup/goody + flexi - emotive dissonance - integral anomaly - dissonant rift2 roam.milk
-Hypnotic/Polar Mirror/Reenen & Telek - Slow Shift Matrix (bb4-5 (Dynamic Beat) Mix [Flexi Nonlinear Moebius Spiral Kaleidoscope].milk
-Hypnotic/Polar Mirror/GreatWho + Flexi - Lasershow [bipolar showoff party].milk
+Hypnotic/Illusion Radiate/MegalomaGreg - Ambitions [Flexi's mix 33 highest grade pixel fucker] [remix 02 and call back your hexcollie].milk
+Hypnotic/Polar Closeup/goody + flexi - emotive dissonance - integral anomaly - dissonant rift.milk
+Hypnotic/Polar Closeup/Goody + flexi - Data Crusher.milk
+Hypnotic/Polar Mirror/martin + flexi - carpet weaver bipolar 01.milk
+Hypnotic/Polar Mirror/GreatWho + Flexi - Lasershow [bipolar stranger party].milk
 Hypnotic/Polar Rolling/suksma - to eat a lover, you must keep it.milk
-Hypnotic/Polar Rolling/HDFX with Flexi - AdamFX n Martin - Bubble Gum in our Mindz Ft Aramandio E.milk
+Hypnotic/Polar Rolling/HDFX with Flexi - AdamFX n Martin - Bubble Gum in our Mindz Ft Aramandio F.milk
 Hypnotic/Polar Static/TonyMilkdrop - Rhythm Of My Life [Flexi - alien complex] --- Isosceles edit.milk
 Hypnotic/Polar Static/TonyMilkdrop - Nuclear [Flexi - help out + multiverse].milk
 Hypnotic/Polar Warp/martin + flexi - lock and release bipolar 01.milk
 Hypnotic/Polar Warp/flexi - grind my glitch up [192].milk
 Hypnotic/Radial Warp/suksma - dinner - ratios that make you feel hopeless - flx spr col.milk
-Hypnotic/Radial Warp/suksma - never degweh - flx spr col.milk
+Hypnotic/Radial Warp/suksma - dinner - ratios that make you feel hopeless - flx spr col(1).milk
 Particles/Blobby/bdrv + al EoS - more waveforms 5 mx.milk
-Particles/Blobby/only glimpses of the reality you once knew - short acting hallucinogens.milk
+Particles/Blobby/$$$ Royal - Mashup (372).milk
 Particles/Crystal/shifter - plasmic.milk
 Particles/Crystal/shifter - plasmic fact - witholding, with-a holding, widdaholting - hollandinate.milk
 Particles/Grid/Ondras - Radar.milk
-Particles/Grid/3dRaGoNs & Rovastar - StarGate rEmIx (Jelly).milk
+Particles/Grid/Stahlregen & flexi + Geiss + Rovastar - Tides (Blur-Spark Motion RMX)_1.milk
 Particles/Orbit/suksma - farming equipment - ice shower.milk
-Particles/Orbit/skipper skipper kiss me hard - tripgnosis, circumlocute with me.milk
+Particles/Orbit/skipper skipper kiss me hard - thank god for martin nitorami - there is no free will, there is no cause, there is no effect.milk
 Particles/Points/fiShbRaiN - swarm (3d).milk
-Particles/Points/shifter - fuzzball (implosion) (Jelly).milk
+Particles/Points/Geiss - Artifact 6 --- Isosceles edit.milk
 Particles/Points Fast/Stahlregen - Hyperspace Rainbow.milk
-Particles/Points Fast/suksma - flukerication machinist.milk
+Particles/Points Fast/suksma - actually i didn't eat last night.milk
 Particles/Points Trails/Blastofftek - Plasma Revisited.milk
-Particles/Points Trails/fed's explode.milk
+Particles/Points Trails/EVET - Firefly Dances.milk
 Particles/Spaz/Martin - Pixies Party (Hakan mash-up) 6-1.milk
-Particles/Spaz/martin - witchcraft reloaded.milk
+Particles/Spaz/Martin - Pixies Party (Hakan mash-up) 6-13.milk
 Particles/Swarm/yin - 315 - Ocean of Light (moreacidplz EoS-Phat).milk
 Particles/Swarm/xtramartin (207).milk
 Reaction/Automata/suksma - plowed into the side of a world of human wreckage (buried in hate shadows).milk
-Reaction/Automata/if it's good enough for me to save, it's dead enough for you to re-m flx roams my sudden non-use of dashes.milk
+Reaction/Automata/flexi - bouncing balls [mindblob terraforming] flx roams domikleasing undergraeduhate.milk
 Reaction/Cloudy/suksma - passive probabilistic roaming coin gods.milk
-Reaction/Cloudy/BADAZJust a TwistFX - Martin - Foggy Notation - Ft AdamFX n Eos - Ufoz in the Fog .milk
+Reaction/Cloudy/Halfbreak - Noise-volume Negative.milk
 Reaction/Contagion/flexi - quantum processing.milk
-Reaction/Contagion/Flexi - emergencey 2 --- Isosceles edit6b warp invert.milk
+Reaction/Contagion/Flexi - emergencey 2 --- Isosceles edit3e sparse.milk
 Reaction/Crystalize/flexi - particle fountain - ointment bacon tableau.milk
 Reaction/Crystalize/suksma - but we're all repeating ourselves.milk
 Reaction/Dunes/shifter + Flexi - liquid circuitry from the other kids toys hive.milk
-Reaction/Dunes/shifter + Flexi - liquid circuitry from the pataoblivion hive encrusted nepitasm nz.milk
-Reaction/Feedback/suksma - shiny-bladed homicide machine at dusk - occult calendar time lapse slice.milk
+Reaction/Dunes/shifter + Flexi - liquid circuitry from the zeropoint derivation hive nz+ grackiopole bucksaw n777 --- Isosceles edit.milk
+Reaction/Feedback/EVET - Jestergate.milk
 Reaction/Feedback/Flexi - splatter effects 12 predator prey warp field 6.milk
 Reaction/Growth/suksma - obviation balms.milk
-Reaction/Growth/Stahlregen & Geiss + ORB - Etheral Waves (MashUp 20 - All-Spark RMX) sensual moral beavers.milk
+Reaction/Growth/Shiroijin - Unicorn Hell, Warp 9 Mr Crusher!!!.milk
 Reaction/Liquid Blobby/BrainStain-fish on.milk
-Reaction/Liquid Blobby/various - whirygig03 - flx rigidigeridoolittle' - reconsidering life in terms of loving how bizarre it is - 1-ret.milk
+Reaction/Liquid Blobby/shifter - crosshatch colony beta6 - ye olde rotgasm.milk
 Reaction/Liquid Closeup/shifter - phasm wraith.milk
-Reaction/Liquid Closeup/shifter - whiteopal glimmer - flx insane psychlopaein formations.milk
+Reaction/Liquid Closeup/suksma - and the foist shall be the bast, poison brick.milk
 Reaction/Liquid Gradient/beta106i - Antidote (Sugar Flood).milk
-Reaction/Liquid Gradient/Rovastar - Oozing Resistance.milk
+Reaction/Liquid Gradient/beta106i - Airhandler (Last Breath - Demon Evolution).milk
 Reaction/Liquid Ripples/Telek EMPR - Scanner - Trust me I've got a Melways --- Isosceles edit1.milk
-Reaction/Liquid Ripples/flexi, geiss, shifter + stahlregen - fusion reactor [space gelatin mix].milk
+Reaction/Liquid Ripples/EVET + Flexi - Lovecraft's Key.milk
 Reaction/Liquid Simmering/shifter - crosshatch colony beta6.milk
-Reaction/Liquid Simmering/suksma - Phat_TanSpiral + random shaders.milk
+Reaction/Liquid Simmering/Stahlregen & Flexi + Geiss + ORB - Spotted Blob (Jelly).milk
 Reaction/Liquid Windy/Krash - interwoven (nightmare weft)_Phats_Maybe_Ill_Go_To_A_Party - mash0000 - pantry needs sweeping, cracker.milk
 Reaction/Liquid Windy/suksma - dick cheney brand ass wipe --- Isosceles edit.milk
 Reaction/Maze/suksma - why not k it all.milk
 Reaction/Maze/grid wars.milk
-Reaction/Mountains/Cope - Cartune (extrusion machine) [fixed].milk
-Reaction/Mountains/MilkArtist Geiss n AdamFX Remake 2 cope - the drain to heaven (in the Center of the Earth) MartinFXInfusion.milk
+Reaction/Mountains/Cope - The Cloud WIP 3 --- Isosceles edit.milk
+Reaction/Mountains/cope - the drain to heaven (Hyperswirl Mix).milk
 Reaction/Rorschach/Halfbreak - Last in Nebula.milk
-Reaction/Rorschach/Mashup ADAMFX 2 Flexi + Geiss - Bipolar vs reaction diffusion + Another Flexi + Fishbrain  + Flexi And ADAMFX 10.milk
+Reaction/Rorschach/BEST OF ADAMFX 2 Flexi + Geiss - Bipolar vs reaction diffusion + Another Flexi + Fishbrain  + Phat Zylot5.milk
 Reaction/Viscera/EVET - Turbohole.milk
 Reaction/Viscera/sone' ovaembiasche' instantaneousle' cliche' novelte' nz+.milk
 Reaction/Whirlpools/Idiot24-7-gohtsthirdeye.milk
-Reaction/Whirlpools/flexi, geiss + stahlregen - tokamak jelly infusion.milk
+Reaction/Whirlpools/Phat_EoS - our own personal demon - bdr_ Ireallydon'tknowwhatIwant - flx mgr turbine lurk roam3.milk
 Reaction/Windy/Goody - Shader Experiment#3-3 (Growth effect) (PS2-0).milk
-Reaction/Windy/you are now leaving the materialistic sector - chloral reef, er.milk
+Reaction/Windy/goody + geiss  - i'm sorry can't get it up but these damn hallucinations keep distracting me.milk
 Sparkle/Explosions/Compelling Vision.milk
-Sparkle/Explosions/suksma - bugs.milk
+Sparkle/Explosions/suksma - water cooled red uranium vs dotes - here, have a hoho - flacc+ - grey budget (never ending babes).milk
 Sparkle/Glimmer/64.milk
-Sparkle/Glimmer/384.milk
+Sparkle/Glimmer/LuxXx - Bombing the City I.milk
 Sparkle/Glimmer Mirror/430.milk
-Sparkle/Glimmer Mirror/432.milk
+Sparkle/Glimmer Mirror/EoS - sectorLoc B_phat_ugly remix 01 EoS7p nz+ crab lardvae.milk
 Sparkle/Glimmer Tunnel/xtramartin (844).milk
-Sparkle/Glimmer Tunnel/$$$ Royal - Mashup (461).milk
+Sparkle/Glimmer Tunnel/12.milk
 Sparkle/Jewel/Serge circles007b.milk
-Sparkle/Jewel/$$$ Royal - Mashup (151).milk
+Sparkle/Jewel/goody + martin - crystal palace - schizotoxin - the wild iris bloom - 16 iterations.milk
 Sparkle/Mass Circles/suksma - dotes hostile undertake - geiss painterly only looks great.milk
-Sparkle/Mass Circles/suksma - dotes hostile undertake - more raisins.milk
+Sparkle/Mass Circles/suksma - dotes hostile undertake - fretting and pouting about one nookieless evening.milk
 Sparkle/Mass Squares/Stahlregen - Dots (Pixels).milk
-Sparkle/Mass Squares/LuxXx - A Sober Life (wasted).milk
+Sparkle/Mass Squares/suksma - dotes hostile undertake - antiborg.milk
 Sparkle/Mass Stars/phat + EoS - Bass_responce_Red_Movements_Disorienting nebula2.milk
-Sparkle/Mass Stars/suksma - ed geining hateops - Matrimonial Nitre Fix.milk
-Sparkle/Mass Triangles/suksma - 3125 bad attempts2 - drive you to the liquor store and you dis soundgarden - canary dissector.milk
+Sparkle/Mass Stars/suksma - ed geining hateops - Informal Martini Exit.milk
+Sparkle/Mass Triangles/suksma - dinner - stalk the stalker with satanic telepathy - flx dth - flacc.milk
 Sparkle/Mass Triangles/suksma - dinner - stalk the stalker with satanic telepathy - j4+.milk
 Sparkle/Squares/suksma - barium titanate --- Isosceles edit16.milk
-Sparkle/Squares/suksma - barium titanate --- Isosceles edit07.milk
+Sparkle/Squares/suksma - barium titanate --- Isosceles edit15.milk
 Supernova/Burst/fiShbRaiN - betelguese.milk
-Supernova/Burst/suksma - absolute loon coming your way.milk
+Supernova/Burst/Tripgnosis - Kaleidestrobe 2.milk
 Supernova/Gas/Pithlit - Nova(Rainbow mix).milk
 Supernova/Gas/Tripgnosis - FlameOrb nz+.milk
 Supernova/Lasers/ORB - Fire and Fumes 2.milk
-Supernova/Lasers/$$$ Royal - Mashup (83).milk
+Supernova/Lasers/$$$ Royal - Mashup (85).milk
 Supernova/Orbits/yin - 252 - Artificial poles of the continuum (remix #2).milk
-Supernova/Orbits/EoS - Apocalypse C.milk
+Supernova/Orbits/EoS - Apocalypse B.milk
 Supernova/Radiate/Hexcollie n EoS - sunburst baboon.milk
-Supernova/Radiate/Benjam and Zylot - Tie-Dye Supernova - prophecies - save phaesse.milk
+Supernova/Radiate/Zylot - Sound Blossom.milk
 Supernova/Shimmer/EoS - starburst 05 phasing.milk
 Supernova/Shimmer/EoS - starburst 07 tracing points.milk
 Supernova/Stars/138.milk
-Supernova/Stars/suksma - aenomolys throaet suggaest.milk
+Supernova/Stars/PieturP - HSL-tunnelvisions_morphing - mash0000 - solidity in discontinuity vs quantum instability.milk
 Waveform/Spectrum/suksma - n19 3 layer overlap opt 3.milk
-Waveform/Spectrum/suksma - daryl feels my hellish lonliness - i agree in full awareness of my foolishness.milk
+Waveform/Spectrum/Stahlregen & Flexi + Geiss - Liquidity (Dynamic Swirls) - fsh mess - pinkerton.milk
 Waveform/Wire Circular/Goody's LSD Zoomtunnel (sharp).milk
-Waveform/Wire Circular/Waltra - Iris.milk
+Waveform/Wire Circular/Stahlregen & EoS + Geiss + Rovastar + Illusion + Krash + Rozzor - Cyclopean Shift_2.milk
 Waveform/Wire Flat/fiShbRaiN - one step beyond (alien remix).milk
-Waveform/Wire Flat/Illusion & Rovastar - Dotty Mad Space (Jelly).milk
+Waveform/Wire Flat/The NG + MindJourney - Unconstructed DreamSpace iPhowned.milk
 Waveform/Wire Flat Double/EoS - waveform 01.milk
-Waveform/Wire Flat Double/Rovastar - Virtual Horizons (Jelly V3).milk
+Waveform/Wire Flat Double/Serge + cope - the drain2.milk
 Waveform/Wire Flower/Rovastar + Unchained - Life After Pie (Remix).milk
 Waveform/Wire Flower/TonyMilkdrop - RGB.milk
 Waveform/Wire Mirror/EVET - Transfiguered Bliss 1.milk
-Waveform/Wire Mirror/suksma + rovastar eos phat rediJedi adamfx - the future of oreos.milk
+Waveform/Wire Mirror/Tripgnosis - Hypesurrealism nz+.milk
 Waveform/Wire Rising/beta106i - Arise! (Padded).milk
-Waveform/Wire Rising/Goody - Need - Transcendance remix.milk
+Waveform/Wire Rising/Goody - Need.milk
 Waveform/Wire Spirograph/shifter - catseye sexy sataniq fuqre.milk
-Waveform/Wire Spirograph/Fumbling_Foo & Flexi, Martin, Orb - Star Forge v14d.milk
+Waveform/Wire Spirograph/Fumbling_Foo & Flexi, Martin, Orb - Star Forge v10.milk
 Waveform/Wire Tangle/Rovastar & Rocke - Sugar Spun Sister.milk
-Waveform/Wire Tangle/fed's BLUR 2-0 -pret.milk
+Waveform/Wire Tangle/suksma + rovastar goody geiss rism - 1982 gremlin pinto hybrid 440 block 2000 watts obscura blaster.milk
 Waveform/Wire Tunnel/BrainStain-boiling-comfortably numb-mix.milk
-Waveform/Wire Tunnel/Serge + martin - crystal palace007.milk
+Waveform/Wire Tunnel/LuxXx - Angels Are Coming For You.milk

@@ -58,11 +58,19 @@ print(f"  using blur passes:                     {blur} ({100*blur/n:.0f}%)   br
 # and the rotation read at runtime. One source of truth: a curated set generated from a different
 # list than the one the application filters by would drift silently, and the drift would look
 # exactly like a rendering bug.
-# BOTH lists are excluded here, including the texture-dependent one, because the curated set is
-# what a stock install ships and a stock install has no textures. The runtime applies the second
-# list conditionally - someone who installs a texture pack sees those presets again - but the
-# default selection cannot depend on something the user may never have.
+# The curated set ships nothing that is missing anything.
+#
+# Both blocklists are excluded because those presets render nothing, and the texture list too
+# because those render with something absent. A stock install carries no images, so anything that
+# asks for one would arrive marked - and a default selection that arrives already flagged is not
+# a default selection. The runtime resolves all three against the machine it is on; the curated
+# set cannot, so it takes the strict reading.
+#
+# This costs style coverage and the cost is deliberate: five styles have no preset that is clean,
+# so they are not represented at all. They are named in the summary below rather than quietly
+# dropped.
 BLOCKLISTS = ["assets/presets-blocklist.txt", "assets/presets-blocklist-textures.txt"]
+TEXTURE_LIST = "assets/presets-textures.txt"
 BLANK_PRESETS = set()
 for _bl in BLOCKLISTS:
     if not os.path.exists(_bl):
@@ -73,6 +81,16 @@ for _bl in BLOCKLISTS:
                     if ln.strip() and not ln.lstrip().startswith("#")}
     print(f"  {os.path.basename(_bl)}: {len(_entries)} preset(s)")
     BLANK_PRESETS |= _entries
+
+# Tab-separated - path, then the image names it wants - so only the first field is a path.
+if os.path.exists(TEXTURE_LIST):
+    with open(TEXTURE_LIST, encoding="utf-8") as f:
+        _tex = {ln.split("\t")[0] for ln in f
+                if "\t" in ln and not ln.lstrip().startswith("#")}
+    print(f"  {os.path.basename(TEXTURE_LIST)}: {len(_tex)} preset(s) want an image we do not ship")
+    BLANK_PRESETS |= _tex
+else:
+    print(f"  WARNING: no {TEXTURE_LIST}; the curated set may contain presets missing an image")
 
 # Two per style: the cheapest, and the median.
 #
@@ -92,7 +110,7 @@ for r in rows:
         continue
     by_style[(r["category"], r["style"])].append(r)
 if excluded:
-    print(f"  excluded {excluded} preset(s) that render nothing")
+    print(f"  excluded {excluded} preset(s) that render nothing or are missing an image")
 
 picked = []
 for key in sorted(by_style):

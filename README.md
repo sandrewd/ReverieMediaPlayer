@@ -20,9 +20,9 @@ try to organise your music collection.
 - **Transport** — play, pause, stop, next, previous, seek, volume, shuffle, repeat that cycles
   off / playlist / one track, and a subtitles toggle
 - **Visualisations** — projectM (Milkdrop) presets, embedded or fullscreen, driven by the decoded
-  audio. The packages carry a curated **363** — two from each of the pack's 183 visual styles,
-  where it has two that work — and the full collection of **9,795** is an optional 2.7 MB
-  download.
+  audio. The packages carry a curated **352**, chosen so that nothing in the default install is
+  missing anything — two from each of 178 of the pack's 183 visual styles — and the full
+  collection of **9,795** is an optional 2.7 MB download.
 - **Visualisations that render nothing are hidden.** Every preset in the pack was rendered and
   measured; 274 of the 9,795 draw an empty frame. They are left out of the curated set and kept out
   of the browser and the rotation, because a black stage reads as the application having failed
@@ -179,12 +179,17 @@ git clone --depth 1 \
 ```
 
 The build installs the presets listed in `assets/presets-curated.txt`: two from each of the
-pack's 183 sub-folders, so every visual style it curates is represented. Within a style the
+pack's sub-folders, so almost every visual style it curates is represented. Within a style the
 cheapest by static cost proxy is taken, which guarantees something a software renderer can
 manage, and the median, which is what the style actually looks like. Presets named in
 `assets/presets-blocklist.txt` and `assets/presets-blocklist-textures.txt` are excluded before
-selection, so a style still gets two that work — `Hypnotic/Illusion` has a single working preset
-out of seventeen and contributes one, which is why the total is 363 rather than 364.
+selection, along with `presets-textures.txt` — so the default install ships nothing that renders
+nothing, and nothing that is missing an image.
+
+That is strict on purpose and it costs coverage. Four styles have only one preset left and
+contribute one; five have none at all and are not represented: `Drawing/Glimmer Mirror`,
+`Drawing/Viscera`, `Fractal/Wings`, `Geometric/Monster` and `Hypnotic/Illusion`. Every preset in
+those either draws nothing or wants an image. They are all still there in the full download.
 
 Point `--presets` at any directory to use a different set.
 
