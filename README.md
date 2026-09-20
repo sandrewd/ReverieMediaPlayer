@@ -27,7 +27,9 @@ try to organise your music collection.
   measured; 274 of the 9,795 draw an empty frame. They are left out of the curated set and kept out
   of the browser and the rotation, because a black stage reads as the application having failed
   rather than as one preset being at fault. *Options ▸ Visualisation ▸ Show broken visualisations*
-  puts them back if you want to look.
+  puts them back if you want to look. When shown they are marked: a red X for the ones no image
+  will fix, an amber ! for the ones an image would, and a blue dot on any visualisation that is
+  missing an image it uses. Hover for what it wants and where to put it.
 - **A browser for them**, in a panel beside the stage: search by name, filter by kind or by the
   pack's own visual style, and click to watch. Star the one you are looking at, and the
   right-click menu keeps your favourites and the last ten you saw — which matters more than it
@@ -140,10 +142,12 @@ Some Milkdrop presets name an external image — `worms`, `clouds`, `lichen` —
 texture. **Reverie ships none of them, in the curated set or the full download, and that is
 deliberate.** 1,866 of the full 9,795 ask for one.
 
-Thirty-nine of those render *nothing at all* without their texture, so in a stock install they are
-hidden along with the rest — but that list is applied only when no texture directory is found.
-Install a texture pack into `~/.local/share/reverie/textures` and all thirty-nine come back on
-their own, because for you they are not broken.
+Thirty-nine of those render *nothing at all* without their image, so in a stock install they are
+hidden along with the rest. Which ones are hidden is decided against the images actually present,
+not against whether a texture directory exists — `assets/presets-textures.txt` ships the names
+each preset asks for, so Reverie lists the directory and resolves it exactly. Put a matching
+`.png` or `.jpg` in `~/.local/share/reverie/textures` and those presets come back, and the marks
+on everything else clear as soon as what they wanted is there.
 
 Nothing breaks without them. projectM substitutes a 1×1 placeholder and the preset still renders,
 missing whatever that image contributed. Every curated preset that asks for a texture was

@@ -36,6 +36,12 @@ class PresetLibrary : public QAbstractListModel
     // answers and deserve different marks.
     Q_PROPERTY(QString blocklist READ blocklist WRITE setBlocklist NOTIFY libraryChanged)
     Q_PROPERTY(QString textureBlocklist READ textureBlocklist WRITE setTextureBlocklist NOTIFY libraryChanged)
+    // Presets that use an external image but still draw without it. Informational only, and a
+    // separate shipped file because working it out means reading every preset in the pack.
+    Q_PROPERTY(QString textureList READ textureList WRITE setTextureList NOTIFY libraryChanged)
+    // Where images actually live on this machine. Listing it is one readdir, so "is this
+    // preset's image present" is answered exactly, every launch, rather than assumed.
+    Q_PROPERTY(QString texturesPath READ texturesPath WRITE setTexturesPath NOTIFY libraryChanged)
     // Where a texture should be dropped to fix one, named in full so the tooltip can say it.
     Q_PROPERTY(QString textureDropPath READ textureDropPath CONSTANT)
     Q_PROPERTY(bool showBroken READ showBroken WRITE setShowBroken NOTIFY libraryChanged)
@@ -59,6 +65,7 @@ public:
         PathRole,
         BrokenRole,                   // renders nothing, and a texture does not help
         NeedsTextureRole,             // renders nothing only because a texture is missing
+        UsesTextureRole,              // renders, but an image it asks for is absent
     };
 
     explicit PresetLibrary(QObject *parent = nullptr);
@@ -71,6 +78,13 @@ public:
     void setBlocklist(const QString &path);
     QString textureBlocklist() const { return m_textureBlocklist; }
     void setTextureBlocklist(const QString &path);
+    QString textureList() const { return m_textureList; }
+    void setTextureList(const QString &path);
+    QString texturesPath() const { return m_texturesPath; }
+    void setTexturesPath(const QString &path);
+    // Re-reads the texture directory and updates the marks in place. Cheap - no reindexing - so
+    // it can run whenever someone might have just dropped a file in.
+    Q_INVOKABLE void refreshTextures();
     QString textureDropPath() const;
 
     // The external textures a preset asks for, parsed on demand rather than at index time:
@@ -129,6 +143,8 @@ private:
         QString style;
         bool broken = false;
         bool needsTexture = false;
+        bool usesTexture = false;   // wants an image that is not installed
+        QStringList wantedTextures;
     };
 
     void rescan();
@@ -137,11 +153,25 @@ private:
     // Relative paths, as they appear in the blocklist file. Comparing relative keeps one set
     // usable against the curated install and the full pack, which sit at different roots.
     static QSet<QString> readList(const QString &path);
+    // path -> the image names it asks for, read once from the shipped list.
+    static QHash<QString, QStringList> readTextureList(const QString &path);
+    // The image basenames present on this machine, lowercased, without extension.
+    QSet<QString> availableTextures() const;
+    // Where images are looked for. The resolved path when one existed at startup, otherwise the
+    // writable default - because the directory a person creates *while running* is exactly the
+    // case this has to cope with, and it did not until it was tested.
+    QString effectiveTexturesPath() const;
+    static QString defaultTexturesDir();
+    static bool satisfied(const QStringList &wanted, const QSet<QString> &available);
 
     QString m_rootPath;
     QString m_curatedList;
     QString m_blocklist;
     QString m_textureBlocklist;
+    QString m_textureList;
+    QString m_texturesPath;
+    QHash<QString, QStringList> m_wantedTextures;
+    QSet<QString> m_availableTextures;
     bool m_showBroken = false;
     int m_brokenCount = 0;
     QString m_searchText;

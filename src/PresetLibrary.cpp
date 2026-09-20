@@ -45,12 +45,19 @@ void PresetLibrary::setTextureBlocklist(const QString &path)
     rescan();
 }
 
+void PresetLibrary::setTextureList(const QString &path)
+{
+    if (path == m_textureList)
+        return;
+    m_textureList = path;
+    rescan();
+}
+
 QString PresetLibrary::textureDropPath() const
 {
     // The writable one, whatever else is on the search path: this is where a person is being
     // told to put a file, so naming a read-only /usr/share would be worse than saying nothing.
-    const QString path = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
-                         + QStringLiteral("/reverie/textures");
+    const QString path = defaultTexturesDir();
     // Abbreviated for display, which is all this is for. An unbroken absolute path is also a
     // single very long word, and a tooltip sizes itself to its longest one - it covered the list
     // it was describing before this.
@@ -60,55 +67,111 @@ QString PresetLibrary::textureDropPath() const
     return path;
 }
 
-// Milkdrop names a texture through sampler_<name>, where the name may carry a sampling-mode
-// prefix (fw_, fc_, pw_, pc_ and their reversed spellings) or a rand_NN_ prefix that means "pick
-// any". Those are not part of the filename, and counting them as external textures is exactly the
-// mistake that once put the built-in noise textures on this list - see the brief.
+// The names come from the shipped list rather than from parsing the preset here. Parsing was the
+// first design and it was wrong twice: on hover it is fine, but the *marks* need the answer for
+// every row, and working that out means reading every preset in the pack - 3.35s from a cold
+// cache against 115ms for the whole index.
 QStringList PresetLibrary::texturesWantedBy(const QString &path) const
 {
-    static const QSet<QString> builtin = {
-        QStringLiteral("noise_hq"),     QStringLiteral("noise_lq"),
-        QStringLiteral("noise_lq_lite"), QStringLiteral("noise_mq"),
-        QStringLiteral("noisevol_hq"),  QStringLiteral("noisevol_lq"),
-        QStringLiteral("main"),         QStringLiteral("blur1"),
-        QStringLiteral("blur2"),        QStringLiteral("blur3"),
-        QStringLiteral("fc_main"),      QStringLiteral("pc_main")};
-    static const QRegularExpression sampler(QStringLiteral("sampler_([A-Za-z0-9_]+)"));
-    static const QRegularExpression prefix(QStringLiteral("^(fc_|fw_|pc_|pw_|cf_|cp_|wf_|wp_)+"));
-    // projectM reads "randNN" and "randNN_prefix" as "pick a random image from the pool" and
-    // "pick a random one whose filename begins with prefix" - see TextureManager::GetRandomTexture.
-    // The tail is NOT a filename, so reporting it as one would send someone looking for a file
-    // that was never meant to exist.
+    const QDir root(m_rootPath);
+    return m_wantedTextures.value(root.relativeFilePath(path));
+}
+
+// projectM reads "randNN" as "any image from the pool" and "randNN_prefix" as "any image whose
+// filename begins with prefix" - see TextureManager::GetRandomTexture. The tail is not a filename,
+// so it is neither looked up nor reported as one.
+bool PresetLibrary::satisfied(const QStringList &wanted, const QSet<QString> &available)
+{
     static const QRegularExpression randomName(QStringLiteral("^rand\\d+(?:_(.+))?$"));
-
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
-        return {};
-    const QString text = QString::fromUtf8(file.readAll());
-
-    QStringList names;
-    auto it = sampler.globalMatch(text);
-    while (it.hasNext()) {
-        QString name = it.next().captured(1).toLower();
-        name.remove(prefix);
-        if (name.isEmpty() || builtin.contains(name))
-            continue;
-
-        QString described;
+    for (const QString &name : wanted) {
         const QRegularExpressionMatch random = randomName.match(name);
         if (random.hasMatch()) {
-            const QString wanted = random.captured(1);
-            described = wanted.isEmpty()
-                            ? tr("any image")
-                            : tr("any image whose name starts with \u201c%1\u201d").arg(wanted);
-        } else {
-            described = name;
+            const QString prefix = random.captured(1);
+            if (available.isEmpty())
+                return false;
+            if (prefix.isEmpty())
+                continue;  // any image will do, and there is at least one
+            bool any = false;
+            for (const QString &have : available) {
+                if (have.startsWith(prefix)) { any = true; break; }
+            }
+            if (!any)
+                return false;
+        } else if (!available.contains(name)) {
+            return false;
         }
-        if (!names.contains(described))
-            names.append(described);
     }
-    names.sort();
-    return names;
+    return true;
+}
+
+QString PresetLibrary::defaultTexturesDir()
+{
+    return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
+           + QStringLiteral("/reverie/textures");
+}
+
+QString PresetLibrary::effectiveTexturesPath() const
+{
+    return m_texturesPath.isEmpty() ? defaultTexturesDir() : m_texturesPath;
+}
+
+QSet<QString> PresetLibrary::availableTextures() const
+{
+    QSet<QString> available;
+    const QString dir = effectiveTexturesPath();
+    if (dir.isEmpty() || !QFileInfo::exists(dir))
+        return available;
+    // One readdir. projectM accepts what stb_image can decode; listing everything and letting the
+    // name match is closer to what it actually does than second-guessing the extension.
+    QDirIterator it(dir, QDir::Files);
+    while (it.hasNext()) {
+        it.next();
+        available.insert(it.fileInfo().completeBaseName().toLower());
+    }
+    return available;
+}
+
+QHash<QString, QStringList> PresetLibrary::readTextureList(const QString &path)
+{
+    QHash<QString, QStringList> wanted;
+    if (path.isEmpty())
+        return wanted;
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning("preset library: cannot read texture list %s", qPrintable(path));
+        return wanted;
+    }
+    QTextStream in(&file);
+    while (!in.atEnd()) {
+        const QString line = in.readLine();
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#')))
+            continue;
+        const int tab = line.indexOf(QLatin1Char('\t'));
+        if (tab <= 0)
+            continue;
+        wanted.insert(line.left(tab),
+                      line.mid(tab + 1).split(QLatin1Char(','), Qt::SkipEmptyParts));
+    }
+    return wanted;
+}
+
+void PresetLibrary::refreshTextures()
+{
+    if (m_rootPath.isEmpty() || m_textureList.isEmpty())
+        return;
+    // Free when nothing has changed, which is almost always. Comparing the directory listing is
+    // one readdir; only a genuine change pays for a rescan.
+    //
+    // A full rescan rather than a flag update, because availability decides more than the mark:
+    // a preset whose image has just appeared stops being excluded, so it has to rejoin the list
+    // and the rotation. Updating the flags alone would leave it marked correctly and still
+    // hidden, which is a worse state than either.
+    const QSet<QString> available = availableTextures();
+    if (available == m_availableTextures)
+        return;
+    qInfo("texture library: %d image(s) available, re-checking visualisations",
+          int(available.size()));
+    rescan();
 }
 
 void PresetLibrary::setShowBroken(bool show)
@@ -116,6 +179,14 @@ void PresetLibrary::setShowBroken(bool show)
     if (show == m_showBroken)
         return;
     m_showBroken = show;
+    rescan();
+}
+
+void PresetLibrary::setTexturesPath(const QString &path)
+{
+    if (path == m_texturesPath)
+        return;
+    m_texturesPath = path;
     rescan();
 }
 
@@ -193,6 +264,7 @@ QVariant PresetLibrary::data(const QModelIndex &index, int role) const
     case PathRole:     return e.path;
     case BrokenRole:        return e.broken;
     case NeedsTextureRole:  return e.needsTexture;
+    case UsesTextureRole:   return e.usesTexture;
     default:           return {};
     }
 }
@@ -206,7 +278,8 @@ QHash<int, QByteArray> PresetLibrary::roleNames() const
             {StyleRole, "style"},
             {PathRole, "path"},
             {BrokenRole, "broken"},
-            {NeedsTextureRole, "needsTexture"}};
+            {NeedsTextureRole, "needsTexture"},
+            {UsesTextureRole, "usesTexture"}};
 }
 
 QStringList PresetLibrary::styles(const QString &category) const
@@ -294,6 +367,9 @@ void PresetLibrary::rescan()
 
     const QSet<QString> broken = readList(m_blocklist);
     const QSet<QString> needsTexture = readList(m_textureBlocklist);
+    m_wantedTextures = readTextureList(m_textureList);
+    m_availableTextures = availableTextures();
+    const QSet<QString> &available = m_availableTextures;
     m_brokenCount = 0;
 
     m_all.clear();
@@ -308,7 +384,12 @@ void PresetLibrary::rescan()
         // Measured to render nothing. Counted whether or not they are shown, because the menu
         // item that reveals them needs to say how many there are.
         const bool isBroken = broken.contains(relative);
-        const bool isTextureless = needsTexture.contains(relative);
+        // Per preset rather than all-or-nothing: one of these is only broken while the image it
+        // names is actually absent, and someone with a partial texture pack has some of them
+        // working and some not.
+        const bool isTextureless =
+            needsTexture.contains(relative)
+            && !satisfied(m_wantedTextures.value(relative), available);
         if (isBroken || isTextureless) {
             ++m_brokenCount;
             if (!m_showBroken)
@@ -321,8 +402,10 @@ void PresetLibrary::rescan()
         // if that ever changes.
         const QString dir = QFileInfo(relative).path();
         const QString style = dir.mid(slash + 1);
+        const QStringList wanted = m_wantedTextures.value(relative);
         m_all.append({name, absolute, category, style == QLatin1String(".") ? QString() : style,
-                      isBroken, isTextureless});
+                      isBroken, isTextureless,
+                      !wanted.isEmpty() && !satisfied(wanted, available), wanted});
         m_byCategory[category].append({name, absolute});
     }
 

@@ -154,6 +154,11 @@ ApplicationWindow {
     // Same rules as the playlist: no panel in mini or fullscreen, and not below the width where
     // the stage would be squeezed out. It also cannot open over video, which has no presets.
     readonly property bool showPresetPanel: !mini && !fullscreen && presetPanelVisible
+    // Someone who has just dropped an image into the texture directory wants the mark gone
+    // without restarting. Hooked here rather than inside the panel: the panel animates its
+    // *width* to zero and stays visible, so its own visibleChanged never fires. Costs one
+    // readdir, and rescans only if the directory really changed.
+    onShowPresetPanelChanged: if (showPresetPanel) PresetLibrary.refreshTextures()
                                             && roomForPlaylist && !AudioEngine.hasVideo
                                             && SystemTheme.visualisationsEnabled
 
@@ -359,6 +364,8 @@ ApplicationWindow {
     // one thing that does not change.
     Binding { target: PresetLibrary; property: "blocklist"; value: initialBlocklist }
     Binding { target: PresetLibrary; property: "textureBlocklist"; value: initialTextureBlocklist }
+    Binding { target: PresetLibrary; property: "textureList"; value: initialTextureList }
+    Binding { target: PresetLibrary; property: "texturesPath"; value: initialTexturesDir }
     Binding { target: PresetLibrary; property: "showBroken"; value: SystemTheme.showBrokenPresets }
     Binding { target: visualizer; property: "blocklists"; value: initialBlocklists }
     Binding { target: visualizer; property: "showBroken"; value: SystemTheme.showBrokenPresets }

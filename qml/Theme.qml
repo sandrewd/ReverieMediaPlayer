@@ -48,7 +48,14 @@ QtObject {
     // background goes - the same shape as stageEdge above. It is deliberately the only such
     // token: the brief records that a hand-picked error colour was rejected once already,
     // because every other colour here is derived and so cannot be made invisible.
-    readonly property color alert: dark ? "#ff7a70" : "#c0392b"
+    // Three levels of messaging on a visualisation, in the browser. Each is keyed to the derived
+    // `dark` flag rather than fixed, so all three stay legible whichever way the user's
+    // background goes - the same shape as stageEdge above. These are the only hand-picked colours
+    // outside the overlay tokens: everything else is derived from the user's four, which is what
+    // guarantees no theme can make text invisible.
+    readonly property color alert: dark ? "#ff7a70" : "#c0392b"   // error: renders nothing
+    readonly property color warn:  dark ? "#f0b429" : "#b06f00"   // warning: nothing without an image
+    readonly property color info:  dark ? "#5fa8e8" : "#1d6fb8"   // informational: an image is missing
 
     readonly property color overlayText: "#f0f2f4"
     readonly property color overlayTextDim: "#a8b0b8"

@@ -150,11 +150,23 @@ Rectangle {
                 //
                 // Styled from the tokens directly, which is the rule for anything that has to
                 // survive a theme change at runtime.
+                HoverHandler { id: rowHover }
+
                 ToolTip {
                     id: rowTip
                     parent: row
                     visible: row.hovered
-                    delay: 400
+                    // Placed against the pointer. Left to itself a Popup lands wherever its
+                    // default placement puts it - measured at 393px to the right of the cursor
+                    // on one row and 24px on another, which reads as belonging to nothing.
+                    // Offset down and right so the pointer never covers the first line, and
+                    // margins keep it inside the window near an edge.
+                    x: rowHover.point.position.x + 14
+                    y: rowHover.point.position.y + 18
+                    margins: 6
+                    // Long enough that brushing past a row on the way somewhere else does not
+                    // raise it, short enough that pausing on one feels answered.
+                    delay: 700
                     text: row.explain()
                     padding: 8
                     // The width goes on the popup, not on the Text. A Popup sizes itself to its
@@ -194,32 +206,54 @@ Rectangle {
                                .arg(wanted.join(", "))
                                .arg(PresetLibrary.textureDropPath)
                     }
-                    if (wanted.length > 0) {
+                    if (model.usesTexture || wanted.length > 0) {
                         // No mark for these: they draw perfectly well, projectM stands a 1x1
                         // placeholder in for the missing image and the preset simply loses that
                         // layer. 1,783 of the pack are in this state and marking them all would
                         // teach people to ignore the mark. The information is still here for
                         // anyone assembling a texture pack.
-                        return qsTr("%1\n\nUses images Reverie does not ship:\n%2\n"
-                                    + "It renders without them, just with less in it.")
+                        return qsTr("%1\n\n\u25cf  An image this visualisation uses is not "
+                                    + "installed, so part of it is missing.\n\nIt wants: %2\n\n"
+                                    + "It still draws without it. Put a matching .png or .jpg "
+                                    + "in\n%3")
                                .arg(model.name).arg(wanted.join(", "))
+                               .arg(PresetLibrary.textureDropPath)
                     }
                     return model.name
                 }
 
                 contentItem: RowLayout {
                     spacing: 4
-                    Text {
-                        // Plain ASCII rather than a drawn glyph or a symbol character: the icons
-                        // here are Canvas-drawn because a system font may not carry a given
-                        // glyph, but "X" and "!" are in every font there is.
-                        visible: model.broken || model.needsTexture
-                        text: model.broken ? "X" : "!"
-                        color: Theme.alert
-                        font.pixelSize: 12
-                        font.bold: true
+                    Item {
+                        // Three levels, in order of severity: error, warning, informational.
+                        //   X  renders nothing, and no image will fix it
+                        //   !  renders nothing until an image it names is supplied
+                        //   o  renders, but an image it asks for is missing from it
+                        // The first two are plain ASCII - the Canvas-drawn icons elsewhere exist
+                        // because a system font may not carry a given glyph, and "X" and "!" are
+                        // in every font there is. The dot is a Rectangle for the same reason: a
+                        // circle drawn as a circle depends on no font at all.
+                        implicitWidth: 11
+                        implicitHeight: 11
+                        visible: model.broken || model.needsTexture || model.usesTexture
                         Layout.alignment: Qt.AlignVCenter
                         Layout.leftMargin: 2
+                        Text {
+                            anchors.centerIn: parent
+                            visible: model.broken || model.needsTexture
+                            text: model.broken ? "X" : "!"
+                            color: model.broken ? Theme.alert : Theme.warn
+                            font.pixelSize: 12
+                            font.bold: true
+                        }
+                        Rectangle {
+                            anchors.centerIn: parent
+                            visible: !model.broken && !model.needsTexture && model.usesTexture
+                            width: 7
+                            height: 7
+                            radius: width / 2
+                            color: Theme.info
+                        }
                     }
                     ColumnLayout {
                         Layout.fillWidth: true

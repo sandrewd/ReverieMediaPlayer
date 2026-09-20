@@ -327,11 +327,16 @@ int main(int argc, char *argv[])
     // ship. It is applied *only* when no texture directory was found: for someone who has
     // installed a texture pack those presets work perfectly, and hiding them would be wrong.
     // Measured individually - 0% with no textures, and back to life with a stand-in in place.
-    QString textureBlocklist;
-    if (texturesDir.isEmpty())
-        textureBlocklist = findResource(QStringLiteral("presets-blocklist-textures.txt"));
-    else
-        qInfo("preset blocklist: textures are installed, so texture-dependent presets are shown");
+    // Always resolved too. Which of these are actually broken is decided per preset against the
+    // installed images, not by whether a texture directory happens to exist.
+    const QString textureBlocklist = findResource(QStringLiteral("presets-blocklist-textures.txt"));
+
+    // Only meaningful while we ship no textures: once a texture directory exists we cannot say
+    // which individual images are present without stat-ing each one, and marking every preset
+    // that uses any image would then be noise rather than information.
+    // Always resolved now: it carries the image *names*, so the browser can check them against
+    // whatever is actually installed rather than assuming nothing is.
+    const QString textureList = findResource(QStringLiteral("presets-textures.txt"));
 
     QStringList blocklists;
     if (!blocklist.isEmpty())
@@ -345,6 +350,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("initialBlocklists", blocklists);
     engine.rootContext()->setContextProperty("initialBlocklist", blocklist);
     engine.rootContext()->setContextProperty("initialTextureBlocklist", textureBlocklist);
+    engine.rootContext()->setContextProperty("initialTextureList", textureList);
+    engine.rootContext()->setContextProperty("initialTexturesDir", texturesDir);
     engine.rootContext()->setContextProperty("initialMaxFps", parser.value(fpsCapOption).toInt());
 
     // Qt 6.4 puts QML module resources under qrc:/<URI>/; 6.5 and later use qrc:/qt/qml/<URI>/.
