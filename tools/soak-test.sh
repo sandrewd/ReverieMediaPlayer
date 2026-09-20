@@ -17,8 +17,8 @@
 # pgrep/pkill once destroyed a scan's own workers and cost 1,629 readings.
 set -u
 
-MEDIA=; DURATION=3600; INTERVAL=30; OUT=; NOVIS=0; DISP=101; OWNDISPLAY=1
-while getopts "m:d:i:o:VD:Xh" opt; do
+MEDIA=; DURATION=3600; INTERVAL=30; OUT=; NOVIS=0; DISP=101; OWNDISPLAY=1; DESKTOP=; PASSIVE=0
+while getopts "m:d:i:o:VD:XW:ph" opt; do
   case $opt in
     m) MEDIA=$OPTARG ;;
     d) DURATION=$OPTARG ;;
@@ -27,6 +27,8 @@ while getopts "m:d:i:o:VD:Xh" opt; do
     V) NOVIS=1 ;;
     D) DISP=$OPTARG ;;
     X) OWNDISPLAY=0 ;;   # use the display already running, rather than a private Xvfb
+    W) DESKTOP=$OPTARG ;; # park the window on this workspace, to stay out of someone's way
+    p) PASSIVE=1 ;;      # no window driving at all: play, and only measure
     h) sed -n '2,20p' "$0"; exit 0 ;;
     *) exit 2 ;;
   esac
@@ -90,10 +92,30 @@ sleep 12
 
 kill -0 "$APP_PID" 2>/dev/null || { echo "reverie exited immediately:"; tail -5 "$WORK/reverie.log"; exit 1; }
 
-WID=$(DISPLAY=":$DISP" xwininfo -root -tree 2>/dev/null \
-      | grep -oE '0x[0-9a-f]+ .* [0-9]{3,4}x[0-9]{3,4}\+[0-9]+\+[0-9]+' \
-      | awk '{print $1}' | head -1)
-[ -n "$WID" ] && DISPLAY=":$DISP" xdotool windowactivate "$WID" 2>/dev/null
+# The window is taken from _NET_CLIENT_LIST and matched on WM_CLASS, which is the only
+# authoritative answer. Do NOT pick it out of `xwininfo -root -tree` by geometry: that tree
+# carries 1x1 decoys, a 3x3 selection owner and a 10x10 stub for this application alone, plus
+# every other client on the display - so a geometry match with `head -1` returns whatever happens
+# to be first, which on a real desktop is somebody else's window. That mistake moved a bystander's
+# window to another workspace before it was caught.
+WID=
+for _w in $(DISPLAY=":$DISP" xprop -root _NET_CLIENT_LIST 2>/dev/null \
+            | sed 's/.*# //' | tr ',' ' '); do
+  case "$(DISPLAY=":$DISP" xprop -id "$_w" WM_CLASS 2>/dev/null)" in
+    *reverie*) WID=$_w; break ;;
+  esac
+done
+if [ -z "$WID" ]; then
+  echo "soak: could not identify the window - running without driving it" >&2
+  PASSIVE=1
+fi
+# Moved before it is activated, so activating it does not drag the viewer along with it.
+if [ -n "$WID" ] && [ -n "$DESKTOP" ]; then
+  DISPLAY=":$DISP" xdotool set_desktop_for_window "$WID" "$DESKTOP" 2>/dev/null \
+    && echo "soak: parked on workspace $DESKTOP"
+  sleep 1
+fi
+[ -n "$WID" ] && [ -z "$DESKTOP" ] && DISPLAY=":$DISP" xdotool windowactivate "$WID" 2>/dev/null
 echo "soak: window $WID, pid $APP_PID, log $WORK/reverie.log"
 
 key()  { [ -n "$WID" ] && DISPLAY=":$DISP" xdotool key --window "$WID" "$1" 2>/dev/null; }
@@ -157,7 +179,12 @@ while :; do
     "$elapsed" "${rss:-0}" "${vsz:-0}" "${thr:-0}" "$fds" "$cpu" "${xrss:-0}" "${maps:-0}" \
     "${st:-?}" "$iowpct" "${load1:-0}" >> "$OUT"
 
-  act "$i"; i=$(( i + 1 ))
+  # Passive leaves the window completely alone. On someone else's desktop that matters: every
+  # mechanism that could drag the window to the workspace they are using is a window-driving call,
+  # and playback alone still exercises the stage transitions and the decoders, which is where the
+  # GPU-side leaks would be.
+  [ "$PASSIVE" = 0 ] && act "$i"
+  i=$(( i + 1 ))
   sleep "$INTERVAL"
 done
 
