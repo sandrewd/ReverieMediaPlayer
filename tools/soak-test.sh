@@ -118,8 +118,17 @@ fi
 [ -n "$WID" ] && [ -z "$DESKTOP" ] && DISPLAY=":$DISP" xdotool windowactivate "$WID" 2>/dev/null
 echo "soak: window $WID, pid $APP_PID, log $WORK/reverie.log"
 
+# Always --window, never bare xdotool key: bare key goes through XTEST, which is indistinguishable
+# from the person at the keyboard actually typing. --window posts the event to our own window and
+# leaves the real input devices alone.
 key()  { [ -n "$WID" ] && DISPLAY=":$DISP" xdotool key --window "$WID" "$1" 2>/dev/null; }
-click(){ DISPLAY=":$DISP" xdotool mousemove "$1" "$2" click 1 2>/dev/null; }
+# Moving the pointer is only ever acceptable on a display we own. On someone's live desktop it
+# takes the mouse out of their hand, so on a borrowed display this does nothing at all and the
+# actions that need it are simply not run.
+click(){
+  [ "$OWNDISPLAY" = 1 ] || return 0
+  DISPLAY=":$DISP" xdotool mousemove "$1" "$2" click 1 2>/dev/null
+}
 
 FULL=0; MINI=0
 # One action per sample, cycled rather than random so a failure is reproducible and every one of
@@ -127,7 +136,8 @@ FULL=0; MINI=0
 act() {
   case $(( $1 % 10 )) in
     0) key ctrl+l ;;                                   # playlist panel
-    1) click 8 400 ;;                                  # visualisation panel, edge handle
+    1) click 8 400 ;;                                  # visualisation panel - pointer only, skipped
+                                                       # on a borrowed display (no shortcut exists)
     2) key ctrl+l ;;
     3) if [ "$FULL" = 0 ]; then key f; FULL=1; else key Escape; FULL=0; fi ;;
     4) [ "$FULL" = 0 ] && DISPLAY=":$DISP" xdotool windowsize "$WID" 820 600 2>/dev/null ;;
