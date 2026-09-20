@@ -161,7 +161,15 @@ act() {
 # exposes it, and report 0 where it does not.
 VRAM_FILE=$(ls /sys/class/drm/card*/device/mem_info_vram_used 2>/dev/null | head -1)
 GTT_FILE=$(ls /sys/class/drm/card*/device/mem_info_gtt_used 2>/dev/null | head -1)
+# amdgpu exposes this through sysfs; the NVIDIA driver does not, and wants nvidia-smi instead.
+# Same column either way, so one analysis reads both.
+NVSMI=0
+if [ -z "$VRAM_FILE" ] && command -v nvidia-smi >/dev/null 2>&1; then
+  NVSMI=1
+  echo "soak: GPU memory from nvidia-smi"
+fi
 [ -n "$VRAM_FILE" ] && echo "soak: GPU memory from $VRAM_FILE"
+[ -z "$VRAM_FILE" ] && [ "$NVSMI" = 0 ] && echo "soak: no GPU memory counter available - vram will read 0"
 printf 'elapsed\trss_kb\tvmsize_kb\tthreads\tfds\tcpu_pct\txorg_rss_kb\tmaps\tstate\tiowait_pct\tload1\tvram_mb\tgtt_mb\n' > "$OUT"
 prev_cpu=0; prev_t=0; prev_iow=0; prev_tot=0; i=0; start=$(date +%s)
 while :; do
@@ -194,6 +202,13 @@ while :; do
   prev_cpu=${ticks:-0}; prev_t=$now
   vram=0; gtt=0
   [ -n "$VRAM_FILE" ] && vram=$(( $(cat "$VRAM_FILE" 2>/dev/null || echo 0) / 1048576 ))
+  # Per-process where the driver reports it, which is better than the device total: on a desktop
+  # with a browser open the device figure moves for reasons that have nothing to do with us.
+  if [ "$NVSMI" = 1 ]; then
+    vram=$(nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader,nounits 2>/dev/null \
+           | awk -F, -v p="$APP_PID" '$1+0==p{print $2+0; found=1} END{if(!found) print 0}')
+    [ "${vram:-0}" = 0 ] && vram=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null | head -1)
+  fi
   [ -n "$GTT_FILE" ]  && gtt=$(( $(cat "$GTT_FILE" 2>/dev/null || echo 0) / 1048576 ))
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$elapsed" "${rss:-0}" "${vsz:-0}" "${thr:-0}" "$fds" "$cpu" "${xrss:-0}" "${maps:-0}" \
