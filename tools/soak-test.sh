@@ -155,7 +155,14 @@ act() {
 # health, and a stalled host looks exactly like a stalled application from the inside. State "D"
 # is uninterruptible I/O wait: if a pause in the trace lines up with D and a jump in iowait, it
 # was the storage underneath, not Reverie. Without this the run can only say "something stalled".
-printf 'elapsed\trss_kb\tvmsize_kb\tthreads\tfds\tcpu_pct\txorg_rss_kb\tmaps\tstate\tiowait_pct\tload1\n' > "$OUT"
+# GPU memory is not in RSS. A leaked texture or framebuffer can grow VRAM indefinitely
+# while the process's resident size sits perfectly flat, so a soak that watches only RSS
+# cannot see the thing a GPU run exists to find. Read it from sysfs where the driver
+# exposes it, and report 0 where it does not.
+VRAM_FILE=$(ls /sys/class/drm/card*/device/mem_info_vram_used 2>/dev/null | head -1)
+GTT_FILE=$(ls /sys/class/drm/card*/device/mem_info_gtt_used 2>/dev/null | head -1)
+[ -n "$VRAM_FILE" ] && echo "soak: GPU memory from $VRAM_FILE"
+printf 'elapsed\trss_kb\tvmsize_kb\tthreads\tfds\tcpu_pct\txorg_rss_kb\tmaps\tstate\tiowait_pct\tload1\tvram_mb\tgtt_mb\n' > "$OUT"
 prev_cpu=0; prev_t=0; prev_iow=0; prev_tot=0; i=0; start=$(date +%s)
 while :; do
   now=$(date +%s); elapsed=$(( now - start ))
@@ -185,9 +192,12 @@ while :; do
     [ "$dt" -gt 0 ] && cpu=$(( (ticks - prev_cpu) * 100 / hz / dt ))
   fi
   prev_cpu=${ticks:-0}; prev_t=$now
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+  vram=0; gtt=0
+  [ -n "$VRAM_FILE" ] && vram=$(( $(cat "$VRAM_FILE" 2>/dev/null || echo 0) / 1048576 ))
+  [ -n "$GTT_FILE" ]  && gtt=$(( $(cat "$GTT_FILE" 2>/dev/null || echo 0) / 1048576 ))
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$elapsed" "${rss:-0}" "${vsz:-0}" "${thr:-0}" "$fds" "$cpu" "${xrss:-0}" "${maps:-0}" \
-    "${st:-?}" "$iowpct" "${load1:-0}" >> "$OUT"
+    "${st:-?}" "$iowpct" "${load1:-0}" "$vram" "$gtt" >> "$OUT"
 
   # Passive leaves the window completely alone. On someone else's desktop that matters: every
   # mechanism that could drag the window to the workspace they are using is a window-driving call,
