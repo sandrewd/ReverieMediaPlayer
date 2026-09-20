@@ -177,6 +177,9 @@ private:
 
     void redetect();
     void startMonitor();
+    // Whether a helper binary exists, resolved once. Starting a QProcess for a program that is
+    // not installed leaks a pipe on every attempt, and one of these is retried every 4 seconds.
+    static bool haveExecutable(const QString &program);
     void applyMonitorLine(const QString &line);
     bool detectSystemDark() const;
     // -1 unknown, 0 light, 1 dark

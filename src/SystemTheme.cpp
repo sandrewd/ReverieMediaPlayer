@@ -4,6 +4,8 @@
 #include <QGuiApplication>
 #include <QPalette>
 #include <QProcess>
+#include <QHash>
+#include <QStandardPaths>
 #include <QDBusConnection>
 #include <QDBusError>
 #include <QDBusReply>
@@ -127,6 +129,18 @@ SystemTheme::~SystemTheme()
     }
 }
 
+bool SystemTheme::haveExecutable(const QString &program)
+{
+    // Cached, because this is asked on a 4-second timer for the life of the process.
+    static QHash<QString, bool> known;
+    auto it = known.constFind(program);
+    if (it != known.constEnd())
+        return *it;
+    const bool found = !QStandardPaths::findExecutable(program).isEmpty();
+    known.insert(program, found);
+    return found;
+}
+
 void SystemTheme::startMonitor()
 {
     // `gsettings monitor` prints a line per change and costs one idle process. If gsettings
@@ -138,8 +152,9 @@ void SystemTheme::startMonitor()
             applyMonitorLine(line);
         redetect();
     });
-    m_monitor.start(QStringLiteral("gsettings"),
-                    {QStringLiteral("monitor"), QStringLiteral("org.gnome.desktop.interface")});
+    if (haveExecutable(QStringLiteral("gsettings")))
+        m_monitor.start(QStringLiteral("gsettings"),
+                        {QStringLiteral("monitor"), QStringLiteral("org.gnome.desktop.interface")});
 
     // XFCE's own theme setting, which its appearance dialog writes and which gsettings may
     // never see.
@@ -151,10 +166,11 @@ void SystemTheme::startMonitor()
             m_themeNameHint = 0;
         redetect();
     });
-    m_xfconfMonitor.start(QStringLiteral("xfconf-query"),
-                          {QStringLiteral("-c"), QStringLiteral("xsettings"),
-                           QStringLiteral("-p"), QStringLiteral("/Net/ThemeName"),
-                           QStringLiteral("-m")});
+    if (haveExecutable(QStringLiteral("xfconf-query")))
+        m_xfconfMonitor.start(QStringLiteral("xfconf-query"),
+                              {QStringLiteral("-c"), QStringLiteral("xsettings"),
+                               QStringLiteral("-p"), QStringLiteral("/Net/ThemeName"),
+                               QStringLiteral("-m")});
 }
 
 void SystemTheme::applyMonitorLine(const QString &line)
@@ -557,10 +573,23 @@ int SystemTheme::queryThemeNameHint()
              std::pair<QString, QStringList>{QStringLiteral("gsettings"),
                  {QStringLiteral("get"), QStringLiteral("org.gnome.desktop.interface"),
                   QStringLiteral("gtk-theme")}}}) {
+        // The whole point of the guard: this loop runs every 4 seconds, and on any desktop that
+        // is not XFCE the first probe names a program that does not exist. A QProcess started on
+        // a missing program leaks a pipe, so that was one descriptor every 4 seconds - about 900
+        // an hour against a soft limit of 1024. Measured on GNOME: the process was 128
+        // descriptors deep after seven minutes and would have exhausted them in under an hour.
+        // It never showed up in development because XFCE, the machine this was written on, is the
+        // one desktop where the program is present.
+        if (!haveExecutable(probe.first))
+            continue;
         QProcess process;
         process.start(probe.first, probe.second);
-        if (!process.waitForFinished(500))
+        if (!process.waitForFinished(500)) {
+            // Still running: kill it and reap it, rather than leaving the destructor to guess.
+            process.kill();
+            process.waitForFinished(200);
             continue;
+        }
         const QString value = QString::fromUtf8(process.readAllStandardOutput()).trimmed();
         if (value.isEmpty())
             continue;
