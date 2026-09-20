@@ -17,8 +17,8 @@
 # pgrep/pkill once destroyed a scan's own workers and cost 1,629 readings.
 set -u
 
-MEDIA=; DURATION=3600; INTERVAL=30; OUT=; NOVIS=0; DISP=101
-while getopts "m:d:i:o:VD:h" opt; do
+MEDIA=; DURATION=3600; INTERVAL=30; OUT=; NOVIS=0; DISP=101; OWNDISPLAY=1
+while getopts "m:d:i:o:VD:Xh" opt; do
   case $opt in
     m) MEDIA=$OPTARG ;;
     d) DURATION=$OPTARG ;;
@@ -26,6 +26,7 @@ while getopts "m:d:i:o:VD:h" opt; do
     o) OUT=$OPTARG ;;
     V) NOVIS=1 ;;
     D) DISP=$OPTARG ;;
+    X) OWNDISPLAY=0 ;;   # use the display already running, rather than a private Xvfb
     h) sed -n '2,20p' "$0"; exit 0 ;;
     *) exit 2 ;;
   esac
@@ -61,14 +62,24 @@ mapfile -t FILES < <(find "$MEDIA" -type f \
 
 echo "soak: ${#FILES[@]} files, ${DURATION}s, sampling every ${INTERVAL}s, visuals $([ "$NOVIS" = 1 ] && echo off || echo on)"
 
-Xvfb ":$DISP" -screen 0 1280x800x24 >/dev/null 2>&1 &
-XVFB_PID=$!
-for _ in $(seq 1 40); do DISPLAY=":$DISP" xdpyinfo >/dev/null 2>&1 && break; sleep 0.5; done
-# A real window manager, because fullscreen and maximise are its job. Without one the geometry
-# calls silently do nothing, which looks exactly like a test that passed.
-DISPLAY=":$DISP" metacity >/dev/null 2>&1 &
-WM_PID=$!
-sleep 2
+# -X runs against the display that is already there. That is the only way to reach a real GPU:
+# a private Xvfb falls back to software rendering, so on a machine with hardware acceleration it
+# would measure the same thing this VM already measures and learn nothing.
+if [ "$OWNDISPLAY" = 1 ]; then
+  Xvfb ":$DISP" -screen 0 1280x800x24 >/dev/null 2>&1 &
+  XVFB_PID=$!
+  for _ in $(seq 1 40); do DISPLAY=":$DISP" xdpyinfo >/dev/null 2>&1 && break; sleep 0.5; done
+  # A real window manager, because fullscreen and maximise are its job. Without one the geometry
+  # calls silently do nothing, which looks exactly like a test that passed.
+  DISPLAY=":$DISP" metacity >/dev/null 2>&1 &
+  WM_PID=$!
+  sleep 2
+else
+  [ -n "${DISPLAY:-}" ] || { echo "-X needs DISPLAY set" >&2; exit 2; }
+  DISP=${DISPLAY#:}
+  XVFB_PID=0; WM_PID=0
+  echo "soak: using the existing display :$DISP"
+fi
 
 DISPLAY=":$DISP" XDG_DATA_HOME="$DATA" XDG_CONFIG_HOME="$CFG" \
   DBUS_SESSION_BUS_ADDRESS="unix:path=/nonexistent/reverie-soak-$DISP" \
@@ -125,7 +136,8 @@ while :; do
   fds=$(ls /proc/$APP_PID/fd 2>/dev/null | wc -l)
   maps=$(wc -l < /proc/$APP_PID/maps 2>/dev/null)
   ticks=$(awk '{print $14+$15}' /proc/$APP_PID/stat 2>/dev/null)
-  xrss=$(awk '/^VmRSS:/{print $2}' /proc/$XVFB_PID/status 2>/dev/null)
+  xrss=0
+  [ "$XVFB_PID" != 0 ] && xrss=$(awk '/^VmRSS:/{print $2}' /proc/$XVFB_PID/status 2>/dev/null)
   st=$(awk '{print $3}' /proc/$APP_PID/stat 2>/dev/null)
   load1=$(awk '{print $1}' /proc/loadavg 2>/dev/null)
   read -r _ u n sy id iow rest < /proc/stat
@@ -151,7 +163,8 @@ done
 
 echo "soak: stopping"
 kill "$APP_PID" 2>/dev/null; sleep 2; kill -9 "$APP_PID" 2>/dev/null
-kill "$WM_PID" 2>/dev/null; kill "$XVFB_PID" 2>/dev/null
+[ "$WM_PID" != 0 ] && kill "$WM_PID" 2>/dev/null
+[ "$XVFB_PID" != 0 ] && kill "$XVFB_PID" 2>/dev/null
 grep -icE 'warning|error|could not|failed' "$WORK/reverie.log" \
   | xargs -I{} echo "soak: {} warning/error line(s) in the app log"
 cp "$WORK/reverie.log" "${OUT%.tsv}.log" 2>/dev/null
