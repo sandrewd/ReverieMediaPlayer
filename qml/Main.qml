@@ -674,10 +674,28 @@ ApplicationWindow {
                     x: (parent.width - width) / 2
                     y: (parent.height - height) / 2
 
-                    onDriftingChanged: if (!drifting) {
-                        x = (parent.width - width) / 2
-                        y = (parent.height - height) / 2
+                    // Restores the *binding*, not just the value. The drift timer assigns to x
+                    // and y, and an assignment destroys a binding - so the mark was left holding
+                    // plain numbers and never moved again on its own. Re-centring with a second
+                    // assignment looked like a fix and was not: leaving fullscreen centres it
+                    // against the stage it is leaving, because the window has not been resized
+                    // yet, and then nothing re-centres it when the resize arrives. It ended up
+                    // low and to the right of a smaller stage, and could leave it entirely.
+                    //
+                    // With the binding back, every later geometry change re-centres it, which
+                    // covers the deferred resize without a timer to get the delay wrong. Same
+                    // trap the brief records for a render scale overwritten at startup and for
+                    // the preset library applied only on change.
+                    function centreMark() {
+                        x = Qt.binding(function () {
+                            return (idleMark.parent.width - idleMark.width) / 2
+                        })
+                        y = Qt.binding(function () {
+                            return (idleMark.parent.height - idleMark.height) / 2
+                        })
                     }
+
+                    onDriftingChanged: if (!drifting) centreMark()
 
                     Timer {
                         // 30fps is plenty for something moving this slowly, and on a software
@@ -689,12 +707,20 @@ ApplicationWindow {
                             const dt = interval / 1000
                             let nx = idleMark.x + idleMark.vx * dt
                             let ny = idleMark.y + idleMark.vy * dt
-                            const maxX = idleMark.parent.width - idleMark.width
-                            const maxY = idleMark.parent.height - idleMark.height
+                            // Math.max(0, ...) because a stage smaller than the mark gives a
+                            // negative bound, and then the reflection tests below would push it
+                            // out rather than hold it in.
+                            const maxX = Math.max(0, idleMark.parent.width - idleMark.width)
+                            const maxY = Math.max(0, idleMark.parent.height - idleMark.height)
                             if (nx <= 0) { nx = 0; idleMark.vx = Math.abs(idleMark.vx) }
                             else if (nx >= maxX) { nx = maxX; idleMark.vx = -Math.abs(idleMark.vx) }
                             if (ny <= 0) { ny = 0; idleMark.vy = Math.abs(idleMark.vy) }
                             else if (ny >= maxY) { ny = maxY; idleMark.vy = -Math.abs(idleMark.vy) }
+                            // A stage that shrank while drifting can leave the mark outside it
+                            // altogether; the reflections above only catch it as it arrives at an
+                            // edge, not when the edge arrives at it.
+                            nx = Math.min(Math.max(nx, 0), maxX)
+                            ny = Math.min(Math.max(ny, 0), maxY)
                             idleMark.x = nx
                             idleMark.y = ny
                         }
