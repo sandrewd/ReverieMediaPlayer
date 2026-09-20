@@ -209,8 +209,12 @@ while :; do
     # appears solely in the plain process table, so that is what gets parsed. The device total is
     # deliberately NOT used as a fallback: on a machine where anything else is using the GPU it
     # measures the other thing, and a number that silently means something else is worse than 0.
+    # The PID is field 5 of the process table - "| 0 N/A N/A <pid> G <name> <n>MiB |" - not field
+    # 2 or 3. Getting that wrong made the column read 0 for a whole two-hour run, which looked
+    # exactly like "no GPU memory used" and was really "the parse never matched". Checked against
+    # real nvidia-smi output rather than written from memory.
     vram=$(nvidia-smi 2>/dev/null | awk -v p="$APP_PID" '
-      $2==p || $3==p { for (i=1;i<=NF;i++) if ($i ~ /^[0-9]+MiB$/) { gsub("MiB","",$i); print $i+0; found=1; exit } }
+      /^\|/ && $5==p { for (i=NF;i>=1;i--) if ($i ~ /^[0-9]+MiB$/) { gsub("MiB","",$i); print $i+0; found=1; exit } }
       END { if (!found) print 0 }')
     gtt=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null | head -1)
   fi
