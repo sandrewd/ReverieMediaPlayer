@@ -205,9 +205,14 @@ while :; do
   # Per-process where the driver reports it, which is better than the device total: on a desktop
   # with a browser open the device figure moves for reasons that have nothing to do with us.
   if [ "$NVSMI" = 1 ]; then
-    vram=$(nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader,nounits 2>/dev/null \
-           | awk -F, -v p="$APP_PID" '$1+0==p{print $2+0; found=1} END{if(!found) print 0}')
-    [ "${vram:-0}" = 0 ] && vram=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null | head -1)
+    # --query-compute-apps only lists CUDA processes; an OpenGL or NVDEC process is type "G" and
+    # appears solely in the plain process table, so that is what gets parsed. The device total is
+    # deliberately NOT used as a fallback: on a machine where anything else is using the GPU it
+    # measures the other thing, and a number that silently means something else is worse than 0.
+    vram=$(nvidia-smi 2>/dev/null | awk -v p="$APP_PID" '
+      $2==p || $3==p { for (i=1;i<=NF;i++) if ($i ~ /^[0-9]+MiB$/) { gsub("MiB","",$i); print $i+0; found=1; exit } }
+      END { if (!found) print 0 }')
+    gtt=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null | head -1)
   fi
   [ -n "$GTT_FILE" ]  && gtt=$(( $(cat "$GTT_FILE" 2>/dev/null || echo 0) / 1048576 ))
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
