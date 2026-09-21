@@ -52,15 +52,15 @@
   <!-- Pinned to a tag rather than main, so the images cannot change under a published listing. -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.8.3/docs/screenshot.png</image>
+      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.9.3/docs/screenshot.png</image>
       <caption>Playing a track with the visualiser running</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.8.3/docs/screenshot-presets.png</image>
+      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.9.3/docs/screenshot-presets.png</image>
       <caption>Choosing a visualisation by category</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.8.3/docs/screenshot-equaliser.png</image>
+      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.9.3/docs/screenshot-equaliser.png</image>
       <caption>The ten-band equaliser</caption>
     </screenshot>
   </screenshots>
@@ -95,6 +95,41 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="0.9.3" date="2026-09-21">
+      <description>
+        <p>
+          Visualisations that render nothing are no longer shown. Every preset in the collection
+          was measured; those that draw an empty frame, and those that need an image Reverie does
+          not ship, are hidden and left out of the default selection. They can be shown again from
+          Options, where they are marked with the reason.
+        </p>
+        <p>
+          Fixes: a file descriptor leak that could exhaust the player within an hour on desktops
+          without xfconf-query, which includes Cinnamon and GNOME; theme-monitor processes left
+          behind on exit; the logo not returning to the centre after leaving fullscreen; and
+          dropping a folder onto the playlist doing nothing on file managers that do not append a
+          trailing slash.
+        </p>
+      </description>
+    </release>
+    <release version="0.9.2" date="2026-09-19">
+      <description>
+        <p>Visualisations became optional, with a first-run notice about flashing and a switch to
+        turn them off. The mini player's height and its behaviour when resized were corrected.</p>
+      </description>
+    </release>
+    <release version="0.9.1" date="2026-09-19">
+      <description>
+        <p>The visualiser now follows the audio continuously rather than sampling fragments of it,
+        and reports the frame rate it is actually running at.</p>
+      </description>
+    </release>
+    <release version="0.9.0" date="2026-09-19">
+      <description>
+        <p>A searchable browser for the visualisations, with favourites and a list of the last ten
+        seen, in a panel beside the stage.</p>
+      </description>
+    </release>
     <release version="0.8.3" date="2026-09-18">
       <description>
         <p>
