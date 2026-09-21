@@ -100,6 +100,12 @@ public slots:
     void addStream(const QString &url, const QString &name = QString());
     bool isCurrentStream() const;
     void addFolder(const QUrl &folder);
+
+    // What a drag-and-drop actually delivers. A dropped folder and a dropped file are the same
+    // kind of URL, and whether a directory carries a trailing slash is up to the file manager -
+    // Dolphin does not add one, which made folders fall into the file path, get filtered out by
+    // extension, and vanish without a word. Ask the filesystem rather than reading the string.
+    Q_INVOKABLE void addDropped(const QList<QUrl> &urls);
     void removeRowsAt(const QList<int> &rows);
     void moveRow(int from, int to);
     void clear();

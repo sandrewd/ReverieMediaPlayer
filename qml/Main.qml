@@ -2685,16 +2685,9 @@ ApplicationWindow {
         onDropped: function(drop) {
             if (!drop.hasUrls)
                 return
-            const files = []
-            for (const url of drop.urls) {
-                // A dropped folder and a dropped file look the same here; the model sorts it out.
-                if (url.toString().endsWith("/"))
-                    PlaylistModel.addFolder(url)
-                else
-                    files.push(url)
-            }
-            if (files.length > 0)
-                PlaylistModel.addFiles(files)
+            // The model sorts folders from files, which is what the comment here used to claim
+            // while the code guessed from a trailing slash that Dolphin never sends.
+            PlaylistModel.addDropped(drop.urls)
         }
     }
 

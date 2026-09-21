@@ -297,6 +297,22 @@ void PlaylistModel::addStream(const QString &url, const QString &name)
         saveSession();
 }
 
+void PlaylistModel::addDropped(const QList<QUrl> &urls)
+{
+    // One entry point, so the drop handler cannot drift from what the menu does. Folders are
+    // recursed, everything else is offered to the extension filter as before; a remote URL is
+    // never stat-ed, it just goes through as a file.
+    QList<QUrl> files;
+    for (const QUrl &url : urls) {
+        if (url.isLocalFile() && QFileInfo(url.toLocalFile()).isDir())
+            addFolder(url);
+        else
+            files.append(url);
+    }
+    if (!files.isEmpty())
+        addFiles(files);
+}
+
 void PlaylistModel::addFolder(const QUrl &folder)
 {
     const QString root = folder.isLocalFile() ? folder.toLocalFile() : folder.toString();
