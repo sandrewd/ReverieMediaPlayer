@@ -36,10 +36,22 @@ from pathlib import Path
 # noise was suppressing the signal, and the scanner reported clean on a file that leaked in both
 # encodings. It only surfaced because it was run against a deliberately poisoned artefact.
 _TAIL = r"(?:/[A-Za-z0-9._+~-]+)*"
+_LEAD = r"(?<![A-Za-z0-9._+~-])"
 PATTERNS = [
-    ("home directory", re.compile(r"/home/[A-Za-z0-9._-]+" + _TAIL)),
-    ("root home", re.compile(r"/root" + _TAIL)),
-    ("flatpak build root", re.compile(r"/run/build/[A-Za-z0-9._-]+" + _TAIL)),
+    ("home directory", re.compile(_LEAD + r"/home/[A-Za-z0-9._-]+" + _TAIL)),
+    # Two boundaries, both about SHAPE rather than about which file a hit came from.
+    #
+    # Leading: these are ABSOLUTE paths, so the opening "/" must not be preceded by a filename
+    # character. Without it, the relative path "Reaction/Liquid Ripples/root danglage ..." in the
+    # preset pack matched "/root" and failed CI on every single build - and a check that cries
+    # wolf on every run is a check somebody eventually turns off.
+    #
+    # Trailing: "/root" must be a whole component, not the start of "/rootkit".
+    #
+    # Deliberately NOT an allow-list of files: the brief records an exemption written to suppress
+    # noise that suppressed the signal instead, and passed a deliberately poisoned package.
+    ("root home", re.compile(_LEAD + r"/root(?![A-Za-z0-9._+~-])" + _TAIL)),
+    ("flatpak build root", re.compile(_LEAD + r"/run/build/[A-Za-z0-9._-]+" + _TAIL)),
 ]
 
 # Placeholders that are documentation rather than a real account. Deliberately a short, literal
@@ -107,8 +119,17 @@ def scan_deb(path, tmp):
     for member in out.glob("*.tar.*"):
         dest = out / (member.name.replace(".", "_"))
         dest.mkdir()
-        with tarfile.open(member) as tf:
-            tf.extractall(dest, filter="data")
+        try:
+            with tarfile.open(member) as tf:
+                tf.extractall(dest, filter="data")
+        except tarfile.ReadError as exc:
+            # Python's tarfile has no zstd, and dpkg-deb defaults to it on current Debian. An
+            # unreadable member used to come out as a traceback; the danger is that a future
+            # "handle it gracefully" turns it into a silent pass, so it is reported as a FAILURE
+            # with a non-zero exit. A member we could not read is not a member we know is clean.
+            print(f"  CANNOT READ {member.name} in {Path(path).name}: {exc}", file=sys.stderr)
+            print("  -> this artefact was NOT fully scanned", file=sys.stderr)
+            raise SystemExit(2)
         member.unlink()
     return scan_tree(out, Path(path).name)
 
