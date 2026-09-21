@@ -31,3 +31,6 @@ assets/test-video/
 preset-scan*.tsv
 scan.log
 nohup.out
+
+# Python bytecode from the tools, never part of the project
+__pycache__/
