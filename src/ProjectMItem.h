@@ -152,6 +152,9 @@ public slots:
     // Both called from the render thread via a queued connection, so they land on the GUI thread.
     void applyStats(qreal frameTimeMs, qreal fps, int width, int height);
     void applyPreset(const QString &name, const QString &file, int index, int count);
+    // projectM refuses a preset it cannot compile and simply keeps the previous one, so a
+    // click in the browser otherwise looks like it did nothing at all.
+    void reportPresetFailed(const QString &name);
     void applyAdaptiveScale(qreal scale);
 
 signals:
@@ -163,6 +166,7 @@ signals:
     void curatedListChanged();
     void blocklistChanged();
     void presetChanged();
+    void presetLoadFailed(const QString &name);
     void presetLockedChanged();
     void shuffleChanged();
     void presetDurationChanged();

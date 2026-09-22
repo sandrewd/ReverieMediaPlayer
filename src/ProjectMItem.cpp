@@ -16,8 +16,14 @@
 #include <QQuickWindow>
 #include <QtMath>
 #include <QDebug>
+#include <atomic>
 
 #include <projectM-4/projectM.h>
+
+// projectM reports a preset it cannot compile only through its log callback, and then quietly
+// keeps the previous one. Set and read on the render thread, immediately either side of the
+// command that could have caused it.
+static std::atomic_bool g_presetCompileFailed{false};
 #include <projectM-4/logging.h>
 #include <projectM-4/callbacks.h>
 #include <projectM-4/playlist.h>
@@ -93,6 +99,9 @@ public:
                     // it beyond installing a texture pack. That makes it diagnostic detail
                     // rather than a warning - the same call §9n made about the frame timer.
                     const bool missingTexture = strstr(message, "Failed to find requested texture");
+                    if (strstr(message, "Could not compile") || strstr(message, "Could not load")
+                        || strstr(message, "Could not parse"))
+                        g_presetCompileFailed.store(true);
                     if (level >= PROJECTM_LOG_LEVEL_WARN && !missingTexture)
                         qWarning("projectM: %s", message);
                     else
@@ -259,6 +268,12 @@ public:
 
         applySettings();
         runCommands();
+        if (g_presetCompileFailed.exchange(false) && m_item && !m_requestedPreset.isEmpty()) {
+            const QString failed = QFileInfo(m_requestedPreset).completeBaseName();
+            m_requestedPreset.clear();
+            QMetaObject::invokeMethod(m_item, "reportPresetFailed", Qt::QueuedConnection,
+                                      Q_ARG(QString, failed));
+        }
         publishPreset();
 
         if (!m_active) {
@@ -521,6 +536,12 @@ private:
                     ++added;
             }
             qInfo("preset library: %u presets from an explicit list", added);
+            // The browser addresses presets by row, so its list and this playlist have to stay the
+            // same length. A preset projectM declines to add shifts every index after it, which
+            // shows up as clicking one row and getting another.
+            if (added != uint32_t(m_explicitPaths.size()))
+                qWarning("preset library: %d paths offered, %u accepted - row indices will not line up",
+                         int(m_explicitPaths.size()), added);
         }
 
         // A curated list keeps the default experience to a few hundred presets. The full
@@ -598,8 +619,16 @@ private:
 
         if (m_pendingJumpIndex >= 0) {
             const uint32_t size = projectm_playlist_size(m_playlist);
-            if (size > 0 && uint32_t(m_pendingJumpIndex) < size)
+            if (size > 0 && uint32_t(m_pendingJumpIndex) < size) {
+                m_requestedPreset = m_pendingJumpIndex < m_explicitPaths.size()
+                                        ? m_explicitPaths.at(m_pendingJumpIndex)
+                                        : QString();
+                g_presetCompileFailed.store(false);
                 projectm_playlist_set_position(m_playlist, uint32_t(m_pendingJumpIndex), true);
+            }
+            else
+                qWarning("preset jump to %d ignored: the playlist holds %u",
+                         m_pendingJumpIndex, size);
             m_pendingJumpIndex = -1;
             m_presetDirty = true;
         }
@@ -772,6 +801,7 @@ private:
     bool m_showBroken = false;
     QStringList m_explicitPaths;
     int m_pendingJumpIndex = -1;
+    QString m_requestedPreset;
     bool m_active = true;
     bool m_selfDriven = false;
     bool m_idleCleared = false;
@@ -1162,6 +1192,12 @@ void ProjectMItem::applyAdaptiveScale(qreal scale)
     if (!m_adaptiveQuality)
         return;
     setRenderScale(scale);
+}
+
+void ProjectMItem::reportPresetFailed(const QString &name)
+{
+    qWarning("visualisation %s could not be loaded", qUtf8Printable(name));
+    emit presetLoadFailed(name);
 }
 
 void ProjectMItem::applyPreset(const QString &name, const QString &file, int index, int count)
