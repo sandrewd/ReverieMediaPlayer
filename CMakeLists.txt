@@ -162,10 +162,13 @@ if(EXISTS "${PLAYER_PRESET_SOURCE}" AND EXISTS "${PLAYER_CURATED_LIST}")
         # published curated archive - so the moment the list is regenerated without republishing
         # that archive, every entry added by the regeneration is simply absent. That is the same
         # structural drift the Flatpak manifest pin had, and it deserves the same visibility.
-        message(WARNING "Reverie: ${_missing} curated preset(s) are not in the corpus at "
-                        "${PLAYER_PRESET_SOURCE} - the package will ship ${_staged} instead of "
-                        "${_staged}+${_missing}. If this is a package build, the published "
-                        "curated archive is older than assets/presets-curated.txt.")
+        math(EXPR _wanted "${_staged} + ${_missing}")
+        message(WARNING "Reverie: this package will ship ${_staged} visualisations instead "
+                        "of ${_wanted}. ${_missing} named in assets/presets-curated.txt are "
+                        "not present in ${PLAYER_PRESET_SOURCE}. A package build stages from "
+                        "the published curated archive, so republish that archive and repin it "
+                        "in CI and the Flatpak manifest - otherwise the .deb and the Flatpak "
+                        "ship different visualisations.")
     endif()
     message(STATUS "Reverie: staged ${_staged} curated presets for install (${_missing} missing)")
     install(DIRECTORY "${PLAYER_PRESET_STAGE}/"
