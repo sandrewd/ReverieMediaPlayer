@@ -500,6 +500,9 @@ void AudioEngine::setSource(const QString &uriOrPath)
         emit tagsChanged();
     }
     m_streamStation.clear();
+    m_sawPlayableStream = false;
+    m_errorReported = false;
+    m_unplayableType.clear();
     m_bufferPercent = 100;
     m_sinceProgress.invalidate();
     if (m_hasVideo) {
@@ -960,6 +963,38 @@ void AudioEngine::setSubtitlesEnabled(bool on)
     setSubtitleTrack(wanted);
 }
 
+QString AudioEngine::describeError(const QString &raw) const
+{
+    const bool network = m_source.startsWith(QLatin1String("http://"))
+                         || m_source.startsWith(QLatin1String("https://"));
+    if (!network || m_sawPlayableStream)
+        return raw;
+
+    // Pasting a station's web page in place of its stream address is the common mistake, and the
+    // page typefinds as text rather than failing to download - so the wording has to name it.
+    if (m_unplayableType.contains(QLatin1String("text/html"))
+        || m_unplayableType.contains(QLatin1String("application/xhtml"))
+        || m_unplayableType.contains(QLatin1String("text/plain"))) {
+        return tr("That address is a web page, not a radio stream. Look for a \"listen\" or "
+                  "direct stream link on the station's own site and use that address instead.");
+    }
+
+    if (!m_unplayableType.isEmpty())
+        return tr("Nothing at that address can be played here (%1).").arg(m_unplayableType);
+
+    // GStreamer's wording for "the data arrived and nothing could be made of it" names nothing
+    // anyone can act on, so it is the one generic message worth replacing. A refused connection,
+    // a 404 or a DNS failure each report themselves properly and are left alone.
+    if (raw.contains(QLatin1String("Internal data stream error"))
+        || raw.contains(QLatin1String("does not contain enough data"))
+        || raw.contains(QLatin1String("doesn't contain enough data"))) {
+        return tr("Nothing could be played from that address. The station may be offline, or the "
+                  "address may be a web page rather than a direct stream link.");
+    }
+
+    return raw;
+}
+
 QString AudioEngine::sidecarSubtitleFor(const QString &uri) const
 {
     const QUrl url(uri);
@@ -1196,7 +1231,21 @@ void AudioEngine::pollBus()
             GError *error = nullptr;
             gchar *debug = nullptr;
             gst_message_parse_error(msg, &error, &debug);
-            emit errorOccurred(QString::fromUtf8(error ? error->message : "unknown error"));
+            // One failure posts several errors and the banner keeps only the last, so the
+            // first - the one nearest the cause - is the one worth keeping.
+            if (!m_errorReported) {
+                m_errorReported = true;
+                const QString raw = QString::fromUtf8(error ? error->message : "unknown error");
+                const QString shown = describeError(raw);
+                // The banner is transient and the user quotes it in a bug report; without this
+                // there is no way to match what they saw against what GStreamer actually said.
+                if (shown == raw)
+                    qWarning("playback error: %s", qUtf8Printable(raw));
+                else
+                    qWarning("playback error: %s  [gstreamer said: %s]",
+                             qUtf8Printable(shown), qUtf8Printable(raw));
+                emit errorOccurred(shown);
+            }
             if (error)
                 g_error_free(error);
             g_free(debug);
@@ -1228,18 +1277,43 @@ void AudioEngine::pollBus()
             gst_message_parse_stream_collection(msg, &collection);
             if (collection) {
                 bool video = false;
+                bool playable = false;
                 const guint count = gst_stream_collection_get_size(collection);
-                for (guint i = 0; i < count && !video; ++i) {
+                for (guint i = 0; i < count; ++i) {
                     GstStream *stream = gst_stream_collection_get_stream(collection, i);
-                    if (stream && (gst_stream_get_stream_type(stream) & GST_STREAM_TYPE_VIDEO))
+                    if (!stream)
+                        continue;
+                    const GstStreamType type = gst_stream_get_stream_type(stream);
+                    if (type & GST_STREAM_TYPE_VIDEO)
                         video = true;
+                    // Text counts for nothing here: a web page typefinds as a text stream, which
+                    // is exactly the case this flag exists to recognise.
+                    if (type & (GST_STREAM_TYPE_AUDIO | GST_STREAM_TYPE_VIDEO))
+                        playable = true;
                 }
+                if (playable)
+                    m_sawPlayableStream = true;
                 rebuildAudioTracks(collection);
                 rebuildSubtitleTracks(collection);
                 gst_object_unref(collection);
                 if (video != m_hasVideo) {
                     m_hasVideo = video;
                     emit hasVideoChanged();
+                }
+            }
+            break;
+        }
+        case GST_MESSAGE_ELEMENT: {
+            // decodebin3 announces what it could not handle as a missing-plugin message, whose
+            // "detail" field carries the caps. That is the only place the media type is named, and
+            // it is what separates "this is a web page" from "that codec is not installed".
+            const GstStructure *structure = gst_message_get_structure(msg);
+            if (structure && gst_structure_has_name(structure, "missing-plugin")) {
+                if (const GValue *detail = gst_structure_get_value(structure, "detail")) {
+                    if (gchar *text = gst_value_serialize(detail)) {
+                        m_unplayableType = QString::fromUtf8(text);
+                        g_free(text);
+                    }
                 }
             }
             break;

@@ -409,6 +409,17 @@ ApplicationWindow {
         }
     }
 
+    // projectM keeps the previous preset when it cannot compile the one asked for, so without
+    // this a click in the browser is indistinguishable from a click that missed.
+    Connections {
+        target: visualizer
+        function onPresetLoadFailed(name) {
+            errorBanner.text = qsTr("\u201C%1\u201D could not be loaded \u2014 that visualisation is faulty.").arg(name)
+            errorBanner.visible = true
+            errorTimer.restart()
+        }
+    }
+
     // --- main layout -------------------------------------------------------------------
 
     ColumnLayout {
@@ -2697,11 +2708,17 @@ ApplicationWindow {
         visible: false
         anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
         anchors.bottomMargin: 96
-        height: errorLabel.implicitHeight + 20
+        // contentHeight, not implicitHeight: a Text reports its implicit size for the unwrapped
+        // string, so the banner stayed one line tall whatever it held and a longer message ran off
+        // both edges. Same trap as the preset tooltip - measure after wrapping, not before.
+        height: errorLabel.contentHeight + 20
         color: "#aa3b2a"
         Label {
             id: errorLabel
             anchors.centerIn: parent
+            width: Math.min(implicitWidth, parent.width - 32)
+            wrapMode: Text.WordWrap
+            horizontalAlignment: Text.AlignHCenter
             color: "white"
             font.pixelSize: 12
         }

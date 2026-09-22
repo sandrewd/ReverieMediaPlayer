@@ -281,6 +281,7 @@ private:
     void rebuildSubtitleTracks(GstStreamCollection *collection);
     void applySubtitleSelection();
     QString sidecarSubtitleFor(const QString &uri) const;
+    QString describeError(const QString &raw) const;
     std::unique_ptr<AudioRingBuffer> m_ring;
     QTimer m_busTimer;
     QTimer m_positionTimer;
@@ -300,6 +301,15 @@ private:
     QString m_source;
     QString m_streamTitle;
     QString m_streamStation;
+
+    // A network source that yields no audio is almost always a web page pasted in place of a
+    // stream URL. GStreamer's own wording for it - "Internal data stream error" - names nothing
+    // anyone can act on, so these carry enough context to say something better. Only the first
+    // error per source is reported: GStreamer posts several and the least useful arrived last,
+    // overwriting the banner set by the most useful.
+    bool m_sawPlayableStream = false;
+    bool m_errorReported = false;
+    QString m_unplayableType;
     bool m_buffering = false;
     int m_bufferPercent = 100;
     QElapsedTimer m_sinceProgress;
