@@ -18,8 +18,8 @@ env:
   # The curated 480 presets, as published alongside a release. The full corpus is 157 MB across
   # 9,795 files and cloning it per run would dominate the job; this is the same archive the
   # Flatpak manifest consumes, pinned to the same digest, so the two cannot drift.
-  PRESETS_URL: https://github.com/sandrewd/ReverieMediaPlayer/releases/download/presets-v2/reverie-presets-curated.tar.xz
-  PRESETS_SHA: c1ec76a09947fb5c9cce8d4897c62628fdd8913194cf449548d9158b85e7f9cb
+  PRESETS_URL: https://github.com/sandrewd/ReverieMediaPlayer/releases/download/presets-v3/reverie-presets-curated.tar.xz
+  PRESETS_SHA: e6e92bb786732adfe7c34cd9dc2befbf27c70047b8dcdddde6118a6eaaae97cc
 
 jobs:
   deb:

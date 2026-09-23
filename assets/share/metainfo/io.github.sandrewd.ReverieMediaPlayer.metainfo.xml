@@ -52,15 +52,15 @@
   <!-- Pinned to a tag rather than main, so the images cannot change under a published listing. -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.9.3/docs/screenshot.png</image>
+      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.9.4/docs/screenshot.png</image>
       <caption>Playing a track with the visualiser running</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.9.3/docs/screenshot-presets.png</image>
+      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.9.4/docs/screenshot-presets.png</image>
       <caption>Choosing a visualisation by category</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.9.3/docs/screenshot-equaliser.png</image>
+      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.9.4/docs/screenshot-equaliser.png</image>
       <caption>The ten-band equaliser</caption>
     </screenshot>
   </screenshots>
@@ -95,6 +95,20 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="0.9.4" date="2026-09-23">
+      <description>
+        <p>
+          A link that is a web page rather than a radio stream now says so, instead of reporting an
+          internal decoder error that named nothing anyone could act on.
+        </p>
+        <p>
+          Visualisations that projectM cannot compile are hidden along with the ones already known to
+          render nothing. These could not be found by the earlier measurement: a visualisation that
+          fails to compile leaves the previous one on screen, so it was recorded as healthy. Choosing
+          one that still fails now says so rather than appearing to do nothing.
+        </p>
+      </description>
+    </release>
     <release version="0.9.3" date="2026-09-21">
       <description>
         <p>

@@ -84,7 +84,7 @@ modules:
     sources:
       - type: git
         url: https://github.com/sandrewd/ReverieMediaPlayer.git
-        tag: v0.9.3
+        tag: v0.9.4
         # Pinned alongside the tag: a tag can be moved, a commit cannot.
         commit: 5667b51b94d04bbf87bf5e1148d69db7fd71c22c
       # The curated default, extracted where the build expects the corpus, and pinned by digest.
@@ -96,6 +96,6 @@ modules:
       # median, which is what the style actually looks like. The full 9,795 are an in-app
       # download; see the presets-v1 release.
       - type: archive
-        url: https://github.com/sandrewd/ReverieMediaPlayer/releases/download/presets-v2/reverie-presets-curated.tar.xz
-        sha256: c1ec76a09947fb5c9cce8d4897c62628fdd8913194cf449548d9158b85e7f9cb
+        url: https://github.com/sandrewd/ReverieMediaPlayer/releases/download/presets-v3/reverie-presets-curated.tar.xz
+        sha256: e6e92bb786732adfe7c34cd9dc2befbf27c70047b8dcdddde6118a6eaaae97cc
         dest: assets/presets
