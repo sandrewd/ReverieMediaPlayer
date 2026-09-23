@@ -20,12 +20,14 @@ try to organise your music collection.
 - **Transport** — play, pause, stop, next, previous, seek, volume, shuffle, repeat that cycles
   off / playlist / one track, and a subtitles toggle
 - **Visualisations** — projectM (Milkdrop) presets, embedded or fullscreen, driven by the decoded
-  audio. The packages carry a curated **352**, chosen so that nothing in the default install is
-  missing anything — two from each of 178 of the pack's 183 visual styles — and the full
+  audio. The packages carry a curated **348**, chosen so that nothing in the default install is
+  missing anything — two from each of 176 of the pack's 183 visual styles — and the full
   collection of **9,795** is an optional 2.7 MB download.
-- **Visualisations that render nothing are hidden.** Every preset in the pack was rendered and
-  measured; 274 of the 9,795 draw an empty frame. They are left out of the curated set and kept out
-  of the browser and the rotation, because a black stage reads as the application having failed
+- **Visualisations that render nothing are hidden.** Every preset in the pack was measured twice —
+  once by rendering it, once by asking projectM whether it will load at all. **341 of the 9,795**
+  show nothing: 302 whatever you do, and 39 more until an image they name is supplied. They are left
+  out of the curated set and kept out of the browser and the rotation, because a black stage reads
+  as the application having failed
   rather than as one preset being at fault. *Options ▸ Visualisation ▸ Show broken visualisations*
   puts them back if you want to look. When shown they are marked: a red X for the ones no image
   will fix, an amber ! for the ones an image would, and a blue dot on any visualisation that is
@@ -98,10 +100,11 @@ flatpak install --user ./reverie.flatpak
 
 ## Building
 
-Requires Qt 6.4+, GStreamer 1.20+, TagLib, CMake 3.22+, and a C++17 compiler. Reverie also builds
-against much newer Qt — the Flatpak uses 6.11.
+Requires Qt 6.4+, GStreamer 1.20+, TagLib, CMake 3.22+, and a C++17 compiler. Reverie is built and
+run against Qt **6.4, 6.8 and 6.11** — the Debian package links the distribution's 6.4, the Flatpak
+carries 6.11 in its runtime.
 
-On Debian/Ubuntu (24.04 or newer):
+On Ubuntu 24.04 or newer, or Debian 12 or newer:
 
 ```sh
 sudo apt install build-essential cmake git \
@@ -150,11 +153,11 @@ each preset asks for, so Reverie lists the directory and resolves it exactly. Pu
 on everything else clear as soon as what they wanted is there.
 
 Nothing breaks without them. projectM substitutes a 1×1 placeholder and the preset still renders,
-missing whatever that image contributed. Every curated preset that asks for a texture was
-rendered and measured: almost all looked normal, and exactly **one** turned out to depend on its
-texture completely — blank without it, full frame with it. That one is no longer in the curated
-set, nor are three others that render nothing whatever you give them. So what a missing texture
-costs you is fidelity in part of the library, not the library itself.
+missing whatever that image contributed. Almost every curated preset that asked for one looked
+normal when measured; a handful did not, and one turned out to depend on its texture completely —
+blank without it, full frame with it. Rather than judge them case by case, the curated set now
+simply excludes everything that names an image at all, so a stock install arrives with no marks on
+it. What a missing texture costs you is fidelity in part of the library, not the library itself.
 
 What you would gain is not worth what it costs. A texture is decoded by `stb_image`, which is not
 hardened against hostile input, and projectM's API accepts only a *search path* — there is no way
@@ -187,9 +190,10 @@ selection, along with `presets-textures.txt` — so the default install ships no
 nothing, and nothing that is missing an image.
 
 That is strict on purpose and it costs coverage. Four styles have only one preset left and
-contribute one; five have none at all and are not represented: `Drawing/Glimmer Mirror`,
-`Drawing/Viscera`, `Fractal/Wings`, `Geometric/Monster` and `Hypnotic/Illusion`. Every preset in
-those either draws nothing or wants an image. They are all still there in the full download.
+contribute one; **seven** have none at all and are not represented: `Drawing/Glimmer Mirror`,
+`Drawing/Viscera`, `Fractal/Wings`, `Geometric/Monster`, `Geometric/Symbols`, `Hypnotic/Illusion`
+and `Sparkle/Glimmer Mirror`. Every preset in those either draws nothing, will not compile, or
+wants an image. They are all still there in the full download.
 
 Point `--presets` at any directory to use a different set.
 
