@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(player VERSION 0.9.4 LANGUAGES CXX)
+project(player VERSION 0.9.4.1 LANGUAGES CXX)
 
 # Shown in About. Real since 2026-09-16; it was deliberately an obvious placeholder until the
 # project had a remote, because a plausible-looking URL that goes nowhere is worse than one that
@@ -181,6 +181,13 @@ endif()
 # The blocklist of visualisations measured to render nothing, installed with both libraries. The
 # curated set is generated so as not to contain any of them, but the optional full pack is the
 # whole corpus and carries every one, so this has to be present either way.
+# Reverie's own visualisation. It is not part of the upstream corpus, so it installs directly
+# rather than being staged through presets-curated.txt, and it lands in the same tree so the
+# browser indexes it as an ordinary preset under its own category.
+install(DIRECTORY "${CMAKE_SOURCE_DIR}/assets/presets-reverie/"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/reverie/presets"
+        FILES_MATCHING PATTERN "*.milk")
+
 set(PLAYER_BLOCKLIST "${CMAKE_SOURCE_DIR}/assets/presets-blocklist.txt")
 set(PLAYER_BLOCKLIST_TEX "${CMAKE_SOURCE_DIR}/assets/presets-blocklist-textures.txt")
 if(EXISTS "${PLAYER_BLOCKLIST}")

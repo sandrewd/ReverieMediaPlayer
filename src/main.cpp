@@ -247,7 +247,7 @@ int main(int argc, char *argv[])
     const auto findResource = [](const QString &relative) -> QString {
         const QString shared = QStandardPaths::locate(
             QStandardPaths::GenericDataLocation, QStringLiteral("reverie/") + relative,
-            relative.endsWith(QStringLiteral(".txt")) ? QStandardPaths::LocateFile
+            relative.contains(QLatin1Char('.')) ? QStandardPaths::LocateFile
                                                       : QStandardPaths::LocateDirectory);
         if (!shared.isEmpty())
             return shared;
@@ -312,7 +312,14 @@ int main(int argc, char *argv[])
     // does not exist costs nothing.
     engine.addImportPath(QStringLiteral("qrc:/"));
     engine.addImportPath(QStringLiteral("qrc:/qt/qml"));
-    engine.rootContext()->setContextProperty("initialPreset", parser.value(presetOption));
+    // Reverie opens on its own visualisation. It is an ordinary preset in the library, so the
+    // rotation carries on from it normally; this only decides what is on screen first. A file given
+    // with --preset still wins, and if the signature is missing we fall through to the rotation
+    // rather than insisting on it.
+    QString startupPreset = parser.value(presetOption);
+    if (startupPreset.isEmpty())
+        startupPreset = findResource(QStringLiteral("presets/Reverie/Reverie - signature.milk"));
+    engine.rootContext()->setContextProperty("initialPreset", startupPreset);
     engine.rootContext()->setContextProperty("initialScale", parser.value(scaleOption).toDouble());
     // Milkdrop presets can name an external texture file. Nothing we ship carries them - not the
     // preset pack, not projectM - so this is usually empty, and then projectM is told nothing and
