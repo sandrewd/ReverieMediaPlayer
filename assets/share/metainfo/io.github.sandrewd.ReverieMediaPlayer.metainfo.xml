@@ -52,15 +52,15 @@
   <!-- Pinned to a tag rather than main, so the images cannot change under a published listing. -->
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.9.4/docs/screenshot.png</image>
+      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.9.4.1/docs/screenshot.png</image>
       <caption>Playing a track with the visualiser running</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.9.4/docs/screenshot-presets.png</image>
+      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.9.4.1/docs/screenshot-presets.png</image>
       <caption>Choosing a visualisation by category</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.9.4/docs/screenshot-equaliser.png</image>
+      <image>https://raw.githubusercontent.com/sandrewd/ReverieMediaPlayer/v0.9.4.1/docs/screenshot-equaliser.png</image>
       <caption>The ten-band equaliser</caption>
     </screenshot>
   </screenshots>
@@ -95,6 +95,16 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="0.9.4.1" date="2026-10-11">
+      <description>
+        <p>
+          Reverie now opens on a visualisation of its own: the figure from its logo, drawn as the
+          oscilloscope trace it has always represented and pushed out of shape by whatever is
+          playing. It joins the collection like any other visualisation, so the rotation carries on
+          from it normally.
+        </p>
+      </description>
+    </release>
     <release version="0.9.4" date="2026-09-23">
       <description>
         <p>
